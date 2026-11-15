@@ -45,8 +45,11 @@ struct PillView: View {
                 Image(systemName: icon(for: result.delivery)).foregroundStyle(Crystal.ok)
                     .symbolEffect(.bounce, value: result.text)
                 Text(headline(for: result)).font(.callout.weight(.semibold)).lineLimit(1)
-                Text("\(result.words) words · \(Format.ms(Double(result.latencyMs)))")
-                    .font(.callout).foregroundStyle(Crystal.ink2).lineLimit(1)
+                // A copy-only message tells the user what to do; it gets the room.
+                if case .copied = result.delivery {} else {
+                    Text("\(result.words) words · \(Format.ms(Double(result.latencyMs)))")
+                        .font(.callout).foregroundStyle(Crystal.ink2).lineLimit(1)
+                }
             }
         case .failed(let message):
             HStack(spacing: 9) {
