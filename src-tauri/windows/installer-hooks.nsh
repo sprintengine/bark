@@ -27,14 +27,23 @@ Var OldNameHadDesktopShortcut
     StrCpy $R0 $R0 -1
   ${EndIf}
   ${If} $R0 != ""
-  ${AndIf} $R0 != $INSTDIR
+  ${AndIf} $R0 == $INSTDIR
+    ; Installing over the old copy's folder replaces its files; drop its
+    ; uninstall entry, which would otherwise run the new uninstaller.
+    DeleteRegKey SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\Fairspoken"
+  ${ElseIf} $R0 != ""
   ${AndIf} ${FileExists} "$R0\uninstall.exe"
     ${If} ${FileExists} "$DESKTOP\Fairspoken.lnk"
       StrCpy $OldNameHadDesktopShortcut 1
     ${EndIf}
     DetailPrint "Removing the copy installed under the old name, Fairspoken, from $R0"
     ; _?= runs the uninstaller in place and waits for it.
+    StrCpy $R2 -1
+    ClearErrors
     ExecWait '"$R0\uninstall.exe" /S _?=$R0' $R2
+    ${If} ${Errors}
+      StrCpy $R2 -1
+    ${EndIf}
     ${If} $R2 = 0
       StrCpy $OldNameMigrated 1
       ; In place, the uninstaller cannot delete itself or its folder.
@@ -48,6 +57,7 @@ Var OldNameHadDesktopShortcut
 
 !macro NSIS_HOOK_POSTINSTALL
   ${If} $OldNameMigrated = 1
+  ${AndIf} $NoShortcutMode <> 1
     ${IfNot} ${FileExists} "$SMPROGRAMS\${PRODUCTNAME}.lnk"
       CreateShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
       !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\${PRODUCTNAME}.lnk"
