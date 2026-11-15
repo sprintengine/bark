@@ -251,10 +251,10 @@ final class DictationController {
             retried.set()
             Task { @MainActor [weak self] in self?.show(progress) }
         }
-        let deliver: @Sendable (TranscriptionOutput) async -> Void = { [weak self] output in
+        let deliver: @Sendable (TranscriptionOutput) async -> Bool = { [weak self] output in
             await self?.complete(output, item: item, target: target, samples: samples, settings: s,
                                  durationSeconds: stats.durationSeconds, released: released,
-                                 retried: retried.isSet)
+                                 retried: retried.isSet) ?? false
         }
         let live: @Sendable () async throws -> TranscriptionOutput = { [weak self] in
             do {
@@ -286,17 +286,14 @@ final class DictationController {
     }
 
     /// The transcript is in: post-process, deliver, record in history (and for post-training),
-    /// show the result.
+    /// show the result. False when post-processing left no words, so nothing was delivered.
     private func complete(_ output: TranscriptionOutput, item: PendingDictation, target: NSRunningApplication?, samples: [Float],
-                          settings s: AppSettings, durationSeconds: Double, released: ContinuousClock.Instant, retried: Bool) async {
+                          settings s: AppSettings, durationSeconds: Double, released: ContinuousClock.Instant, retried: Bool) async -> Bool {
         let transcribed = ContinuousClock.now
         transcribingNote = nil
         let text = await postProcessor.process(
             output.text, context: PostProcessContext(appBundleID: item.appBundleId, vocabulary: s.vocabularyHints))
-        guard !text.isEmpty else {
-            fail("No speech detected")
-            return
-        }
+        guard !text.isEmpty else { return false }
         let delivery = await deliver(text, settings: s, target: target, retried: retried)
         let total = Int((ContinuousClock.now - released) / .milliseconds(1))
         let transcribeMs = Int((transcribed - released) / .milliseconds(1))
@@ -321,6 +318,7 @@ final class DictationController {
         } else {
             scheduleReset(after: .milliseconds(1600))
         }
+        return true
     }
 
     private func show(_ progress: DictationRecovery.Progress) {

@@ -111,7 +111,7 @@ struct DictationRecoveryTests {
         let delivered = Delivered()
         let outcome = await recovery.run("dictation-1", live: {
             throw RemoteTranscriptionError.http(status: 500, message: RemoteProtocol.errorMessage(statusCode: 500, body: Data(Self.shortTail.utf8)))
-        }, routes: client(transport), policy: .live(timeoutSeconds: 60), deliver: { delivered.add($0) })
+        }, routes: client(transport), policy: .live(timeoutSeconds: 60), deliver: { delivered.add($0); return true })
 
         guard case .delivered(let output) = outcome else { Issue.record("expected delivery, got \(outcome)"); return }
         #expect(output.text == "Patient reports chest tightness.")
@@ -133,7 +133,7 @@ struct DictationRecoveryTests {
         let outcome = await recovery.run("dictation-1", live: {
             streamed.withLock { $0 = samples.count / 2 }
             throw RemoteTranscriptionError.unreachable("The network connection was lost.")
-        }, routes: client(transport), policy: .live(timeoutSeconds: 60), deliver: { _ in })
+        }, routes: client(transport), policy: .live(timeoutSeconds: 60), deliver: { _ in true })
 
         #expect(outcome == .delivered(TranscriptionOutput(text: "Patient reports chest tightness.", modelMs: 0, model: "parakeet-tdt-0.6b-v3",
                                                           backend: "parakeet", placement: .remoteHost)).withAnyTiming(outcome))
@@ -155,6 +155,7 @@ struct DictationRecoveryTests {
         let outcome = await recovery.run("dictation-1", live: { throw RemoteTranscriptionError.timedOut(60) },
                                          routes: client(transport), policy: .live(timeoutSeconds: 60), deliver: { _ in
             Issue.record("nothing should be delivered")
+            return true
         })
         guard case .kept(let kept) = outcome else { Issue.record("expected the dictation to be kept, got \(outcome)"); return }
         #expect(kept.state == .failed)
@@ -176,7 +177,7 @@ struct DictationRecoveryTests {
         let back = ScriptedTransport([.json(200, Self.ok)], audio: relaunched.audioURL("dictation-1"))
         let delivered = Delivered()
         let later = await DictationRecovery(store: relaunched, sleep: { _ in })
-            .run("dictation-1", live: nil, routes: client(back), policy: .later(timeoutSeconds: 60), deliver: { delivered.add($0) })
+            .run("dictation-1", live: nil, routes: client(back), policy: .later(timeoutSeconds: 60), deliver: { delivered.add($0); return true })
         guard case .delivered = later else { Issue.record("expected delivery, got \(later)"); return }
         #expect(back.audioOnDiskAtEachRequest == [true])
         #expect(delivered.all.count == 1)
@@ -195,7 +196,7 @@ struct DictationRecoveryTests {
         let progress = Mutex<[DictationRecovery.Progress]>([])
         let outcome = await recovery.run("dictation-1", live: { throw RemoteTranscriptionError.unreachable("Could not connect to the server.") },
                                          routes: routes, policy: .live(timeoutSeconds: 60),
-                                         progress: { p in progress.withLock { $0.append(p) } }, deliver: { _ in })
+                                         progress: { p in progress.withLock { $0.append(p) } }, deliver: { _ in true })
         guard case .delivered(let output) = outcome else { Issue.record("expected delivery, got \(outcome)"); return }
         #expect(output.placement == .neuralEngine)
         #expect(heard.withLock { $0 } == samples.count)
@@ -210,7 +211,7 @@ struct DictationRecoveryTests {
         routes.local = { _ in TranscriptionOutput(text: "Here.", modelMs: 1, model: "m", placement: .neuralEngine) }
         let outcome = await recovery.run("dictation-1", live: {
             throw RemoteTranscriptionError.http(status: 401, message: "Remote transcription host returned an error: 401 Unauthorized")
-        }, routes: routes, policy: .live(timeoutSeconds: 60), deliver: { _ in })
+        }, routes: routes, policy: .live(timeoutSeconds: 60), deliver: { _ in true })
         #expect(transport.requests.isEmpty)
         guard case .delivered(let output) = outcome else { Issue.record("expected delivery, got \(outcome)"); return }
         #expect(output.text == "Here.")
@@ -220,7 +221,7 @@ struct DictationRecoveryTests {
         _ = try record()
         let transport = ScriptedTransport([.json(200, Self.ok)])
         let outcome = await recovery.run("dictation-1", live: { throw RemoteTranscriptionError.noSpeech },
-                                         routes: client(transport), policy: .live(timeoutSeconds: 60), deliver: { _ in })
+                                         routes: client(transport), policy: .live(timeoutSeconds: 60), deliver: { _ in true })
         #expect(outcome == .noSpeech)
         #expect(transport.requests.isEmpty)
         #expect(store.all().isEmpty)
@@ -230,12 +231,30 @@ struct DictationRecoveryTests {
         _ = try record()
         let transport = ScriptedTransport([.json(200, Self.silent)])
         let outcome = await recovery.run("dictation-1", live: nil, routes: client(transport), policy: .later(timeoutSeconds: 60),
-                                         deliver: { _ in Issue.record("nothing to deliver") })
+                                         deliver: { _ in Issue.record("nothing to deliver"); return true })
         #expect(outcome == .noSpeech)
         // Kept because something failed, so an empty answer later isn't trusted with the audio.
         #expect(trash.received == ["dictation-1.wav"])
         #expect(FileManager.default.fileExists(atPath: trash.folder.appendingPathComponent("dictation-1.wav").path))
         #expect(store.all().isEmpty)
+    }
+
+    @Test func noSpeechAfterAFailedAttemptGoesToTheTrashNotAway() async throws {
+        _ = try record()
+        let transport = ScriptedTransport([.json(200, Self.silent)])
+        let outcome = await recovery.run("dictation-1", live: { throw RemoteTranscriptionError.timedOut(60) },
+                                         routes: client(transport), policy: .live(timeoutSeconds: 60), deliver: { _ in true })
+        #expect(outcome == .noSpeech)
+        #expect(trash.received == ["dictation-1.wav"])
+    }
+
+    @Test func aTranscriptThatPostProcessingEmptiesIsNotTakenAsDelivered() async throws {
+        _ = try record()
+        let transport = ScriptedTransport([.json(200, Self.ok)])
+        let outcome = await recovery.run("dictation-1", live: nil, routes: client(transport), policy: .later(timeoutSeconds: 60),
+                                         deliver: { _ in false })
+        #expect(outcome == .noSpeech)
+        #expect(trash.received == ["dictation-1.wav"])
     }
 
     @Test func aKeptDictationStaysWhenTheTrashCantTakeIt() async throws {
@@ -246,7 +265,7 @@ struct DictationRecoveryTests {
             Issue.record("a silent answer is not a failure to fall back from")
             return TranscriptionOutput(text: "x", modelMs: 0, model: "m", placement: .neuralEngine)
         }
-        let outcome = await recovery.run("dictation-1", live: nil, routes: routes, policy: .later(timeoutSeconds: 60), deliver: { _ in })
+        let outcome = await recovery.run("dictation-1", live: nil, routes: routes, policy: .later(timeoutSeconds: 60), deliver: { _ in true })
         guard case .kept(let kept) = outcome else { Issue.record("expected the dictation to be kept, got \(outcome)"); return }
         #expect(kept.lastError == "No speech was heard, and the recording couldn't be moved to the Trash")
         #expect(FileManager.default.fileExists(atPath: store.audioURL("dictation-1").path))
@@ -301,7 +320,7 @@ struct DictationRecoveryTests {
         _ = try record()
         var routes = client(ScriptedTransport([.json(500, Self.shortTail)]))
         routes.local = { _ in throw NSError(domain: "engine", code: 2, userInfo: [NSLocalizedDescriptionKey: "The speech model is still loading"]) }
-        let outcome = await recovery.run("dictation-1", live: nil, routes: routes, policy: .later(timeoutSeconds: 60), deliver: { _ in })
+        let outcome = await recovery.run("dictation-1", live: nil, routes: routes, policy: .later(timeoutSeconds: 60), deliver: { _ in true })
         guard case .kept(let kept) = outcome else { Issue.record("expected the dictation to be kept, got \(outcome)"); return }
         #expect(kept.attempts == 2)
         #expect(kept.lastError == "Remote transcription host returned an error (500 Internal Server Error): "

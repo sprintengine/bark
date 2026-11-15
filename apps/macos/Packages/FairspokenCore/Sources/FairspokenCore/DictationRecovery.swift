@@ -77,7 +77,7 @@ public enum DictationOutcome: Sendable, Equatable {
 
 /// Gets a kept recording transcribed without ever losing it: the live attempt (the stream that
 /// ran while the user spoke), then re-sends of the whole recording from disk, then the
-/// on-device engine. The audio is deleted only after `deliver` has the transcript; if
+/// on-device engine. The audio is deleted only after `deliver` took the transcript; if
 /// everything fails it stays on disk as a failed dictation.
 public struct DictationRecovery: Sendable {
     public enum Progress: Sendable, Equatable {
@@ -94,13 +94,15 @@ public struct DictationRecovery: Sendable {
         self.sleep = sleep
     }
 
-    /// `live` is the attempt already under way, nil when retrying a kept dictation.
+    /// `live` is the attempt already under way, nil when retrying a kept dictation. `deliver`
+    /// returns false when it delivered nothing (post-processing left no words), which counts as
+    /// no speech.
     public func run(_ id: String,
                     live: (@Sendable () async throws -> TranscriptionOutput)?,
                     routes: TranscriptionRoutes,
                     policy: DictationRetryPolicy,
                     progress: @Sendable (Progress) -> Void = { _ in },
-                    deliver: @Sendable (TranscriptionOutput) async -> Void) async -> DictationOutcome {
+                    deliver: @Sendable (TranscriptionOutput) async -> Bool) async -> DictationOutcome {
         store.update(id) { $0.state = .transcribing }
         var failures = 0
         var hostFailure: String?
@@ -109,11 +111,12 @@ public struct DictationRecovery: Sendable {
         /// No speech was heard, but the audio couldn't go to the Trash, so it is kept.
         var silentButKept = false
 
-        /// A kept dictation was saved because something failed, so an empty answer later is not
-        /// proof it held nothing: it goes to the Trash, where the user can still find it. If the
-        /// Trash can't be used it stays kept.
+        /// No speech from the first attempt deletes the audio, as for a silent recording. Once an
+        /// attempt has failed (or for a kept dictation) an empty answer is no proof the recording
+        /// held nothing: it goes to the Trash, where the user can still find it. If the Trash
+        /// can't be used it stays kept.
         func noSpeech() -> DictationOutcome? {
-            if live != nil {
+            if live != nil && failures == 0 {
                 store.remove(id)
                 return .noSpeech
             }
@@ -131,7 +134,11 @@ public struct DictationRecovery: Sendable {
                 silentButKept = true
                 return nil
             }
-            await deliver(output)
+            guard await deliver(output) else {
+                if let outcome = noSpeech() { return outcome }
+                silentButKept = true
+                return nil
+            }
             store.remove(id)
             return .delivered(output)
         }

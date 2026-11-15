@@ -157,7 +157,7 @@ final class PendingDictations {
             reload()
         }
         let outcome = await recovery.run(id, live: nil, routes: routes, policy: .later(timeoutSeconds: s.remoteTimeoutSeconds)) { [weak self] output in
-            await self?.deliver(output, for: item, copy: manual)
+            await self?.deliver(output, for: item, copy: manual) ?? false
         }
         switch outcome {
         case .delivered(let output):
@@ -169,10 +169,11 @@ final class PendingDictations {
         }
     }
 
-    private func deliver(_ output: TranscriptionOutput, for item: PendingDictation, copy: Bool) async {
+    /// False when post-processing left no words, so nothing was delivered.
+    private func deliver(_ output: TranscriptionOutput, for item: PendingDictation, copy: Bool) async -> Bool {
         let s = settings.settings
         let text = await BasicPostProcessor().process(output.text, context: PostProcessContext(appBundleID: item.appBundleId, vocabulary: s.vocabularyHints))
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else { return false }
         if copy { TextInserter.copy(text) }
         keepForTraining(item.id, samples: nil, rawText: output.text, finalText: text, model: output.model, appBundleID: item.appBundleId)
         history.add(TranscriptHistoryItem(
@@ -181,6 +182,7 @@ final class PendingDictations {
             timings: DictationTimings(transcribeMs: output.modelMs, speechModelMs: output.modelMs, totalMs: 0),
             model: output.model, appName: item.appName, appBundleId: item.appBundleId))
         onRecovered?(WordCounter.count(text), copy, output.placement)
+        return true
     }
 
     // MARK: Export and delete
