@@ -2,8 +2,6 @@
 
 October 2026. Brand, website prototype and macOS 26 Liquid Glass mockups for **Fairspoken**: Irish, open-source, local-first push-to-talk dictation.
 
-![Brand board](board/brand-board.png)
-
 | | |
 |---|---|
 | **Mark** | "The Settle": a spoken wave settles into one straight line and stops at a red caret |
@@ -227,7 +225,6 @@ Screenshots aren't committed. Capture them locally with `_tools/shoot.mjs --them
 ```
 design/brand/
 ├── README.md                 this brand book
-├── board/brand-board.png     one-page summary (3840 × 2400); brand-board.html + assets/ source
 ├── research/                 README.md + 2× captures of 15 sites
 ├── logo/                     lockups, marks, wordmark, favicon, app-icon layers + previews, exploration/
 ├── site/                     index.html, site.css, site.js, hero-gl.js, fonts/ (OFL)
