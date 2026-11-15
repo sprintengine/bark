@@ -31,11 +31,13 @@ final class LearnedLibrary {
         self.settings = settings
         self.persists = persists
         url = directory.appendingPathComponent("learned.json")
-        // Until this app has its own, the Tauri app's (as settings are imported once): its
-        // learned entries came over with its settings, and what was dismissed or deleted there
-        // must stay that way.
+        // Until this app has its own, the Tauri app's, when its learned entries came over with an
+        // imported settings file: what was dismissed or deleted there must stay that way.
+        let imported = !settings.settings.learnedVocabularyHints.isEmpty
+            || settings.settings.transcriptCorrections.contains { $0.origin == .learned }
         let tauri = AppInfo.tauriDirectory.appendingPathComponent("learned.json")
-        store = persists ? LearnedStore.load((try? Data(contentsOf: url)) ?? (try? Data(contentsOf: tauri))) : Self.demo()
+        let data = (try? Data(contentsOf: url)) ?? (imported ? try? Data(contentsOf: tauri) : nil)
+        store = persists ? LearnedStore.load(data) : Self.demo()
         suggestions = store.suggestions
         // Off the main thread, well before the first fix needs it.
         DispatchQueue.global(qos: .utility).async { _ = Self.drugs }
