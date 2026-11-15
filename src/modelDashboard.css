@@ -119,7 +119,7 @@
 .model-table { padding: 4px; overflow: hidden; }
 .model-table-head, .model-row {
   display: grid; align-items: center; column-gap: 8px;
-  grid-template-columns: 24px minmax(200px, 1fr) 76px 76px 84px 58px 78px 104px;
+  grid-template-columns: 24px minmax(200px, 1fr) 76px 80px 80px 58px 78px 104px;
 }
 .model-table-head { padding: 6px 10px 8px; border-bottom: 1px solid var(--crystal-hairline); color: var(--crystal-ink-2); font-size: var(--sem-font-size-micro); font-weight: 600; }
 .model-row { min-height: 52px; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: background-color var(--crystal-motion-fast) var(--crystal-ease); }
@@ -156,10 +156,11 @@
 .model-kind-glyph svg { width: 11px; height: 11px; }
 .model-kind--speech .model-kind-glyph { background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 60%), var(--crystal-tile-models); }
 .model-kind--polish .model-kind-glyph { background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 60%), #8b5cf6; }
-.model-est { margin-left: 3px; color: var(--crystal-ink-3); font-weight: 500; }
+.model-rating { display: inline-flex; align-items: center; gap: 5px; }
+.model-est { color: var(--crystal-ink-3); font-size: 10px; font-weight: 500; }
 /* All local: the Runs on column says nothing, so it goes. */
 .model-table.is-all-local .model-table-head > :nth-child(7), .model-table.is-all-local .model-row > :nth-child(7) { display: none; }
-.model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 24px minmax(200px, 1fr) 76px 76px 84px 58px 104px; }
+.model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 24px minmax(200px, 1fr) 76px 80px 80px 58px 104px; }
 .model-steps { display: inline-flex; gap: 2px; }
 .model-steps i { width: 9px; height: 6px; border-radius: 2px; background: var(--crystal-track); }
 .model-steps i.on { background: var(--crystal-accent); }
@@ -208,6 +209,7 @@
   .model-kind { font-size: 0; gap: 0; }
   .model-steps i { width: 8px; }
   .model-est { display: none; }
+  .model-steps:has(+ .model-est) i.on { opacity: 0.6; }
 }
 @media (max-width: 800px) {
   .model-table-head, .model-row, .model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 24px minmax(150px, 1fr) 26px 52px 52px 92px; }

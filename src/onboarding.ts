@@ -3,7 +3,7 @@ import "./onboarding.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { accelTokens, keyGlyph, keyWord } from "./shortcuts";
-import { SPEECH_MODELS, formatBytes, speechInfo } from "./modelCatalog";
+import { SPEECH_MODELS, formatBytes, isMeasured, speechInfo } from "./modelCatalog";
 
 // First-run setup in its own window: welcome, permissions, a microphone
 // check, a speech model, a first dictation, the training-data choice, done.
@@ -323,10 +323,11 @@ async function loadDevices(select: HTMLSelectElement): Promise<void> {
 // Model: three good starting points; the rest live in Models.
 const STARTER_MODELS = ["parakeet-tdt-0.6b-v3", "parakeet-tdt-0.6b-v2", "base"];
 
-function ratingBar(label: string, value: number): HTMLElement {
-  return h("span", { class: "ob-rating", "aria-label": `${label} ${value} of 5` }, [
+function ratingBar(label: string, value: number, measured: boolean): HTMLElement {
+  return h("span", { class: "ob-rating", "aria-label": `${label} ${value} of 5${measured ? "" : ", estimated"}` }, [
     h("span", { class: "ob-rating-label", "aria-hidden": "true" }, [label]),
     h("span", { class: "ob-rating-steps", "aria-hidden": "true" }, Array.from({ length: 5 }, (_, i) => h("i", { class: i < value ? "on" : "" }))),
+    measured ? null : h("span", { class: "ob-rating-est", "aria-hidden": "true" }, ["est."]),
   ]);
 }
 
@@ -358,7 +359,7 @@ function renderModel(): void {
       h("span", { class: "ob-card-text" }, [
         h("strong", {}, [info.name, info.recommended ? h("span", { class: "ob-badge ob-badge--accent" }, ["Recommended"]) : null, info.language === "en" ? h("span", { class: "ob-badge" }, ["EN"]) : null]),
         h("span", {}, [info.language === "en" ? info.summary : `${info.summary} · ${info.languages}`]),
-        h("span", { class: "ob-ratings" }, [ratingBar("Speed", info.speed), ratingBar("Accuracy", info.accuracy)]),
+        h("span", { class: "ob-ratings" }, [ratingBar("Speed", info.speed, isMeasured(info)), ratingBar("Accuracy", info.accuracy, isMeasured(info))]),
       ]),
       h("span", { class: "ob-card-end" }, [end]),
     ]);
@@ -380,7 +381,7 @@ function renderModel(): void {
     list,
     h("p", { class: `ob-note${failed ? " ob-note--warn" : ""}`, role: failed ? "alert" : false }, [failed
       ? `The download didn't finish: ${download.error}`
-      : "Downloads carry on in the background while you finish setting up. Ratings are estimates."]),
+      : "Downloads carry on in the background while you finish setting up."]),
   );
   const state = modelState(chosenModel);
   setFooter({

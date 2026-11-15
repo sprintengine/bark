@@ -3,7 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
 import "./modelDashboard.css";
 import { createPublisherIcon } from "./publisherIcons";
-import { POLISH_RATINGS, filterAndSort, formatBytes, measuredSpeed, speechInfo, type LibraryFilter, type LibraryRow, type ModelKind, type SortKey } from "./modelCatalog";
+import { POLISH_RATINGS, filterAndSort, formatBytes, isMeasured, measuredSpeed, speechInfo, type LibraryFilter, type LibraryRow, type ModelKind, type SortKey } from "./modelCatalog";
 
 // The Models screen: one library table of every speech and polish model, with
 // favourites, filters, sort and Hugging Face search. A row opens to show its
@@ -77,6 +77,10 @@ type Row = LibraryRow & {
   languages: string;
   recommended: boolean;
   isNew: boolean;
+  /** Ratings from benchmark figures (wer, rtfx) rather than an estimate. */
+  measured: boolean;
+  wer?: number;
+  rtfx?: number;
   source?: string;
   polish?: Model;
 };
@@ -89,6 +93,7 @@ function speechRows(): Row[] {
       publisher: info.publisher, languages: info.languages, language: info.language, bytes: info.bytes, speed: info.speed, accuracy: info.accuracy, rank: info.rank,
       installed: m.cached, inUse: settings.transcriptionLocation === "local" && settings.model === m.model, favorite: favorites.has(m.model),
       location: "local" as const, recommended: !!info.recommended, isNew: !!info.isNew,
+      measured: isMeasured(info), wer: info.wer, rtfx: info.rtfx,
       searchText: [info.name, info.publisher, m.model, info.languages, "speech dictation"].join(" "),
     };
   });
@@ -102,7 +107,7 @@ function polishRows(): Row[] {
       id: m.id, kind: "polish" as ModelKind, name: m.name, summary, detail: m.description, publisher: m.publisher, languages: rating.languages,
       language: rating.language, bytes: m.bytes, speed: rating.speed, accuracy: rating.accuracy, rank: rating.rank,
       installed: m.installed, inUse: settings.polishEnabled && settings.polishProvider === "local" && m.selected && m.installed, favorite: favorites.has(m.id),
-      location: "local" as const, recommended: !!rating.recommended, isNew: !!rating.isNew, source: m.source, polish: m,
+      location: "local" as const, recommended: !!rating.recommended, isNew: !!rating.isNew, measured: false, source: m.source, polish: m,
       searchText: [m.name, m.publisher, m.id, m.description, "polish cleanup"].join(" "),
     };
   });
@@ -114,7 +119,7 @@ function remoteRows(): Row[] {
   const rows: Row[] = [];
   const remote = (id: string, kind: ModelKind, name: string, summary: string, location: "host" | "cloud"): Row => ({
     id, kind, name, summary, detail: summary, publisher: location === "cloud" ? "Fairspoken" : "Host", languages: "", language: "multi",
-    bytes: 0, speed: 0, accuracy: 0, rank: -1, installed: true, inUse: true, favorite: favorites.has(id), location, recommended: false, isNew: false,
+    bytes: 0, speed: 0, accuracy: 0, rank: -1, installed: true, inUse: true, favorite: favorites.has(id), location, recommended: false, isNew: false, measured: false,
     searchText: `${name} ${summary}`,
   });
   if (settings.transcriptionLocation === "remote-host") rows.push(remote("remote-host", "speech", "Your host", "Dictation runs on your transcription host", "host"));
@@ -123,13 +128,17 @@ function remoteRows(): Row[] {
   return rows;
 }
 
-function steps(label: string, value: number, title = ""): HTMLElement {
+// Five steps; an estimate says so beside them, a measurement in its tooltip.
+function steps(label: string, value: number, measured: boolean, title: string): HTMLElement {
+  const wrap = el("span", "model-rating");
   const node = el("span", "model-steps");
   node.setAttribute("role", "img");
-  node.setAttribute("aria-label", value ? `${label}: ${value} of 5` : `${label}: not rated`);
-  if (title) node.title = title;
+  node.setAttribute("aria-label", value ? `${label}: ${value} of 5${measured ? "" : ", estimated"}` : `${label}: not rated`);
+  node.title = title;
   for (let i = 1; i <= 5; i += 1) node.append(el("i", i <= value ? "on" : ""));
-  return node;
+  wrap.append(node);
+  if (value && !measured) { const est = el("span", "model-est", "est."); est.setAttribute("aria-hidden", "true"); est.title = "Estimated"; wrap.append(est); }
+  return wrap;
 }
 
 function badge(text: string, tone = ""): HTMLElement { return el("span", `model-badge${tone ? ` model-badge--${tone}` : ""}`, text); }
@@ -184,7 +193,9 @@ function details(row: Row): HTMLElement {
   fact("Publisher", row.publisher);
   if (row.languages) fact("Languages", row.languages);
   if (row.bytes) fact(row.kind === "speech" ? "Download, about" : "Download", formatBytes(row.bytes));
-  if (row.kind === "speech" && row.inUse && measured) fact("Measured here", `${measured.toFixed(0)}× real time`);
+  if (row.wer !== undefined) fact("Word error rate", `${row.wer}%`);
+  if (row.rtfx !== undefined) fact("Speed on an M4 Mac", `${row.rtfx}× real time`);
+  if (row.kind === "speech" && row.inUse && measured) fact("Speed on this computer", `${measured.toFixed(0)}× real time`);
   if (row.polish?.downloads != null) fact("Hugging Face downloads", row.polish.downloads.toLocaleString());
   body.append(facts);
   if (row.location === "local") {
@@ -232,14 +243,19 @@ function rowElement(row: Row): HTMLElement[] {
   kind.append(glyph, row.kind === "speech" ? "Speech" : "Polish");
   kind.title = row.kind === "speech" ? "Speech to text" : "Cleans up the text";
 
-  const measuredTitle = row.kind === "speech" && row.inUse && measured ? `Measured on this computer: ${measured.toFixed(0)}× real time` : "";
+  const bench = "on 20 LibriSpeech clips, measured on an M4 Mac";
+  const speedTitle = [
+    row.rtfx !== undefined ? `${row.rtfx}× real time ${bench}` : "Estimated",
+    row.kind === "speech" && row.inUse && measured ? `${measured.toFixed(0)}× real time on this computer` : "",
+  ].filter(Boolean).join(" · ");
+  const accuracyTitle = row.wer !== undefined ? `${row.wer}% word error rate ${bench}` : "Estimated";
   const where = row.location === "local" ? "This device" : row.location === "host" ? "Your host" : "Cloud";
   node.append(
     cell(star),
     cell(open),
     cell(kind),
-    cell(row.speed ? steps("Speed", row.speed, measuredTitle) : el("span", "model-muted", "—")),
-    cell(row.accuracy ? steps("Accuracy", row.accuracy) : el("span", "model-muted", "—")),
+    cell(row.speed ? steps("Speed", row.speed, row.rtfx !== undefined, speedTitle) : el("span", "model-muted", "—")),
+    cell(row.accuracy ? steps("Accuracy", row.accuracy, row.wer !== undefined, accuracyTitle) : el("span", "model-muted", "—")),
     Object.assign(cell(row.bytes ? formatBytes(row.bytes) : "—"), { className: "model-cell col-size num" }),
     Object.assign(cell(where), { className: `model-cell model-where model-where--${row.location}` }),
     Object.assign(cell(action(row)), { className: "model-cell model-action-cell" }),

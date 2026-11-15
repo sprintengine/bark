@@ -156,6 +156,7 @@ body {
 .ob-rating-steps { display: inline-flex; gap: 2px; }
 .ob-rating-steps i { width: 12px; height: 5px; border-radius: 2px; background: var(--crystal-track); }
 .ob-rating-steps i.on { background: var(--crystal-accent); }
+.ob-rating-est { color: var(--crystal-ink-3); font-size: 10px; }
 .ob-size { color: var(--crystal-ink-2); font-size: var(--sem-font-size-meta); font-variant-numeric: tabular-nums; }
 .ob-progress-ring {
   --p: 0; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
