@@ -87,6 +87,8 @@ struct LocalSpeechRouterTests {
         async let first: Void = router.load(Self.whisper) { _ in }
         try await Task.sleep(for: .milliseconds(20))
         async let second: Void = router.load(Self.ultra) { _ in }
+        // Started after `second`, so it is the newest request (async lets start in no set order).
+        try await Task.sleep(for: .milliseconds(10))
         async let third: Void = router.load(Self.parakeet) { _ in }
         _ = try? await first
         _ = try? await second
@@ -94,6 +96,27 @@ struct LocalSpeechRouterTests {
         #expect(await router.loadedModelID == Self.parakeet)
         #expect(residency.current == [Self.parakeet])
         #expect(residency.peak == 1)
+    }
+
+    /// A superseded load that still finishes is never handed to a transcription (live text keeps
+    /// asking while the switch runs).
+    @Test func aSupersededModelIsNeverUsedForTranscription() async throws {
+        let residency = Residency()
+        let router = LocalSpeechRouter(parakeet: FakeEngine(residency: residency, delay: .milliseconds(100)),
+                                       whisper: FakeEngine(residency: residency, delay: .milliseconds(150), ignoresCancellation: true))
+        let first = Task { try await router.load(Self.whisper) { _ in } }
+        try await Task.sleep(for: .milliseconds(20))
+        let second = Task { try await router.load(Self.parakeet) { _ in } }
+        var used: Set<String> = []
+        let end = ContinuousClock.now + .milliseconds(400)
+        while ContinuousClock.now < end {
+            if let out = try? await router.transcribe([0], options: .init()) { used.insert(out.model) }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        _ = try? await first.value
+        try await second.value
+        #expect(!used.contains(Self.whisper))
+        #expect(try await router.transcribe([0], options: .init()).model == Self.parakeet)
     }
 
     /// Never two models in memory, across engines or within one.
