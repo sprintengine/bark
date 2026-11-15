@@ -67,6 +67,8 @@ struct SetupGuideTests {
         #expect(check(seconds: SetupGuide.silenceSeconds) == .silent)
         #expect(check(seconds: 9, peak: 0.5) == .hearing)
         #expect(check(running: false) == .idle)
+        // A test that stopped itself after silence keeps saying so.
+        #expect(check(running: false, seconds: SetupGuide.silenceSeconds) == .silent)
         // Once heard, stopping the test keeps the result.
         #expect(check(running: false, peak: 0.5) == .hearing)
     }
@@ -86,10 +88,46 @@ struct SetupGuideTests {
         #expect(!SetupGuide.isReady(downloading))
         #expect(downloading[1].state == .pending("Downloading, 46%"))
         #expect(downloading.last?.kind == .micHeard)
+        #expect(downloading.last?.state == .pending("Nothing heard"))
 
         let failed = SetupGuide.checklist(microphone: .granted, accessibility: true, model: .failed("Disk full"), micHeard: nil)
         #expect(failed[1].state == .problem("Disk full"))
         #expect(SetupGuide.isReady(SetupGuide.checklist(microphone: .granted, accessibility: false, model: .remote, micHeard: false)))
+    }
+
+    @Test func modelProgressFollowsTheChosenModel() {
+        func progress(chosen: String = "b", active: String = "a", engine: SetupGuide.EngineStatus = .ready,
+                      item: SetupGuide.ItemStatus = .available, error: String? = nil, remote: Bool = false) -> SetupGuide.ModelProgress {
+            SetupGuide.modelProgress(remote: remote, chosenID: chosen, activeID: active, activeName: "Model A",
+                                     engine: engine, chosenItem: item, downloadError: error)
+        }
+        #expect(progress(remote: true) == .remote)
+        // Model A works and B's download fails: dictation still works.
+        let fallback = progress(error: "No connection")
+        #expect(fallback == .fallback(failed: "No connection", using: "Model A"))
+        #expect(fallback.canContinue && fallback.engineUsable)
+        #expect(SetupGuide.isReady(SetupGuide.checklist(microphone: .granted, accessibility: false, model: fallback, micHeard: nil)))
+        // Nothing works: a real failure.
+        #expect(progress(engine: .failed("Out of memory"), error: "No connection") == .failed("No connection"))
+        #expect(progress(chosen: "a", engine: .idle, error: "No connection") == .failed("No connection"))
+        #expect(progress(item: .downloading(0.4)) == .preparing(fraction: 0.4))
+        #expect(progress(item: .preparing) == .preparing(fraction: nil))
+        #expect(progress() == .notStarted)
+        #expect(progress(chosen: "a", engine: .downloading(0.2)) == .preparing(fraction: 0.2))
+        #expect(progress(chosen: "a", engine: .failed("Bad file")) == .failed("Bad file"))
+        #expect(progress(chosen: "a", item: .installed) == .ready)
+        #expect(progress(chosen: "a", engine: .busy, item: .installed) == .preparing(fraction: nil))
+        // Installed, waiting to load after the dictation in progress.
+        #expect(progress(item: .installed) == .preparing(fraction: nil))
+    }
+
+    @Test func onlyTheLatestCaptureOwnerMayStopIt() {
+        var ownership = CaptureOwnership()
+        let test = ownership.begin()
+        #expect(ownership.owns(test))
+        let dictation = ownership.begin()
+        #expect(!ownership.owns(test))
+        #expect(ownership.owns(dictation))
     }
 
     // MARK: Key hints

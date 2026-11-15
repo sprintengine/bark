@@ -78,11 +78,12 @@ final class AppModel {
         // Carry an imported Tauri shortcut over once (KeyboardShortcuts owns it afterwards).
         if settings.importedFromTauri { HotkeyController.adoptAccelerator(settings.settings.recordingShortcut) }
 
-        // A dictation takes the microphone from the setup guide's test.
-        hotkeys.onPress = { [weak self] in self?.micTest.stop(); self?.dictation.hotkeyPressed() }
+        // Every recording takes the microphone from the setup guide's test.
+        dictation.onWillStart = { [weak self] in self?.micTest.stop() }
+        hotkeys.onPress = { [weak self] in self?.dictation.hotkeyPressed() }
         hotkeys.onRelease = { [weak self] in self?.dictation.hotkeyReleased() }
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
-        hotkeys.onFnPress = { [weak self] in self?.micTest.stop(); self?.dictation.fnPressed() }
+        hotkeys.onFnPress = { [weak self] in self?.dictation.fnPressed() }
         hotkeys.onFnRelease = { [weak self] in self?.dictation.fnReleased() }
     }
 
@@ -182,25 +183,23 @@ final class AppModel {
     /// Where the chosen speech model is, as the setup guide and Home show it: its tracked library
     /// download (progress, failure), then loading on the engine.
     var modelProgress: SetupGuide.ModelProgress {
-        if settings.settings.transcriptionLocation == .remoteHost { return .remote }
-        let id = SpeechModelCatalog.resolve(settings.settings.model).id
-        if let error = models.downloadErrors[id] { return .failed(error) }
-        switch models.state(of: id) {
-        case .downloading(let f): return .preparing(fraction: f)
-        case .unpacking, .compiling: return .preparing(fraction: nil)
-        case .available:
-            if models.activeModelID == id, case .downloading(let f) = models.engineState { return .preparing(fraction: f) }
-            if models.activeModelID == id, models.engineState.isBusy { return .preparing(fraction: nil) }
-            if models.activeModelID == id, case .failed(let message) = models.engineState { return .failed(message) }
-            return .notStarted
-        case .installed:
-            guard models.activeModelID == id else { return .preparing(fraction: nil) }
-            switch models.engineState {
-            case .ready: return .ready
-            case .failed(let message): return .failed(message)
-            default: return .preparing(fraction: nil)
-            }
+        let chosen = SpeechModelCatalog.resolve(settings.settings.model).id
+        let engine: SetupGuide.EngineStatus = switch models.engineState {
+        case .idle: .idle
+        case .downloading(let f): .downloading(f)
+        case .unpacking, .compiling, .loading, .warming: .busy
+        case .ready: .ready
+        case .failed(let message): .failed(message)
         }
+        let item: SetupGuide.ItemStatus = switch models.state(of: chosen) {
+        case .available: .available
+        case .downloading(let f): .downloading(f)
+        case .unpacking, .compiling: .preparing
+        case .installed: .installed
+        }
+        return SetupGuide.modelProgress(remote: settings.settings.transcriptionLocation == .remoteHost, chosenID: chosen,
+                                        activeID: models.activeModelID, activeName: models.activeModel.shortName,
+                                        engine: engine, chosenItem: item, downloadError: models.downloadErrors[chosen])
     }
 
     static func permission(_ status: Permissions.Status) -> SetupGuide.Permission {

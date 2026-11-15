@@ -55,6 +55,9 @@ final class DictationController {
 
     @ObservationIgnored var onPhaseChange: ((Phase) -> Void)?
     @ObservationIgnored var onNeedsOnboarding: (() -> Void)?
+    /// Called as any recording starts (shortcut, fn, the menu bar, a button), before it takes the
+    /// microphone: the setup guide's test steps aside.
+    @ObservationIgnored var onWillStart: (() -> Void)?
     @ObservationIgnored let capture = AudioCapture()
     @ObservationIgnored private var session: (any TranscriptionSession)?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
@@ -113,6 +116,7 @@ final class DictationController {
 
     func start(_ trigger: Trigger) {
         guard !phase.isActive else { return }
+        onWillStart?()
         permissions.refresh()
         switch permissions.microphone {
         case .granted: break

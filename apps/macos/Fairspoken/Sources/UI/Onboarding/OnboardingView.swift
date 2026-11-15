@@ -301,6 +301,8 @@ private struct MicrophoneStep: View {
     @Binding var heard: Bool?
     @Environment(AppModel.self) private var model
     @State private var names: [String] = []
+    /// Read once: the step redraws ten times a second while it listens.
+    @State private var defaultName: String?
 
     var body: some View {
         let test = model.micTest
@@ -316,7 +318,7 @@ private struct MicrophoneStep: View {
                             model.settings.update { $0.audioDevice = v }
                             restart()
                         })) {
-                            Text("System default\(Microphones.defaultName().map { " (\($0))" } ?? "")").tag("")
+                            Text("System default\(defaultName.map { " (\($0))" } ?? "")").tag("")
                             ForEach(names, id: \.self) { Text($0).tag($0) }
                         }
                         .labelsHidden()
@@ -335,6 +337,7 @@ private struct MicrophoneStep: View {
         }
         .onAppear {
             names = Microphones.names()
+            defaultName = Microphones.defaultName()
             if !AppInfo.isDemo, model.permissions.microphone.isGranted, !model.dictation.phase.isActive { restart() }
         }
         .onDisappear { model.micTest.stop() }
@@ -550,6 +553,24 @@ private struct ModelProgressLine: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Crystal.error.opacity(0.08), in: .rect(cornerRadius: 10, style: .continuous))
+        case .fallback(let message, let using):
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Crystal.warn)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(info.shortName) didn't download. Dictation keeps using \(using).")
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
+                    Text(message).font(TypeScale.meta).foregroundStyle(Crystal.ink2).textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Button("Retry") {
+                    model.models.clearDownloadError(info.id)
+                    model.useModel(info.id)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Crystal.warn.opacity(0.08), in: .rect(cornerRadius: 10, style: .continuous))
         case .notStarted, .remote:
             EmptyView()
         }
@@ -886,8 +907,12 @@ private struct ChecklistRow: View {
         case .done:
             switch item.kind {
             case .microphone: "Heard only while you dictate"
-            case .model: model.modelProgress == .remote ? "Transcribing on your network device"
-                : "\(SpeechModelCatalog.resolve(model.settings.settings.model).shortName) on this Mac"
+            case .model:
+                switch model.modelProgress {
+                case .remote: "Transcribing on your network device"
+                case .fallback(_, let using): "\(using) on this Mac, until the model you chose downloads"
+                default: "\(SpeechModelCatalog.resolve(model.settings.settings.model).shortName) on this Mac"
+                }
             case .accessibility: "Your words go where you type"
             case .micHeard: "We heard you"
             }

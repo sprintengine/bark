@@ -37,6 +37,8 @@ final class MicTest {
     @ObservationIgnored private let capture: AudioCapture
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var showcased = false
+    /// This test's hold on the shared capture; a dictation that starts afterwards takes it over.
+    @ObservationIgnored private var captureToken: Int?
 
     init(capture: AudioCapture) { self.capture = capture }
 
@@ -53,7 +55,7 @@ final class MicTest {
         error = nil
         peak = 0
         do {
-            try capture.start(deviceName: deviceName, maxSeconds: 60, sink: nil)
+            captureToken = try capture.start(deviceName: deviceName, maxSeconds: 60, sink: nil)
         } catch {
             self.error = error.localizedDescription
             return
@@ -69,7 +71,8 @@ final class MicTest {
     func stop() {
         timer?.invalidate()
         timer = nil
-        if running && !showcased { capture.stop() }
+        if running && !showcased, let captureToken { capture.stop(owner: captureToken) }
+        captureToken = nil
         running = false
         showcased = false
     }

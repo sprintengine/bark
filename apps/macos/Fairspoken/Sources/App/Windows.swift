@@ -37,9 +37,14 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         present(dashboard!)
     }
 
-    /// Opens the setup guide at its first step, every time (a guide reopened half-way through
-    /// would start from stale state).
-    func showOnboarding() {
+    /// Opens the setup guide at its first step (a guide reopened half-way through would start from
+    /// stale state). `reset: false` (a dictation found the microphone off) only brings an open guide
+    /// forward, so someone on the Permissions step stays there.
+    func showOnboarding(reset: Bool = true) {
+        if !reset, let window = onboarding {
+            present(window)
+            return
+        }
         let view = OnboardingView { [weak self] in
             self?.onboarding?.close()
             self?.showDashboard(.home)

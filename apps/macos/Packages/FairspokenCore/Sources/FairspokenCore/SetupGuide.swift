@@ -48,11 +48,14 @@ public enum SetupGuide {
         case preparing(fraction: Double?)
         case ready
         case failed(String)
+        /// The chosen model failed to download, but dictation still works with the model already
+        /// loaded (`using`, its short name).
+        case fallback(failed: String, using: String)
         /// Transcribing on a network device: no local model is needed.
         case remote
 
         /// The model step may move on: the download carries on in the background. A failure keeps
-        /// the person on the step with Retry and "Skip for now".
+        /// the person on the step with Retry and "Skip for now", unless another model still works.
         public var canContinue: Bool {
             if case .failed = self { return false }
             return true
@@ -85,6 +88,57 @@ public enum SetupGuide {
             list.append(model)
         }
         return list
+    }
+
+    /// The speech engine, as `modelProgress` needs it.
+    public enum EngineStatus: Equatable, Sendable {
+        case idle
+        case downloading(Double)
+        /// Unpacking, compiling, loading or warming.
+        case busy
+        case ready
+        case failed(String)
+    }
+
+    /// The chosen model in the library.
+    public enum ItemStatus: Equatable, Sendable {
+        case available
+        case downloading(Double)
+        /// Unpacking or compiling.
+        case preparing
+        case installed
+    }
+
+    /// Where the chosen model (`chosenID`) is: its tracked download, then loading on the engine.
+    /// The engine holds `activeID` (`activeName` is its short name); a chosen model that failed
+    /// while another one works is `.fallback`, not a dead end.
+    public static func modelProgress(remote: Bool, chosenID: String, activeID: String, activeName: String,
+                                     engine: EngineStatus, chosenItem: ItemStatus, downloadError: String?) -> ModelProgress {
+        if remote { return .remote }
+        let chosenIsActive = chosenID == activeID
+        if let downloadError {
+            return !chosenIsActive && engine == .ready ? .fallback(failed: downloadError, using: activeName) : .failed(downloadError)
+        }
+        switch chosenItem {
+        case .downloading(let f): return .preparing(fraction: f)
+        case .preparing: return .preparing(fraction: nil)
+        case .available:
+            guard chosenIsActive else { return .notStarted }
+            switch engine {
+            case .downloading(let f): return .preparing(fraction: f)
+            case .busy: return .preparing(fraction: nil)
+            case .failed(let message): return .failed(message)
+            case .idle, .ready: return .notStarted
+            }
+        case .installed:
+            // Installed but not loaded yet (it loads between dictations).
+            guard chosenIsActive else { return .preparing(fraction: nil) }
+            switch engine {
+            case .ready: return .ready
+            case .failed(let message): return .failed(message)
+            default: return .preparing(fraction: nil)
+            }
+        }
     }
 
     // MARK: Microphone check
@@ -125,7 +179,11 @@ public enum SetupGuide {
         }
         if deviceCount == 0 { return .noDevice }
         if let error { return .failed(error) }
-        guard running else { return peakLevel >= speechLevel ? .hearing : .idle }
+        guard running else {
+            // A finished test keeps what it found.
+            if peakLevel >= speechLevel { return .hearing }
+            return listenedSeconds >= silenceSeconds ? .silent : .idle
+        }
         if peakLevel >= speechLevel { return .hearing }
         return listenedSeconds >= silenceSeconds ? .silent : .listening
     }
@@ -157,7 +215,7 @@ public enum SetupGuide {
         }(), required: true))
         items.append(.init(kind: .model, state: {
             switch model {
-            case .ready, .remote: .done
+            case .ready, .remote, .fallback: .done
             case .preparing(let f): .pending(f.map { "Downloading, \(Int(($0 * 100).rounded()))%" } ?? "Getting ready")
             case .failed(let message): .problem(message)
             case .notStarted: .pending("Not downloaded")
@@ -166,7 +224,7 @@ public enum SetupGuide {
         items.append(.init(kind: .accessibility, state: accessibility ? .done : .pending("Dictations are copied for you to paste"),
                            required: false))
         if let micHeard {
-            items.append(.init(kind: .micHeard, state: micHeard ? .done : .pending("Not tested"), required: false))
+            items.append(.init(kind: .micHeard, state: micHeard ? .done : .pending("Nothing heard"), required: false))
         }
         return items
     }
@@ -213,6 +271,22 @@ public enum SetupGuide {
         default: key
         }
     }
+}
+
+/// Who owns a shared microphone capture: each start takes a new token, and only the holder of
+/// the latest token may stop it. A test that was overtaken by a dictation then never stops the
+/// dictation's recording.
+public struct CaptureOwnership: Sendable {
+    public private(set) var current = 0
+    public init() {}
+
+    /// A new owner; earlier tokens lose the capture.
+    public mutating func begin() -> Int {
+        current += 1
+        return current
+    }
+
+    public func owns(_ token: Int) -> Bool { token == current }
 }
 
 extension Array where Element == TranscriptHistoryItem {
