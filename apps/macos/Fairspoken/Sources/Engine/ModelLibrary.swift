@@ -1,10 +1,12 @@
 import FairspokenSpeech
+import FairspokenWhisper
 import Foundation
 import FairspokenCore
 import Observation
 import OSLog
 
-/// State of the local speech engine and the model gallery.
+/// State of the local speech engine and the Models library: which models are on this Mac,
+/// downloads in flight, and the model loaded for dictation (Parakeet or Whisper).
 @Observable
 final class ModelLibrary {
     enum EngineState: Equatable {
@@ -45,6 +47,13 @@ final class ModelLibrary {
         case unpacking
         case compiling
         case installed
+
+        var isBusy: Bool {
+            switch self {
+            case .downloading, .unpacking, .compiling: true
+            default: false
+            }
+        }
     }
 
     private(set) var engineState: EngineState = .idle
@@ -55,13 +64,19 @@ final class ModelLibrary {
     /// Why the last download of a model failed (says what and where), until the next try.
     private(set) var downloadErrors: [String: String] = [:]
 
-    let engine = FluidAudioEngine()
+    /// Runs whichever engine the active model needs; dictation transcribes through it.
+    let engine = LocalSpeechRouter()
+    /// Called when a model failed to load and the previous one was put back (its id), so the
+    /// saved choice can follow what is really in use.
+    @ObservationIgnored var onFallback: ((String) -> Void)?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var downloads: [String: Task<Void, Never>] = [:]
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "models")
 
-    var activeModel: SpeechModelInfo {
-        SpeechModelCatalog.model(id: activeModelID) ?? SpeechModelCatalog.all[0]
-    }
+    var activeModel: SpeechModelInfo { SpeechModelCatalog.resolve(activeModelID) }
+
+    /// Models on this Mac (what the "Downloaded" filter keeps).
+    var installedIDs: Set<String> { Set(items.filter { $0.value == .installed }.map(\.key)) }
 
     init() {
         refresh()
@@ -71,30 +86,30 @@ final class ModelLibrary {
 
     func refresh() {
         for model in SpeechModelCatalog.all {
-            if case .downloading = items[model.id] { continue }
-            if items[model.id] == .compiling || items[model.id] == .unpacking { continue }
-            items[model.id] = FluidAudioEngine.isInstalled(model.id) && !presentedAsAvailable.contains(model.id) ? .installed : .available
+            if items[model.id]?.isBusy == true { continue }
+            items[model.id] = SpeechModels.isInstalled(model.id) && !presentedAsAvailable.contains(model.id) ? .installed : .available
         }
+        let hidden = presentedAsAvailable
         Task.detached(priority: .utility) {
             var sizes: [String: Int64] = [:]
-            for model in SpeechModelCatalog.all {
-                if let dir = FluidAudioEngine.directory(for: model.id), FileManager.default.fileExists(atPath: dir.path) {
-                    sizes[model.id] = Self.directorySize(dir)
-                }
+            for model in SpeechModelCatalog.all where !hidden.contains(model.id) {
+                if let bytes = SpeechModels.installedBytes(model.id) { sizes[model.id] = bytes }
             }
             await MainActor.run { self.diskBytes = sizes }
         }
     }
 
-    /// Download if needed, load onto the ANE and warm up. Safe to call repeatedly.
-    func prepare(_ id: String) {
+    /// Download if needed, load and warm up. Safe to call repeatedly. An id the catalogue
+    /// doesn't know loads the default model instead.
+    func prepare(_ requested: String) {
+        let id = SpeechModelCatalog.resolve(requested).id
         guard !(activeModelID == id && (engineState.isReady || engineState.isBusy)) else { return }
         activeModelID = id
         loadTask?.cancel()
         engineState = .loading
         downloadErrors[id] = nil
         let started = Date()
-        let report: @Sendable (FluidAudioEngine.Stage) -> Void = { [weak self] stage in
+        let report: @Sendable (ModelStage) -> Void = { [weak self] stage in
             Task { @MainActor in self?.apply(stage, for: id) }
         }
         loadTask = Task { [weak self, engine] in
@@ -106,13 +121,24 @@ final class ModelLibrary {
                     self.lastLoadSeconds = Date().timeIntervalSince(started)
                     self.refresh()
                 }
+            } catch is CancellationError {
+                // A newer choice replaced this one; it reports for itself.
             } catch {
+                // The router puts the previous model back when it can.
+                let fallback = await engine.loadedModelID
                 await MainActor.run {
                     guard let self, self.activeModelID == id else { return }
                     Self.log.error("Model load failed: \(error.localizedDescription, privacy: .public)")
-                    self.engineState = .failed("Couldn't load the model: \(error.localizedDescription)")
-                    // A model that never arrived shows why on its card too.
-                    if !FluidAudioEngine.isInstalled(id) { self.downloadErrors[id] = error.localizedDescription }
+                    let message = "Couldn't load the model: \(error.localizedDescription)"
+                    // The model's row says why, whether or not it arrived.
+                    self.downloadErrors[id] = message
+                    if let fallback, fallback != id {
+                        self.activeModelID = fallback
+                        self.engineState = .ready
+                        self.onFallback?(fallback)
+                    } else {
+                        self.engineState = .failed(message)
+                    }
                     if self.items[id] != .installed { self.items[id] = nil }
                     self.refresh()
                 }
@@ -120,9 +146,9 @@ final class ModelLibrary {
         }
     }
 
-    private func apply(_ stage: FluidAudioEngine.Stage, for id: String) {
+    private func apply(_ stage: ModelStage, for id: String) {
         guard activeModelID == id, engineState != .ready else { return }
-        // A late report after the load failed would leave the card looking busy.
+        // A late report after the load failed would leave the row looking busy.
         if case .failed = engineState { return }
         switch stage {
         case .downloading(let f):
@@ -142,31 +168,33 @@ final class ModelLibrary {
         }
     }
 
-    /// Gallery download (not activated).
+    /// Library download (not activated).
     func download(_ id: String) {
-        guard state(of: id) == .available else { return }
+        guard state(of: id) == .available, SpeechModelCatalog.model(id: id) != nil else { return }
         items[id] = .downloading(0)
         downloadErrors[id] = nil
-        let report: @Sendable (FluidAudioEngine.Stage) -> Void = { [weak self] stage in
+        let report: @Sendable (ModelStage) -> Void = { [weak self] stage in
             Task { @MainActor in
+                guard let self, self.items[id]?.isBusy == true else { return }
                 switch stage {
-                case .downloading(let f): self?.items[id] = .downloading(f)
-                case .unpacking: self?.items[id] = .unpacking
-                case .compiling: self?.items[id] = .compiling
+                case .downloading(let f): self.items[id] = .downloading(f)
+                case .unpacking: self.items[id] = .unpacking
+                case .compiling: self.items[id] = .compiling
                 default: break
                 }
             }
         }
-        Task { [weak self] in
+        downloads[id] = Task { [weak self] in
             var failure: String?
             do {
-                try await FluidAudioEngine.download(id, progress: report)
+                try await SpeechModels.download(id, progress: report)
             } catch is CancellationError {
             } catch {
                 Self.log.error("Download failed: \(error.localizedDescription, privacy: .public)")
-                failure = error.localizedDescription
+                failure = Task.isCancelled ? nil : error.localizedDescription
             }
             await MainActor.run { [weak self] in
+                self?.downloads[id] = nil
                 self?.items[id] = nil
                 self?.downloadErrors[id] = failure
                 self?.refresh()
@@ -174,28 +202,30 @@ final class ModelLibrary {
         }
     }
 
+    /// Stops a library download. Files already fetched stay, so the next try resumes.
+    func cancelDownload(_ id: String) {
+        downloads[id]?.cancel()
+    }
+
+    func isDownloading(_ id: String) -> Bool { downloads[id] != nil }
+
     func clearDownloadError(_ id: String) { downloadErrors[id] = nil }
 
     /// Screenshot mode: shows a model as not downloaded, whatever is on disk.
     @ObservationIgnored var presentedAsAvailable: Set<String> = []
 
-    /// Removes a model's files. The active model is never deleted.
+    /// Removes a model's files, only ever inside its engine's model folder. The active model is
+    /// never deleted.
     func delete(_ id: String) {
-        guard id != activeModelID, let dir = FluidAudioEngine.directory(for: id) else { return }
-        // Only ever delete inside FluidAudio's model cache.
-        guard dir.path.contains("/FluidAudio/Models/") else { return }
-        try? FileManager.default.removeItem(at: dir)
+        guard id != activeModelID, state(of: id) == .installed else { return }
+        do {
+            try SpeechModels.delete(id)
+        } catch {
+            Self.log.error("Delete failed: \(error.localizedDescription, privacy: .public)")
+            downloadErrors[id] = "Couldn't delete the model: \(error.localizedDescription)"
+        }
         items[id] = .available
         diskBytes[id] = nil
         refresh()
-    }
-
-    nonisolated private static func directorySize(_ url: URL) -> Int64 {
-        guard let e = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey]) else { return 0 }
-        var total: Int64 = 0
-        for case let file as URL in e {
-            total += Int64((try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey]).totalFileAllocatedSize) ?? 0)
-        }
-        return total
     }
 }

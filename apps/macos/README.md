@@ -5,7 +5,7 @@ Swift packages:
 
 | App | Bundle id (Release / Debug) | What it is |
 |---|---|---|
-| **Fairspoken** (`Fairspoken.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (FluidAudio + Parakeet CoreML), a Liquid Glass dashboard (Home, Models, Settings), a floating recording pill, and optional transcription on your own host |
+| **Fairspoken** (`Fairspoken.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a Liquid Glass dashboard (Home, Models, Settings), a floating recording pill, and optional transcription on your own host |
 | **Fairspoken Server** (`Fairspoken Server.app`, scheme `FairspokenServer`) | `ie.fairspoken.server` / `.dev` | A transcription server for a practice or a team: the host protocol of `src-tauri/src/host/PROTOCOL.md` on Parakeet and the Neural Engine, with a live view of who is dictating, models, configuration and the address clients need |
 
 Fairspoken (Mac), the Windows and Linux desktop app and the web dashboard all talk to Fairspoken
@@ -225,6 +225,41 @@ Trash (permanent deletion only after a second confirmation, on a drive without a
 folders `index.jsonl` names are ever touched. The Post-train button stays disabled until the
 training step ships.
 
+## Speech models and engines
+
+The client runs two model families on the Neural Engine, one model loaded at a time
+(`LocalSpeechRouter` in `FairspokenWhisper`):
+
+| Engine | Models | Where the files live |
+|---|---|---|
+| FluidAudio 0.17.5 | Parakeet TDT 0.6B v3 (default), Parakeet Ultra, Parakeet TDT 0.6B v2 | FluidAudio's shared cache, `~/Library/Application Support/FluidAudio/Models/` |
+| WhisperKit 1.1.1 | Whisper tiny, base, small, medium (each also `.en`), large-v2, large-v3, large-v3-turbo; Distil-Whisper large-v3 | `~/Library/Application Support/Fairspoken/Models/WhisperKit/`, in the Hugging Face layout (`models/argmaxinc/whisperkit-coreml/<variant>/`, tokenizers in `models/openai/whisper-<size>/`) |
+
+- **Catalogue** (`SpeechModelCatalog` in `FairspokenCore`): id, name, family, vendor, engine, kind
+  (speech; cleanup models and remote endpoints will be rows of the same table), languages and an
+  English-only flag, download size, memory, local or remote, licence, source, and the measured
+  word error rate and speed behind the 1–5 bars (`ScoreScale`). Whisper ids are the Tauri app's
+  (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`), so one settings.json
+  means one model in both apps; `.en` and `distil-large-v3` are Mac-only, and the Tauri app falls
+  back to its default for them. An id neither app knows falls back to Parakeet v3.
+- **Variants** are the repository's folder names; the compressed ones are used where offered
+  (`openai_whisper-small_216MB`, `openai_whisper-large-v3_947MB`,
+  `openai_whisper-large-v3-v20240930_626MB` for large-v3-turbo, …).
+- **Whisper downloads** fetch the Core ML bundles and the tokenizer, then compile once for the
+  Neural Engine ("Optimising for this device…"); a marker file says the download finished, so an
+  interrupted one is never taken for installed and resumes on the next try. Cancelling stops the
+  transfer. Deleting removes that model's folder, only ever inside the models folder after
+  resolving `..` and symbolic links (`ModelStorage`).
+- **Decoding:** greedy, without timestamps, in the dictation language (`language`; `auto` detects
+  it; `.en` models always English), with Whisper's usual temperature retries when the text looks
+  like a loop; recordings over 30 s are cut at pauses. Vocabulary is passed as Whisper's prompt
+  (at most 100 tokens). Download links (below) are Parakeet-only for now.
+- **Figures:** see `docs/model-benchmarks.md` for how speed and accuracy were measured.
+- The server (Fairspoken Server) still serves Parakeet only and doesn't link WhisperKit.
+
+`--selftest <wav> --model large-v3-turbo` runs any catalogue model through the same engine as
+dictation (downloading it first if needed).
+
 ## Model download links
 
 For networks that can't reach the standard model download: each card on Fairspoken › **Models** and
@@ -383,8 +418,10 @@ FairspokenServer/                Fairspoken Server
 Packages/
   FairspokenCore/                platform-neutral core + tests: frame codec, URL policy, protocol types, SSE parser,
                                  host events/stats/live-state reducer, polling differ, simulator, settings/history models
-  FairspokenSpeech/              the only FluidAudio code (pinned 0.17.5): model registry, the client's engine,
-                                 the server's worker pool (shared weights, one decoder per worker)
+  FairspokenSpeech/              FairspokenSpeech: the only FluidAudio code (pinned 0.17.5): model registry, the client's engine,
+                                 the server's worker pool (shared weights, one decoder per worker);
+                                 FairspokenWhisper (client only): the only WhisperKit code (pinned 1.1.1), the
+                                 Whisper model store, `SpeechModels` and the client's `LocalSpeechRouter`
   FairspokenHost/                the server runtime + tests: HTTP/1.1 on Network.framework, routing and auth, queue,
                                  workers, metrics, SSE fan-out, config file; `fairspoken-host-dev` (stub engine)
   FairspokenUI/                  shared SwiftUI: palette, cards, chips, tags, brand mark, formatting
