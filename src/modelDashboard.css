@@ -119,7 +119,7 @@
 .model-table { padding: 4px; overflow: hidden; }
 .model-table-head, .model-row {
   display: grid; align-items: center; column-gap: 8px;
-  grid-template-columns: 24px minmax(200px, 1fr) 30px 60px 60px 58px 78px 104px;
+  grid-template-columns: 24px minmax(200px, 1fr) 76px 64px 64px 58px 78px 104px;
 }
 .model-table-head { padding: 6px 10px 8px; border-bottom: 1px solid var(--crystal-hairline); color: var(--crystal-ink-2); font-size: var(--sem-font-size-micro); font-weight: 600; }
 .model-row { min-height: 52px; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: background-color var(--crystal-motion-fast) var(--crystal-ease); }
@@ -143,16 +143,23 @@
 .model-name-stack { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .model-name { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--crystal-ink); font-size: var(--sem-font-size-body); font-weight: 600; }
 .model-name { overflow: hidden; }
-.model-name-text { flex: 0 1 auto; min-width: 7ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-name-sub { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.model-name-sub .model-badge { flex: none; }
 .model-name-summary { color: var(--crystal-ink-2); font-size: var(--sem-font-size-micro); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .model-badge { flex: none; padding: 1px 5px; border-radius: 4px; background: var(--crystal-well-strong); color: var(--crystal-ink-2); font-size: 10px; font-weight: 650; letter-spacing: 0.01em; line-height: 1.4; }
 .model-badge--accent { background: var(--crystal-accent); color: var(--sem-color-text-on-accent); }
 .model-badge--good { background: var(--crystal-tint-strong); color: var(--crystal-accent); }
 .model-badge--new { background: color-mix(in srgb, var(--crystal-tile-models) 16%, transparent); color: var(--crystal-tile-models); }
-.model-kind { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: #ffffff; }
-.model-kind svg { width: 13px; height: 13px; }
-.model-kind--speech { background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 60%), var(--crystal-tile-models); }
-.model-kind--polish { background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 60%), #8b5cf6; }
+.model-kind { display: inline-flex; align-items: center; gap: 6px; color: var(--crystal-ink-2); }
+.model-kind-glyph { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; color: #ffffff; flex: none; }
+.model-kind-glyph svg { width: 11px; height: 11px; }
+.model-kind--speech .model-kind-glyph { background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 60%), var(--crystal-tile-models); }
+.model-kind--polish .model-kind-glyph { background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 60%), #8b5cf6; }
+.model-est { margin-left: 3px; color: var(--crystal-ink-3); font-weight: 500; }
+/* All local: the Runs on column says nothing, so it goes. */
+.model-table.is-all-local .model-table-head > :nth-child(7), .model-table.is-all-local .model-row > :nth-child(7) { display: none; }
+.model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 24px minmax(200px, 1fr) 76px 64px 64px 58px 104px; }
 .model-steps { display: inline-flex; gap: 2px; }
 .model-steps i { width: 9px; height: 6px; border-radius: 2px; background: var(--crystal-track); }
 .model-steps i.on { background: var(--crystal-accent); }
@@ -192,13 +199,16 @@
 .model-hub-row .ds-list-row-title { color: var(--crystal-ink); font-weight: 600; }
 .model-hub-row .ds-list-row-supporting { display: block; white-space: normal; color: var(--crystal-ink-2); font-size: var(--sem-font-size-meta); }
 
-@media (max-width: 900px) {
-  .model-table-head, .model-row { grid-template-columns: 24px minmax(180px, 1fr) 30px 56px 56px 58px 100px; }
+@media (max-width: 960px) {
+  .model-table-head, .model-row, .model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 24px minmax(170px, 1fr) 26px 56px 56px 56px 96px; }
   .model-table-head > :nth-child(7), .model-row > :nth-child(7) { display: none; }
+  /* The kind keeps its glyph and title; the word goes first. */
+  .model-kind { font-size: 0; gap: 0; }
   .model-steps i { width: 8px; }
+  .model-est { display: none; }
 }
-@media (max-width: 780px) {
-  .model-table-head, .model-row { grid-template-columns: 24px minmax(160px, 1fr) 30px 52px 52px 96px; }
+@media (max-width: 800px) {
+  .model-table-head, .model-row, .model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 24px minmax(150px, 1fr) 26px 52px 52px 92px; }
   .model-table-head .col-size, .model-row .col-size { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {

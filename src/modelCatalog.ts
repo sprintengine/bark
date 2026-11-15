@@ -108,9 +108,9 @@ export function filterAndSort<T extends LibraryRow>(rows: T[], filter: LibraryFi
   return [...kept].sort(by[sort]);
 }
 
-/** The model in use's speed on this machine, from recent dictations: seconds of speech per second of compute. */
-export function measuredSpeed(history: { durationSeconds: number; timings?: { speechModelMs: number } | null }[]): number | null {
-  const timed = history.filter((item) => item.timings && item.timings.speechModelMs > 0 && item.durationSeconds > 0);
+/** A model's speed on this machine, from recent dictations it transcribed: seconds of speech per second of compute. */
+export function measuredSpeed(history: { durationSeconds: number; model?: string | null; timings?: { speechModelMs: number } | null }[], model: string): number | null {
+  const timed = history.filter((item) => item.model === model && item.timings && item.timings.speechModelMs > 0 && item.durationSeconds > 0);
   if (timed.length === 0) return null;
   const ratios = timed.map((item) => (item.durationSeconds * 1000) / item.timings!.speechModelMs).sort((a, b) => a - b);
   const mid = Math.floor(ratios.length / 2);

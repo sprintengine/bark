@@ -47,7 +47,7 @@ function card(item: RecentDictation, now: number): HTMLLIElement {
   }
   const when = document.createElement("time");
   when.dateTime = new Date(item.createdAt).toISOString();
-  when.textContent = relativeTime(item.createdAt, now).replace(/^just now$/, "Just now");
+  when.textContent = relativeTime(item.createdAt, now);
   when.title = new Date(item.createdAt).toLocaleString();
   meta.append(when);
 

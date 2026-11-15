@@ -14,7 +14,7 @@ type Model = { id: string; name: string; publisher: string; description: string;
 type Download = { model: string; stage: string; downloaded: number; total: number; message: string };
 type Catalog = { polish: Model[]; download: Download | null; metadataError: string | null };
 type SpeechModel = { model: string; cached: boolean };
-type HistoryEntry = { durationSeconds: number; timings?: { speechModelMs: number } | null };
+type HistoryEntry = { durationSeconds: number; model?: string | null; timings?: { speechModelMs: number } | null };
 const root = document.querySelector<HTMLElement>("#screen-models")!;
 const feedback = root.querySelector<HTMLElement>("#modelFeedback")!;
 const rowsHost = root.querySelector<HTMLElement>("#modelRows")!;
@@ -214,18 +214,23 @@ function rowElement(row: Row): HTMLElement[] {
   const open = el("button", "model-name-btn"); open.type = "button"; open.id = `model-open-${row.id}`;
   open.setAttribute("aria-expanded", String(expanded.has(row.id))); open.setAttribute("aria-controls", `model-detail-${row.id}`);
   const chevron = el("span", "model-chevron"); chevron.innerHTML = SVG.chevron;
+  // The name keeps the first line to itself; badges lead the second, so a
+  // narrow window shortens the summary before it touches the name.
   const titleLine = el("span", "model-name");
   titleLine.append(el("span", "model-name-text", row.name));
-  if (row.recommended) titleLine.append(badge("Recommended", "good"));
-  if (row.language === "en") titleLine.append(badge("EN"));
-  if (row.isNew) titleLine.append(badge("New", "new"));
-  const text = el("span", "model-name-stack"); text.append(titleLine, el("span", "model-name-summary", row.summary));
+  const subLine = el("span", "model-name-sub");
+  if (row.recommended) subLine.append(badge("Recommended", "good"));
+  if (row.isNew) subLine.append(badge("New", "new"));
+  if (row.language === "en") subLine.append(badge("EN"));
+  subLine.append(el("span", "model-name-summary", row.summary));
+  const text = el("span", "model-name-stack"); text.append(titleLine, subLine);
   open.append(chevron, createPublisherIcon(row.publisher, { size: "sm" }), text);
   open.addEventListener("click", (event) => { event.stopPropagation(); toggle(row.id); });
 
-  const kind = el("span", `model-kind model-kind--${row.kind}`); kind.innerHTML = row.kind === "speech" ? SVG.speech : SVG.polish;
-  kind.title = row.kind === "speech" ? "Speech to text" : "Cleanup and polish";
-  kind.setAttribute("aria-label", kind.title); kind.setAttribute("role", "img");
+  const kind = el("span", `model-kind model-kind--${row.kind}`);
+  const glyph = el("span", "model-kind-glyph"); glyph.innerHTML = row.kind === "speech" ? SVG.speech : SVG.polish; glyph.setAttribute("aria-hidden", "true");
+  kind.append(glyph, row.kind === "speech" ? "Speech" : "Polish");
+  kind.title = row.kind === "speech" ? "Speech to text" : "Cleans up the text";
 
   const measuredTitle = row.kind === "speech" && row.inUse && measured ? `Measured on this computer: ${measured.toFixed(0)}× real time` : "";
   const where = row.location === "local" ? "This device" : row.location === "host" ? "Your host" : "Cloud";
@@ -267,6 +272,8 @@ function render(): void {
   progressCells.clear();
   renderSummary();
   const rows = filterAndSort([...remoteRows(), ...speechRows(), ...polishRows()], filter, sort);
+  // "Runs on" earns its column only when something runs elsewhere.
+  root.querySelector("#modelTable")!.classList.toggle("is-all-local", rows.every((row) => row.location === "local"));
   rowsHost.replaceChildren(...rows.flatMap(rowElement));
   if (!rows.length) {
     const empty = el("div", "model-empty"); empty.setAttribute("role", "row");
@@ -352,7 +359,7 @@ async function load(refresh = false): Promise<void> {
     const previous = catalog;
     let history: HistoryEntry[];
     [settings, catalog, speech, cloudAvailable, history] = values;
-    measured = measuredSpeed(history ?? []);
+    measured = measuredSpeed(history ?? [], settings.model);
     if (!refresh && previous) {
       for (const model of catalog.polish) model.downloads = previous.polish.find(m => m.id === model.id)?.downloads ?? model.downloads;
     }
@@ -540,6 +547,9 @@ function jumpTo(hit: SearchHit): void {
   if (!id) return;
   Object.assign(filter, { query: "", kind: "all", language: "all", downloadedOnly: false, localOnly: false });
   syncFilterControls();
+  // The field and the table say the same thing: the search is done.
+  searchInput.value = ""; searchClear.hidden = true; ++searchRevision; clearTimeout(searchTimer);
+  searchStatus.textContent = ""; searchResults.replaceChildren(); hubSection.hidden = true;
   expanded.add(id);
   render();
   const target = document.getElementById(`model-${id}`);

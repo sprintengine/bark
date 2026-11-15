@@ -126,8 +126,14 @@ function renderChart(week: WeeklyBucket[]): void {
   );
 }
 
+const monthlyUsage = byId("monthlyUsage");
+
 function renderStats(summary: UsageStatsSummary): void {
   renderMonthlyUsage(summary);
+  // Months of zeros say nothing a first-run welcome doesn't.
+  monthlyUsage.hidden = !summary.hasData;
+  // A first run leads with setup; the tests come once there is something to compare.
+  document.body.classList.toggle("is-first-run", !summary.hasData);
   if (!summary.hasData) {
     homeEmpty.hidden = false;
     homeStats.hidden = true;
@@ -142,10 +148,10 @@ function renderStats(summary: UsageStatsSummary): void {
     `vs typing at ${typingWpm} wpm`;
 
   statTotalWords.textContent = summary.totalWords.toLocaleString();
-  statSpokenTime.textContent = formatDuration(summary.totalRecordingSeconds);
+  // Written as the headline writes durations: "5h 57m".
+  statSpokenTime.textContent = formatDuration(summary.totalRecordingSeconds).replace(/ ([hm])\b/g, "$1");
   statThisWeek.textContent = `${summary.thisWeekWords.toLocaleString()} words`;
-  statWeekDelta.textContent = `${summary.thisWeekWords.toLocaleString()} this week${summary.lastWeekWords > 0 ? ` · ${weekDeltaLabel(summary.thisWeekWords, summary.lastWeekWords).replace(" vs last week", "")}` : ""}`;
-  statWeekDelta.title = weekDeltaLabel(summary.thisWeekWords, summary.lastWeekWords);
+  statWeekDelta.textContent = weekDeltaLabel(summary.thisWeekWords, summary.lastWeekWords);
   statStreak.textContent = String(summary.currentStreak);
   statBestStreak.textContent = `· best ${summary.bestStreak}`;
   statWpm.textContent = String(summary.speakingWpm);

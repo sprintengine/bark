@@ -49,7 +49,10 @@ assert.deepEqual(ids(filterAndSort(mixed, { ...all, query: "TURBO" }, "name")), 
 assert.equal(formatBytes(2.5e9), "2.5 GB");
 assert.equal(formatBytes(148e6), "148 MB");
 assert.equal(formatBytes(0), "—");
-assert.equal(measuredSpeed([]), null);
-assert.equal(measuredSpeed([{ durationSeconds: 10, timings: { speechModelMs: 0 } }, { durationSeconds: 5, timings: null }]), null);
-assert.equal(measuredSpeed([{ durationSeconds: 10, timings: { speechModelMs: 1000 } }, { durationSeconds: 10, timings: { speechModelMs: 500 } }, { durationSeconds: 3, timings: { speechModelMs: 1000 } }]), 10);
+const m = "parakeet-tdt-0.6b-v3";
+assert.equal(measuredSpeed([], m), null);
+assert.equal(measuredSpeed([{ model: m, durationSeconds: 10, timings: { speechModelMs: 0 } }, { model: m, durationSeconds: 5, timings: null }], m), null);
+assert.equal(measuredSpeed([{ model: m, durationSeconds: 10, timings: { speechModelMs: 1000 } }, { model: m, durationSeconds: 10, timings: { speechModelMs: 500 } }, { model: m, durationSeconds: 3, timings: { speechModelMs: 1000 } }], m), 10);
+// Only that model's own dictations count: another model's or an unlabelled one never does.
+assert.equal(measuredSpeed([{ model: "tiny", durationSeconds: 10, timings: { speechModelMs: 100 } }, { durationSeconds: 10, timings: { speechModelMs: 100 } }], m), null);
 console.log("model catalog: ok");

@@ -226,11 +226,12 @@ body[data-pill="recording"] .pill-hint {
   background: none; border-left: 1px solid var(--hairline); border-radius: 0;
   color: var(--text-secondary);
 }
+body[data-pill="recording"] .pill-hint { color: var(--text-primary); }
 body[data-pill="recording"] .pill-hint::before {
   content: "Stop";
   font: 500 11px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   letter-spacing: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 body[data-record-mode="push-to-talk"][data-pill="recording"] .pill-hint::before { content: "Release"; }
 

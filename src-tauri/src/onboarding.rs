@@ -9,9 +9,19 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager};
 
 pub const WINDOW_LABEL: &str = "onboarding";
+
+/// Set when the person closes onboarding before finishing: "later" lasts
+/// until the app restarts, so reopening the app meanwhile shows Home.
+static DEFERRED: AtomicBool = AtomicBool::new(false);
+
+/// Closing the window before the end defers onboarding to the next start.
+pub fn defer_for_session() {
+    DEFERRED.store(true, Ordering::SeqCst);
+}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -83,7 +93,10 @@ pub fn complete_onboarding(app: AppHandle) -> Result<(), String> {
 /// The window to show when the app starts or is reopened: onboarding until it
 /// is done, then Home.
 pub fn open_start_window(app: &AppHandle) {
-    if needs_onboarding() && open_onboarding_window(app.clone()).is_ok() {
+    if needs_onboarding()
+        && !DEFERRED.load(Ordering::SeqCst)
+        && open_onboarding_window(app.clone()).is_ok()
+    {
         return;
     }
     let _ = crate::open_home_window(app.clone(), None);
@@ -155,6 +168,11 @@ mod system {
     use super::Permission;
     use objc2::{class, msg_send};
     use objc2_foundation::NSString;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    /// macOS shows the Accessibility dialog once; a second Allow this session
+    /// goes to the pane instead of asking again behind it.
+    static ACCESSIBILITY_ASKED: AtomicBool = AtomicBool::new(false);
 
     #[link(name = "AVFoundation", kind = "framework")]
     extern "C" {
@@ -216,9 +234,14 @@ mod system {
     }
 
     pub fn request_accessibility() {
-        // Shows the system dialog once; after that the pane is the only way.
-        if !crate::macos_input::accessibility_trusted(true) {
+        if crate::macos_input::accessibility_trusted(false) {
+            return;
+        }
+        if ACCESSIBILITY_ASKED.swap(true, Ordering::SeqCst) {
             open_privacy_pane("Privacy_Accessibility");
+        } else {
+            // Shows the system dialog, which itself offers System Settings.
+            crate::macos_input::accessibility_trusted(true);
         }
     }
 

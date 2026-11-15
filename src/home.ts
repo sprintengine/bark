@@ -22,7 +22,7 @@ import "./crystal.css";
 // The Settings screen's own controls are driven independently by settings.ts,
 // the Home screen's stats by homeStats.ts, and the Notes library by notes.ts.
 
-const SCREENS = ["home", "notes", "dictionary", "activity", "models", "settings", "profile"] as const;
+const SCREENS = ["home", "notes", "dictionary", "activity", "models", "settings"] as const;
 type Screen = (typeof SCREENS)[number];
 
 const TITLES: Record<Screen, string> = {
@@ -32,7 +32,6 @@ const TITLES: Record<Screen, string> = {
   activity: "Activity",
   settings: "Settings",
   models: "Models",
-  profile: "Your profile",
 };
 
 // A quiet line under the title, where the screen has one worth saying.

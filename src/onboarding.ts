@@ -129,6 +129,7 @@ function permissionLabel(state: Permission): [string, string] {
     case "granted": return ["Allowed", "ok"];
     case "denied": return ["Not allowed", "warn"];
     case "not-determined": return ["Not asked yet", "idle"];
+    case "not-needed": return ["Not needed", "idle"];
     default: return ["Not checked", "idle"];
   }
 }
@@ -215,11 +216,24 @@ function enterPermissions(): void {
 }
 
 // Microphone check: the device list and a live level, from the window's own
-// stream (separate from dictation, closed when the step is left).
+// stream (separate from dictation, closed when the step is left or the
+// window hides). Each way it can fail says what to do about it.
+function micProblem(error: unknown): string {
+  const name = error instanceof DOMException ? error.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return permissions.platform === "macos"
+      ? "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone."
+      : "Microphone access is off. Allow it in your system's privacy settings.";
+  }
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone found. Plug one in, or pick another above.";
+  if (name === "NotReadableError") return "That microphone is busy or unavailable. Close apps using it, or pick another.";
+  return "The microphone couldn't start. Pick another, or try again.";
+}
+
 function enterMic(): void {
   const select = h("select", { class: "ob-select", id: "obMicSelect", "aria-label": "Microphone" });
   const bars = h("div", { class: "ob-wave", "aria-hidden": "true" }, Array.from({ length: 36 }, () => h("span")));
-  const status = h("p", { class: "ob-mic-status", role: "status" }, ["Say something…"]);
+  const status = h("p", { class: "ob-mic-status", role: "status" }, ["Listening…"]);
   const card = h("div", { class: "ob-card ob-mic" }, [
     h("label", { class: "ob-field" }, [h("span", {}, ["Microphone"]), select]),
     bars,
@@ -233,7 +247,12 @@ function enterMic(): void {
   let frame = 0;
   let heard = 0;
   let session = 0;
+  let silentSince = 0;
   const levels: number[] = Array(36).fill(0);
+  const say = (text: string, tone?: "ok" | "warn") => {
+    status.textContent = text;
+    if (tone) status.dataset.tone = tone; else delete status.dataset.tone;
+  };
   const stop = () => {
     session += 1;
     cancelAnimationFrame(frame);
@@ -244,6 +263,8 @@ function enterMic(): void {
   const start = async () => {
     stop();
     const mine = session;
+    heard = 0;
+    say("Listening…");
     try {
       const constraints: MediaTrackConstraints = { channelCount: 1 };
       if (select.value) constraints.deviceId = { exact: select.value };
@@ -256,6 +277,7 @@ function enterMic(): void {
       context.createMediaStreamSource(opened).connect(analyser);
       const data = new Uint8Array(analyser.fftSize);
       let last = 0;
+      silentSince = performance.now();
       const tick = (time: number) => {
         if (mine !== session) return;
         frame = requestAnimationFrame(tick);
@@ -269,17 +291,17 @@ function enterMic(): void {
         const level = Math.min(1, Math.sqrt(Math.max(0, rms - 0.004) / 0.03));
         levels.shift(); levels.push(level);
         [...bars.children].forEach((bar, i) => { (bar as HTMLElement).style.transform = `scaleY(${Math.max(0.08, levels[i])})`; });
-        heard = level > 0.35 ? heard + 1 : Math.max(0, heard - 0.25);
-        if (heard > 4) { status.textContent = "Sounds good."; status.dataset.tone = "ok"; }
+        if (level > 0.35) { heard += 1; silentSince = time; } else heard = Math.max(0, heard - 0.25);
+        if (heard > 4) say("Sounds good.", "ok");
+        else if (status.dataset.tone !== "ok" && time - silentSince > 5000) say("Nothing yet. Speak up, move closer, or pick another microphone.", "warn");
       };
       frame = requestAnimationFrame(tick);
       await loadDevices(select);
-    } catch {
-      status.textContent = "No sound: allow the microphone, or pick another one.";
-      status.dataset.tone = "warn";
+    } catch (error) {
+      if (mine === session) say(micProblem(error), "warn");
     }
   };
-  select.addEventListener("change", () => { heard = 0; status.textContent = "Say something…"; delete status.dataset.tone; void start(); });
+  select.addEventListener("change", () => { void start(); });
   void loadDevices(select).then(start);
   leaveStep = () => {
     stop();
@@ -306,17 +328,30 @@ function ratingBar(label: string, value: number): HTMLElement {
   ]);
 }
 
+function modelState(id: string): "ready" | "downloading" | "failed" | "missing" {
+  if (download.active && download.model === id) return "downloading";
+  if (speech.find((model) => model.model === id)?.cached) return "ready";
+  if (download.error && download.model === id) return "failed";
+  return "missing";
+}
+
 function renderModel(): void {
+  const focusedId = stepHost.contains(document.activeElement) ? document.activeElement?.id : "";
   const list = h("div", { class: "ob-cards ob-models", role: "radiogroup", "aria-label": "Speech model" });
-  for (const id of STARTER_MODELS) {
+  const ids = STARTER_MODELS;
+  for (const id of ids) {
     const info = speechInfo(id);
-    const cached = speech.find((model) => model.model === id)?.cached ?? false;
+    const state = modelState(id);
     const selected = chosenModel === id;
-    const downloading = download.active && download.model === id;
-    const end = downloading
-      ? h("span", { class: "ob-progress-ring", style: `--p:${download.percentage}` }, [h("span", {}, [`${Math.round(download.percentage)}%`])])
-      : cached ? h("span", { class: "ob-status ob-status--ok" }, [svg(ICONS.check), "Downloaded"]) : h("span", { class: "ob-size" }, [formatBytes(info.bytes)]);
-    const option = h("button", { class: `ob-card ob-model${selected ? " is-selected" : ""}`, type: "button", role: "radio", "aria-checked": String(selected) }, [
+    const end = state === "downloading"
+      ? h("span", { class: "ob-progress-ring", style: `--p:${download.percentage}`, "aria-label": `Downloading, ${Math.round(download.percentage)}%` }, [h("span", { "aria-hidden": "true" }, [`${Math.round(download.percentage)}%`])])
+      : state === "ready" ? h("span", { class: "ob-status ob-status--ok" }, [svg(ICONS.check), "Downloaded"])
+      : state === "failed" ? h("span", { class: "ob-status ob-status--warn" }, ["Failed"])
+      : h("span", { class: "ob-size" }, [formatBytes(info.bytes)]);
+    const option = h("button", {
+      class: `ob-card ob-model${selected ? " is-selected" : ""}`, type: "button", role: "radio", id: `ob-model-${id}`,
+      "aria-checked": String(selected), tabindex: selected ? "0" : "-1",
+    }, [
       h("span", { class: "ob-radio", "aria-hidden": "true" }),
       h("span", { class: "ob-card-text" }, [
         h("strong", {}, [info.name, info.recommended ? h("span", { class: "ob-badge ob-badge--accent" }, ["Recommended"]) : null, info.language === "en" ? h("span", { class: "ob-badge" }, ["EN"]) : null]),
@@ -325,34 +360,57 @@ function renderModel(): void {
       ]),
       h("span", { class: "ob-card-end" }, [end]),
     ]);
-    option.addEventListener("click", () => { chosenModel = id; renderModel(); (list.querySelector(`[aria-checked="true"]`) as HTMLElement | null)?.focus(); });
+    option.addEventListener("click", () => { chosenModel = id; renderModel(); document.getElementById(`ob-model-${id}`)?.focus(); });
     list.append(option);
   }
+  // Arrow keys move the choice, as in any radio group.
+  list.addEventListener("keydown", (event) => {
+    const delta = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
+    if (!delta) return;
+    event.preventDefault();
+    chosenModel = ids[(ids.indexOf(chosenModel) + delta + ids.length) % ids.length];
+    renderModel();
+    document.getElementById(`ob-model-${chosenModel}`)?.focus();
+  });
+  const failed = modelState(chosenModel) === "failed";
   stepHost.replaceChildren(
     header("stack", "indigo", "Choose a speech model", "It runs on this computer. You can switch any time in Models."),
     list,
-    h("p", { class: "ob-note" }, [download.error ? download.error : "Downloads carry on in the background while you finish setting up. Ratings are estimates."]),
+    h("p", { class: `ob-note${failed ? " ob-note--warn" : ""}`, role: failed ? "alert" : false }, [failed
+      ? `The download didn't finish: ${download.error}`
+      : "Downloads carry on in the background while you finish setting up. Ratings are estimates."]),
   );
-  const cached = speech.find((model) => model.model === chosenModel)?.cached ?? false;
-  setFooter({ next: cached || (download.active && download.model === chosenModel) ? "Continue" : "Download and continue", back: true });
+  const state = modelState(chosenModel);
+  setFooter({
+    next: state === "ready" || state === "downloading" ? "Continue" : failed ? "Try again" : "Download and continue",
+    back: true,
+    skip: state === "ready" || state === "downloading" ? undefined : "Not now",
+  });
+  // A progress update re-renders the list; keep focus where it was.
+  if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
 }
 
-async function chooseModel(): Promise<void> {
+/** Saves the choice and starts its download. False when the download could not start. */
+async function chooseModel(): Promise<boolean> {
   if (!settings) await readSettings();
   if (settings!.model !== chosenModel) await saveSettings({ model: chosenModel, transcriptionLocation: "local" });
-  const cached = speech.find((model) => model.model === chosenModel)?.cached ?? false;
-  if (!cached && !(download.active && download.model === chosenModel)) {
-    Object.assign(download, { model: chosenModel, percentage: 0, message: "Starting download…", active: true, error: "" });
-    await invoke("begin_prepare_transcription_model", { request: { model: chosenModel } }).catch((error) => {
-      Object.assign(download, { active: false, error: String(error) });
-    });
+  const state = modelState(chosenModel);
+  if (state === "ready" || state === "downloading") return true;
+  Object.assign(download, { model: chosenModel, percentage: 0, message: "Starting download…", active: true, error: "" });
+  try {
+    await invoke("begin_prepare_transcription_model", { request: { model: chosenModel } });
+    return true;
+  } catch (error) {
+    Object.assign(download, { active: false, error: String(error) });
+    renderModel();
+    return false;
   }
 }
 
 // Try it: a chat with one message waiting for an answer. The real shortcut
 // (handled by the pill) dictates as usual; its live text shows in the
-// composer and the result arrives as the reply. The button beside the
-// composer records without inserting anywhere.
+// composer, and what was heard lands as your message with how fast you
+// spoke. The button beside the composer records without inserting anywhere.
 function enterTry(): void {
   const shortcut = settings?.recordingShortcut ?? "";
   const holdMode = settings?.recordingShortcutMode === "push-to-talk";
@@ -360,7 +418,7 @@ function enterTry(): void {
     bubble("them", "Hi! What will you use Fairspoken for? Answer out loud."),
   ]);
   const live = h("div", { class: "ob-compose-text", "data-placeholder": "Your words appear here as you speak" });
-  const mic = h("button", { class: "ob-mic-btn", type: "button", "aria-label": "Hold to talk" }, [svg(ICONS.mic)]);
+  const mic = h("button", { class: "ob-mic-btn", type: "button", "aria-label": "Hold to talk", title: "Hold to talk" }, [svg(ICONS.mic)]);
   const compose = h("div", { class: "ob-compose" }, [live, mic]);
   const hint = h("p", { class: "ob-try-hint" }, holdMode
     ? ["Hold", keycaps(shortcut), "while you speak, or hold the microphone button."]
@@ -370,33 +428,46 @@ function enterTry(): void {
   stepHost.replaceChildren(header("bubble", "teal", "Try it", "Say a sentence. Watch it appear as you speak."), hint, chat, status);
   setFooter({ next: "Continue", back: true, skip: "Skip" });
 
-  const modelReady = () => !download.active || download.model !== settings?.model;
-  const showDownload = () => {
-    const waiting = !modelReady();
-    mic.disabled = waiting;
-    compose.classList.toggle("is-waiting", waiting);
-    status.textContent = waiting ? `${speechInfo(download.model).name} is downloading · ${Math.round(download.percentage)}%. You can try it when it's ready.` : "";
+  // Whether the chosen model can transcribe yet, and what to do if not.
+  const showModel = () => {
+    const state = modelState(settings?.model ?? chosenModel);
+    const name = speechInfo(settings?.model ?? chosenModel).name;
+    mic.disabled = state !== "ready";
+    compose.classList.toggle("is-waiting", state !== "ready");
+    status.classList.toggle("ob-note--warn", state === "failed" || state === "missing");
+    status.textContent = state === "downloading" ? `${name} is downloading · ${Math.round(download.percentage)}%. You can try it when it's ready.`
+      : state === "failed" ? `${name} didn't download. Go back to try again, or skip this step.`
+      : state === "missing" ? `${name} isn't downloaded yet. Go back to download it, or skip this step.`
+      : "";
   };
-  showDownload();
+  showModel();
 
-  let answered = false;
-  const answer = (text: string, seconds: number) => {
+  let tries = 0;
+  const result = (text: string, seconds: number) => {
     const clean = text.trim();
     live.textContent = "";
     compose.classList.remove("is-live");
-    if (!clean) return;
+    if (!clean) { status.textContent = "Nothing was heard. Try again a little louder."; return; }
     thread.append(bubble("me", clean));
     const words = clean.split(/\s+/).length;
     const wpm = seconds > 0 ? Math.round((words / seconds) * 60) : 0;
-    const reply = answered
-      ? "Lovely. Keep going as long as you like."
-      : wpm > 0
-        ? `Got it: ${words} word${words === 1 ? "" : "s"} in ${seconds.toFixed(1)} seconds. That's about ${wpm} words a minute${wpm >= 80 ? `, ${Math.round(wpm / 40)}× a typical typing speed` : ""}.`
-        : "Got it. That's all there is to it.";
-    answered = true;
-    setTimeout(() => { thread.append(bubble("them", reply)); thread.scrollTop = thread.scrollHeight; }, 380);
+    tries += 1;
+    const detail = wpm > 0 ? `${words} word${words === 1 ? "" : "s"} in ${seconds.toFixed(1)} s · ${wpm} words a minute` : `${words} word${words === 1 ? "" : "s"}`;
+    setTimeout(() => {
+      thread.append(h("div", { class: "ob-bubble ob-bubble--them ob-bubble--done" }, [
+        svg(ICONS.check),
+        h("span", {}, [h("strong", {}, [tries === 1 ? "That's it. It works." : "Got that too."]), h("span", {}, [detail])]),
+      ]));
+      thread.scrollTop = thread.scrollHeight;
+    }, 320);
     thread.scrollTop = thread.scrollHeight;
   };
+
+  // Hold-to-talk on the button: the side-effect-free capture the voice
+  // accuracy test uses, so nothing is pasted or saved.
+  let holding = false;
+  let stopping = false;
+  let started: Promise<unknown> | null = null;
 
   const unlisten: Promise<UnlistenFn>[] = [
     listen<{ text: string }>("transcript-preview", (event) => {
@@ -404,30 +475,36 @@ function enterTry(): void {
       compose.classList.add("is-live");
     }),
     listen<{ item: HistoryItem }>("transcript-history-updated", (event) => {
-      if (!holding) answer(event.payload.item.text, event.payload.item.durationSeconds);
+      if (!holding) result(event.payload.item.text, event.payload.item.durationSeconds);
     }),
-    listen<PrepareProgress>("model-prepare-progress", () => showDownload()),
+    listen<PrepareProgress>("model-prepare-progress", () => showModel()),
   ];
 
-  // Hold-to-talk on the button: the side-effect-free capture the voice
-  // accuracy test uses, so nothing is pasted or saved.
-  let holding = false;
-  let started: Promise<unknown> | null = null;
   const press = (event: Event) => {
     event.preventDefault();
-    if (holding || mic.disabled) return;
+    if (holding || stopping || mic.disabled) return;
     holding = true;
     mic.classList.add("is-on");
     compose.classList.add("is-live");
-    started = invoke("start_recording").catch((error) => { status.textContent = String(error); holding = false; mic.classList.remove("is-on"); });
+    status.textContent = "";
+    started = invoke("start_recording").catch((error) => {
+      status.textContent = String(error);
+      holding = false;
+      mic.classList.remove("is-on");
+      compose.classList.remove("is-live");
+      throw error;
+    });
   };
+  // pointerup and pointerleave both end a hold; only the first one stops.
   const release = () => {
-    if (!holding) return;
+    if (!holding || stopping) return;
+    stopping = true;
     mic.classList.remove("is-on");
-    void (started ?? Promise.resolve()).then(() => invoke<{ transcript: string; recordingSeconds: number }>("stop_voice_test_capture"))
-      .then((capture) => answer(capture.transcript, capture.recordingSeconds))
-      .catch((error) => { status.textContent = String(error); live.textContent = ""; compose.classList.remove("is-live"); })
-      .finally(() => { holding = false; });
+    void (started ?? Promise.resolve())
+      .then(() => invoke<{ transcript: string; recordingSeconds: number }>("stop_voice_test_capture"))
+      .then((capture) => result(capture.transcript, capture.recordingSeconds))
+      .catch((error) => { if (holding) status.textContent = String(error); live.textContent = ""; compose.classList.remove("is-live"); })
+      .finally(() => { holding = false; stopping = false; });
   };
   mic.addEventListener("pointerdown", press);
   mic.addEventListener("pointerup", release);
@@ -465,18 +542,39 @@ function renderImprove(): void {
   setFooter({ next: "Continue", back: true });
 }
 
+// Done: a live checklist of what setup left in place, each with its fix.
+function checkItem(ok: boolean | "busy", title: string, detail: string, fix?: { label: string; step: Step }): HTMLElement {
+  const mark = ok === true ? h("span", { class: "ob-check ob-check--ok", "aria-hidden": "true" }, [svg(ICONS.check)])
+    : ok === "busy" ? h("span", { class: "ob-check ob-check--busy", "aria-hidden": "true" })
+    : h("span", { class: "ob-check ob-check--warn", "aria-hidden": "true" }, ["!"]);
+  const button = fix ? h("button", { class: "ob-btn ob-btn--sm", type: "button" }, [fix.label]) : null;
+  button?.addEventListener("click", () => go(fix!.step));
+  return h("li", { class: "ob-check-row" }, [mark, h("div", { class: "ob-card-text" }, [h("strong", {}, [title]), h("span", {}, [detail])]), button]);
+}
+
 function renderDone(): void {
   const shortcut = settings?.recordingShortcut ?? "";
+  const mac = permissions.platform === "macos";
+  const micOk = permissions.microphone === "granted";
+  const typeOk = permissions.accessibility === "granted";
+  const model = settings?.model ?? chosenModel;
+  const state = modelState(model);
+  const name = speechInfo(model).name;
+  const ready = micOk && (!mac || typeOk) && state === "ready";
+  const list = h("ul", { class: "ob-card ob-checklist" }, [
+    checkItem(micOk, "Microphone", micOk ? "Allowed" : "Not allowed yet", micOk ? undefined : { label: "Fix", step: "permissions" }),
+    mac ? checkItem(typeOk, "Typing into apps", typeOk ? "Accessibility is allowed" : "Without Accessibility, text is copied for you to paste", typeOk ? undefined : { label: "Fix", step: "permissions" }) : null,
+    checkItem(state === "ready" ? true : state === "downloading" ? "busy" : false, name,
+      state === "ready" ? "Downloaded and ready" : state === "downloading" ? `Downloading · ${Math.round(download.percentage)}%` : state === "failed" ? "The download failed" : "Not downloaded yet",
+      state === "ready" || state === "downloading" ? undefined : { label: state === "failed" ? "Retry" : "Download", step: "model" }),
+  ]);
   stepHost.replaceChildren(
-    header("check", "green", "You're all set", "Fairspoken is ready in every app."),
+    header(ready ? "check" : "wave", "green", ready ? "You're all set" : "Almost there", ready ? "Fairspoken is ready in every app." : "Everything else is ready. You can finish later in Settings."),
     h("div", { class: "ob-card ob-recap" }, [
       h("div", { class: "ob-recap-keys" }, [keycaps(shortcut)]),
-      h("p", {}, [settings?.recordingShortcutMode === "push-to-talk" ? "Hold to dictate, let go to insert." : "Press to start, press again to insert."]),
+      h("p", {}, [settings?.recordingShortcutMode === "push-to-talk" ? "Hold to dictate in any app, let go to insert." : "Press to dictate in any app, press again to insert."]),
     ]),
-    h("ul", { class: "ob-points ob-points--compact" }, [
-      point("wave", "green", "The pill shows when it's listening", "It sits at the bottom of your screen. Click it to start or stop."),
-      point("stack", "indigo", "Change models any time", "Models has speech and polish models, with search."),
-    ]),
+    list,
   );
   setFooter({ next: "Open Fairspoken", back: true });
 }
@@ -519,19 +617,45 @@ function go(next: Step): void {
   stepHost.querySelector<HTMLElement>("h1")?.focus({ preventScroll: true });
 }
 
+let finished = false;
+
 async function advance(): Promise<void> {
   const index = STEPS.indexOf(step);
   if (step === "model") {
     nextButton.disabled = true;
-    try { await chooseModel(); } finally { nextButton.disabled = false; }
+    let ok = false;
+    try { ok = await chooseModel(); } finally { nextButton.disabled = false; }
+    if (!ok) return; // stay, with the error and Try again
   }
   if (step === "done") {
     nextButton.disabled = true;
-    try { await invoke("complete_onboarding"); } catch { nextButton.disabled = false; }
+    try {
+      await invoke("complete_onboarding");
+      finished = true;
+    } finally {
+      nextButton.disabled = false;
+    }
     return;
   }
   go(STEPS[Math.min(STEPS.length - 1, index + 1)]);
 }
+
+// The window hides rather than closes. While hidden nothing keeps running
+// (the microphone check's stream, a held recording); shown again, it resumes
+// the step, or starts over once setup was finished.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    leaveStep?.();
+    leaveStep = null;
+    return;
+  }
+  if (finished) {
+    finished = false;
+    void Promise.all([readSettings().catch(() => null), refreshPermissions()]).then(() => go("welcome"));
+  } else {
+    void refreshPermissions().then(() => go(step));
+  }
+});
 
 nextButton.addEventListener("click", () => { void advance(); });
 skipButton.addEventListener("click", () => go(STEPS[Math.min(STEPS.length - 1, STEPS.indexOf(step) + 1)]));
@@ -548,6 +672,7 @@ void listen<PrepareProgress>("model-prepare-progress", (event) => {
     if (model) model.cached = true;
   }
   if (step === "model") renderModel();
+  if (step === "done") renderDone();
 }).catch(() => {});
 
 // Open on the step named in the URL (#mic, for a re-run from Settings or a

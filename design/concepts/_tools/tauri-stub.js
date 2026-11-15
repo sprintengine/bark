@@ -17,8 +17,10 @@
   const hour = 60 * minute;
   const day = 24 * hour;
 
+  // Monday-first, up to and including today; nothing after it.
+  const today = (new Date().getDay() + 6) % 7;
   const week = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dayLabel, i) => ({
-    dayLabel, words: [820, 1460, 640, 1980, 1210, 0, 0][i], isToday: i === 4,
+    dayLabel, words: i > today ? 0 : [820, 1460, 640, 1980, 1210, 940, 1060][i], isToday: i === today,
   }));
   const months = ["2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11"].map((month, i) => ({
     month, words: [3200, 7400, 9100, 12800, 15400, 6100][i], isCurrentMonth: i === 5,

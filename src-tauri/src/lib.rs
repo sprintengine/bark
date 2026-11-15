@@ -1827,6 +1827,8 @@ fn perform_stop_and_transcribe(app: &AppHandle, services: &AppServices) -> Resul
         }),
         format: format_record,
         app_name: frontmost_app.as_ref().map(|app| app.name.clone()),
+        model: (settings.transcription_location == TranscriptionLocation::Local)
+            .then(|| settings.model.model_id().to_string()),
     };
 
     #[cfg(target_os = "macos")]
@@ -3038,6 +3040,7 @@ pub fn run() {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
+                    onboarding::defer_for_session();
                     let _ = open_home_window(window.app_handle().clone(), None);
                 }
             }
