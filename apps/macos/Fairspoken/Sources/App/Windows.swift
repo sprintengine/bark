@@ -167,6 +167,13 @@ final class DashboardWindow: AppWindow {
         }
         return super.validateMenuItem(menuItem)
     }
+
+    // The toolbar's sidebar button is validated here, not in `validateMenuItem`, and NSWindow
+    // turns down an action it doesn't implement itself, which would leave the button disabled.
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(toggleSidebar(_:)) { return true }
+        return super.validateUserInterfaceItem(item)
+    }
 }
 
 /// The app's windows. `appearsActive` (screenshot runs only) draws them as the key window even

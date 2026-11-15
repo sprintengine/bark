@@ -25,7 +25,7 @@ public enum Crystal {
     /// Secondary text, a neutral grey: at least 4.5:1 on every card and ground in both themes.
     public static let ink2 = Color(hex: 0x5C5C62, dark: 0xA3A3A9, highContrast: (0x2E2E33, 0xD6D6DA))
     /// Tertiary text: timestamps and captions. Still 4.5:1 on cards and grounds.
-    public static let ink3 = Color(hex: 0x68686E, dark: 0x8E8E94, highContrast: (0x46464B, 0xB4B4B9))
+    public static let ink3 = Color(hex: 0x68686E, dark: 0x98989E, highContrast: (0x46464B, 0xB4B4B9))
     /// Dividers and outlines (8–10%, stronger with Increase Contrast).
     public static let hairline = Color(
         light: NSColor(white: 0, alpha: 0.09),
