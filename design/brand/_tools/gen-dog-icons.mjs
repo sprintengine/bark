@@ -138,9 +138,11 @@ async function scale(master, px) {
 const CONTRAST_16 = 1.3;
 const masters = new Map();
 async function icon(px, { server = false } = {}) {
-  // The master only changes with the line weights, so share it between sizes.
-  const key = `${server}:${px <= 32 ? 32 : px <= 64 ? 64 : 1024}`;
-  if (!masters.has(key)) masters.set(key, await render(tileSvg({ server, forPx: px <= 32 ? px : px <= 64 ? 64 : 1024 })));
+  // The master only changes with the line weights, which only change at 32 px and
+  // below, so share it between the sizes that draw the same weights.
+  const forPx = px <= 32 ? px : 1024;
+  const key = `${server}:${forPx}`;
+  if (!masters.has(key)) masters.set(key, await render(tileSvg({ server, forPx })));
   const master = masters.get(key);
   return px === 1024 ? master : scale(master, px);
 }
