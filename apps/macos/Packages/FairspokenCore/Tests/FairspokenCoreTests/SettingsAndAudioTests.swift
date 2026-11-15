@@ -138,12 +138,6 @@ struct AudioGateTests {
         let speech = (0..<16_000).map { Float(sin(Double($0) / 8)) * 0.2 }
         #expect(RecordingGate.evaluate(AudioStats(samples: speech, sampleRate: 16_000)) == .accept)
     }
-
-    @Test func meterLevelIsBounded() {
-        #expect(PCM.meterLevel(rms: 0) == 0)
-        #expect(PCM.meterLevel(rms: 1) == 1)
-        #expect(PCM.meterLevel(rms: 0.01) > 0.2 && PCM.meterLevel(rms: 0.01) < 0.5)
-    }
 }
 
 @Suite("Vocabulary casing")

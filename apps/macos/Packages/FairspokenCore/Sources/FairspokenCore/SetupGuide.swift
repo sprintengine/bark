@@ -163,8 +163,8 @@ public enum SetupGuide {
         case hearing
     }
 
-    /// The level (0…1, the meter's display scale: about -40 dBFS) that counts as someone speaking.
-    public static let speechLevel: Float = 0.3
+    /// The level (0…1, the meter's display scale) that counts as someone speaking: -40 dBFS.
+    public static let speechLevel: Float = MicLevel.normalized(decibels: -40)
     /// How long the test listens before calling it silence.
     public static let silenceSeconds: Double = 5
 
@@ -234,34 +234,7 @@ public enum SetupGuide {
         items.allSatisfy { !$0.required || $0.isDone }
     }
 
-    // MARK: Key hints
-
-    /// One hint in the recording pill: "Stop ⇧⌘1", "Cancel esc", "Release to finish".
-    public struct KeyHint: Equatable, Sendable {
-        public var action: String
-        public var keys: String?
-        public init(action: String, keys: String?) {
-            self.action = action
-            self.keys = keys
-        }
-    }
-
-    public enum Trigger: Sendable { case shortcut, fn, button }
-
-    /// What ends the recording, then what cancels it, from the person's own keys.
-    public static func listeningHints(mode: RecordingShortcutMode, trigger: Trigger, shortcut: String,
-                                      cancel: String?) -> [KeyHint] {
-        var hints: [KeyHint] = []
-        switch (trigger, mode) {
-        case (.fn, _): hints.append(.init(action: "Release fn to finish", keys: nil))
-        case (.shortcut, .pushToTalk): hints.append(.init(action: "Release to finish", keys: nil))
-        case (.shortcut, .toggle), (.button, .toggle):
-            hints.append(.init(action: "Stop", keys: shortcut.isEmpty ? nil : shortcut))
-        case (.button, .pushToTalk): hints.append(.init(action: "Click stop to finish", keys: nil))
-        }
-        if let cancel, !cancel.isEmpty { hints.append(.init(action: "Cancel", keys: keyLabel(cancel))) }
-        return hints
-    }
+    // MARK: Keys
 
     /// Spells a key the way a keycap shows it: "⎋" and "Escape" become "esc".
     public static func keyLabel(_ key: String) -> String {
