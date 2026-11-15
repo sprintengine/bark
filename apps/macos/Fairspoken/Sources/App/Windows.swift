@@ -126,6 +126,8 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
             stopOnboardingAudio()
             onboarding = nil
         }
+        // The speed test ends with its window: a recording for it is thrown away.
+        if window == dashboard { model.speedTest.isPresented = false }
         DispatchQueue.main.async { [weak self] in self?.updatePolicy() }
     }
 

@@ -24,10 +24,13 @@ struct HomeView: View {
                 if !model.pending.items.isEmpty { PendingDictationsCard() }
                 if model.history.items.isEmpty {
                     FirstUseCard()
+                    // The test needs dictation to work; before that, setup comes first.
+                    if SetupGuide.isReady(model.setupChecklist()) { SpeedTestCard() }
                     EmptyRecent()
                 } else {
                     StatsStrip()
                     DictateBar()
+                    SpeedTestCard()
                     RecentDictations()
                 }
             }
@@ -158,32 +161,77 @@ private struct EmptyRecent: View {
 
 // MARK: - Stats
 
-/// Pace, words, apps and time saved, in one card.
+/// What dictation has done, lifetime: the words spoken, the time spent speaking them, how long
+/// typing them would have taken (at the speed test's typing speed when there is one) and the time
+/// saved, with the two times as bars.
 struct StatsStrip: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         let usage = model.history.usage
+        let wpm = Int(usage.typingWPMInUse.rounded())
+        let faster = usage.totalRecordingSeconds > 0 ? usage.typingSeconds / usage.totalRecordingSeconds : 0
         Card(padding: 0) {
-            HStack(spacing: 0) {
-                StatTile(title: "Average pace", value: usage.speakingWPM.map { "\(Int($0.rounded()))" } ?? "—", unit: "wpm",
-                         footnote: "Typing is about \(Int(UsageStats.typingWPM))")
-                divider
-                StatTile(title: "Words", value: Format.number(usage.totalWords), unit: nil,
-                         footnote: "\(Format.number(usage.totalDictations)) dictations")
-                divider
-                StatTile(title: "Apps used", value: "\(model.history.items.appsUsed)", unit: nil,
-                         footnote: "In recent dictations")
-                divider
-                StatTile(title: "Time saved", value: Format.duration(usage.timeSavedSeconds), unit: nil,
-                         footnote: "Against typing")
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    StatTile(title: "Words spoken", value: Format.number(usage.totalWords), unit: nil,
+                             footnote: "\(Format.number(usage.totalDictations)) dictations · \(model.history.items.appsUsed) apps")
+                        .help("Apps counted from recent dictations")
+                    divider
+                    StatTile(title: "Time speaking", value: Format.duration(usage.totalRecordingSeconds), unit: nil,
+                             footnote: usage.speakingWPM.map { "Average \(Int($0.rounded())) wpm" } ?? "Pace after a minute of speech")
+                    divider
+                    StatTile(title: "Typing would take", value: Format.duration(usage.typingSeconds), unit: nil,
+                             footnote: usage.measuredTypingWpm == nil ? "At \(wpm) wpm, a typical pace" : "At \(wpm) wpm, your speed test")
+                    divider
+                    StatTile(title: "Time saved", value: Format.duration(usage.timeSavedSeconds), unit: nil,
+                             footnote: faster >= 1.05 ? "\(SpeedTestFormat.multiplier(faster)) faster than typing" : "Against typing",
+                             accent: true)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                if usage.typingSeconds > 0 {
+                    Rectangle().fill(Crystal.hairline).frame(height: 1)
+                    SpeakingVersusTyping(speaking: usage.totalRecordingSeconds, typing: usage.typingSeconds)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                }
             }
         }
-        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var divider: some View {
         Rectangle().fill(Crystal.hairline).frame(width: 1).padding(.vertical, 14)
+    }
+}
+
+/// The time spent speaking beside the time typing would have taken, on one scale.
+private struct SpeakingVersusTyping: View {
+    var speaking: Double
+    var typing: Double
+
+    var body: some View {
+        let longest = max(speaking, typing, 1)
+        VStack(spacing: 6) {
+            row("Speaking", speaking / longest, Crystal.clientAccent, speaking)
+            row("Typing", typing / longest, Crystal.Tile.gray, typing)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Speaking took \(Format.duration(speaking)); typing would take \(Format.duration(typing))")
+    }
+
+    private func row(_ label: String, _ fraction: Double, _ color: Color, _ seconds: Double) -> some View {
+        HStack(spacing: 10) {
+            Text(label).font(.system(size: 11, weight: .medium)).foregroundStyle(Crystal.ink2).frame(width: 56, alignment: .leading)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Crystal.well)
+                    Capsule().fill(color).frame(width: max(4, geo.size.width * min(1, fraction)))
+                }
+            }
+            .frame(height: 8)
+            Text(Format.duration(seconds)).font(.system(size: 11).monospacedDigit()).foregroundStyle(Crystal.ink2)
+                .frame(width: 64, alignment: .trailing)
+        }
     }
 }
 
@@ -192,12 +240,14 @@ private struct StatTile: View {
     var value: String
     var unit: String?
     var footnote: String
+    var accent = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.system(size: 12, weight: .medium)).foregroundStyle(Crystal.ink2)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value).font(.mvNumber(22)).foregroundStyle(Crystal.ink).lineLimit(1).minimumScaleFactor(0.7)
+                Text(value).font(.mvNumber(22)).foregroundStyle(accent ? Crystal.clientAccent : Crystal.ink)
+                    .lineLimit(1).minimumScaleFactor(0.7)
                 if let unit { Text(unit).font(TypeScale.meta).foregroundStyle(Crystal.ink2) }
             }
             Text(footnote).font(.system(size: 11)).foregroundStyle(Crystal.ink3).lineLimit(1)
