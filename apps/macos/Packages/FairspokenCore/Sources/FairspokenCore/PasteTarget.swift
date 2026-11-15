@@ -53,11 +53,13 @@ public enum PasteTarget {
     ]
     static let textSubroles: Set<String> = ["AXSearchField", "AXSecureTextField"]
 
-    /// Controls and containers that never take pasted text themselves.
+    /// Controls and containers that never take pasted text themselves. Grids (`AXTable`, `AXRow`,
+    /// `AXColumn`, `AXCell`) are not here: spreadsheets and keyboard-editable web grids take ⌘V
+    /// on a selected cell without reporting anything editable.
     static let nonTextRoles: Set<String> = [
         "AXButton", "AXCheckBox", "AXRadioButton", "AXRadioGroup", "AXPopUpButton",
         "AXMenuButton", "AXDisclosureTriangle", "AXSlider", "AXIncrementor", "AXColorWell",
-        "AXList", "AXOutline", "AXTable", "AXBrowser", "AXRow", "AXColumn", "AXCell",
+        "AXList", "AXOutline", "AXBrowser",
         "AXImage", "AXTabGroup", "AXToolbar", "AXMenu", "AXMenuBar", "AXMenuBarItem",
         "AXMenuItem", "AXProgressIndicator", "AXLevelIndicator", "AXSplitter",
     ]

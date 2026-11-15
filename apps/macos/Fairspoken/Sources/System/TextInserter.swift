@@ -3,6 +3,7 @@ import ApplicationServices
 import Carbon.HIToolbox
 import FairspokenCore
 import OSLog
+import Synchronization
 
 /// Delivers text to the frontmost app: clipboard + synthetic ⌘V after the hotkey's
 /// modifiers are released (plan §2.7), then optionally restores the previous clipboard.
@@ -35,29 +36,35 @@ enum TextInserter {
             write(text, to: pasteboard, transient: false)
             return .copied(reason: "Copied — allow Accessibility to paste")
         }
+        // The target is checked after the wait: the user may switch apps while still releasing
+        // the shortcut, and ⌘V goes to whatever is in front once it is up.
+        await waitForModifierRelease(timeout: .milliseconds(800))
         if IsSecureEventInputEnabled() || focusedElementIsSecure() {
             write(text, to: pasteboard, transient: false)
             return .copied(reason: "Copied — secure field")
         }
 
-        let front = NSWorkspace.shared.frontmostApplication
-        if PasteTarget.decide(focus(of: front), appBundleID: front?.bundleIdentifier) == .copyOnly {
+        let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let focus = await probeFocus(of: front)
+        let bundleID = front.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
+        if PasteTarget.decide(focus, appBundleID: bundleID) == .copyOnly {
             write(text, to: pasteboard, transient: false)
             return .copied(reason: noTextTargetReason)
         }
 
-        let switchedApps = expectedApp != nil && front?.processIdentifier != expectedApp
+        let switchedApps = expectedApp != nil && front != expectedApp
         let saved = restoreClipboard && !switchedApps ? snapshot(pasteboard) : nil
         write(text, to: pasteboard, transient: saved != nil)
         let ourChange = pasteboard.changeCount
-
-        await waitForModifierRelease(timeout: .milliseconds(800))
         postCommandV()
 
         if let saved {
-            // Give the target app time to read the pasteboard before restoring it.
+            // Give the target app time to read the pasteboard before restoring it. If another
+            // app came to the front meanwhile, the paste may have missed: leave the dictation.
             try? await Task.sleep(for: .milliseconds(450))
-            if pasteboard.changeCount == ourChange { restore(saved, to: pasteboard) }
+            if pasteboard.changeCount == ourChange, NSWorkspace.shared.frontmostApplication?.processIdentifier == front {
+                restore(saved, to: pasteboard)
+            }
         }
         return .pasted
     }
@@ -113,11 +120,33 @@ enum TextInserter {
         up?.post(tap: .cghidEventTap)
     }
 
-    /// What the app says has focus, read with a short messaging timeout. Any error is `.unknown`
-    /// (which pastes); only an explicit "nothing focused" is `.none`.
-    private static func focus(of app: NSRunningApplication?) -> PasteTarget.Focus {
-        guard let app else { return .unknown }
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+    /// Reads the app's focus off the main actor, under one deadline for all of its AX queries
+    /// (each is cross-process IPC). Running out of time is `.unknown`, which pastes.
+    private static func probeFocus(of pid: pid_t?, deadline: Duration = .milliseconds(300)) async -> PasteTarget.Focus {
+        guard let pid else { return .unknown }
+        return await withCheckedContinuation { continuation in
+            let probe = FocusProbe(continuation)
+            DispatchQueue.global(qos: .userInitiated).async { probe.finish(focus(of: pid)) }
+            Task.detached {
+                try? await Task.sleep(for: deadline)
+                probe.finish(.unknown)
+            }
+        }
+    }
+
+    /// Resumes its continuation once: with the probe's answer or the deadline's, whichever is first.
+    nonisolated private final class FocusProbe: Sendable {
+        private let continuation: Mutex<CheckedContinuation<PasteTarget.Focus, Never>?>
+        init(_ continuation: CheckedContinuation<PasteTarget.Focus, Never>) { self.continuation = Mutex(continuation) }
+        func finish(_ focus: PasteTarget.Focus) {
+            continuation.withLock { $0.take() }?.resume(returning: focus)
+        }
+    }
+
+    /// What the app says has focus. Any error is `.unknown` (which pastes); only an explicit
+    /// "nothing focused" is `.none`.
+    nonisolated private static func focus(of pid: pid_t) -> PasteTarget.Focus {
+        let appElement = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(appElement, 0.25)
         var focused: CFTypeRef?
         switch AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focused) {
@@ -137,7 +166,7 @@ enum TextInserter {
         }
     }
 
-    private static func describe(_ element: AXUIElement) -> PasteTarget.Element {
+    nonisolated private static func describe(_ element: AXUIElement) -> PasteTarget.Element {
         AXUIElementSetMessagingTimeout(element, 0.25)
         func value(_ attribute: String) -> CFTypeRef? {
             var value: CFTypeRef?

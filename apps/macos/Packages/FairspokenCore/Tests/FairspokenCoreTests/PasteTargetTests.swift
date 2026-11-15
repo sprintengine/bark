@@ -16,9 +16,17 @@ struct PasteTargetTests {
         #expect(Self.decide(E(role: role), app: PasteTarget.finderBundleID) == .paste)
     }
 
-    @Test(arguments: ["AXButton", "AXList", "AXOutline", "AXTable", "AXImage", "AXCell", "AXMenuItem"])
+    @Test(arguments: ["AXButton", "AXList", "AXOutline", "AXImage", "AXMenuItem"])
     func controlsAndListsCopyOnly(role: String) {
         #expect(Self.decide(E(role: role)) == .copyOnly)
+    }
+
+    /// A selected cell in a spreadsheet or a keyboard-editable web grid takes ⌘V without
+    /// reporting anything editable.
+    @Test(arguments: ["AXTable", "AXRow", "AXColumn", "AXCell"])
+    func gridsPasteWithoutEditableSignals(role: String) {
+        #expect(Self.decide(E(role: role, isEditable: nil, hasEditableAncestor: false, valueIsSettable: nil)) == .paste)
+        #expect(Self.decide(E(role: role, valueIsSettable: false)) == .paste)
     }
 
     @Test func editableSignalsWinOverTheRole() {
