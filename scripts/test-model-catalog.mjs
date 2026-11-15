@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import ts from "typescript";
 const source = await readFile(new URL("../src/modelCatalog.ts", import.meta.url), "utf8");
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ES2020 } }).outputText;
-const { SPEECH_MODELS, POLISH_RATINGS, filterAndSort, formatBytes, measuredSpeed, speechInfo, accuracyScore, speedScore, isMeasured } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+const { SPEECH_MODELS, POLISH_RATINGS, filterAndSort, formatBytes, measuredSpeed, speechInfo, accuracyScore, speedScore, isMeasured, starterChoices } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
 
 const row = (id, extra = {}) => ({ id, kind: "speech", name: id, language: "multi", bytes: 1, speed: 3, accuracy: 3, rank: 5, installed: false, inUse: false, favorite: false, location: "local", searchText: id, ...extra });
 const all = { query: "", kind: "all", language: "all", downloadedOnly: false, localOnly: false };
@@ -62,4 +62,11 @@ assert.equal(measuredSpeed([{ model: m, durationSeconds: 10, timings: { speechMo
 assert.equal(measuredSpeed([{ model: m, durationSeconds: 10, timings: { speechModelMs: 1000 } }, { model: m, durationSeconds: 10, timings: { speechModelMs: 500 } }, { model: m, durationSeconds: 3, timings: { speechModelMs: 1000 } }], m), 10);
 // Only that model's own dictations count: another model's or an unlabelled one never does.
 assert.equal(measuredSpeed([{ model: "tiny", durationSeconds: 10, timings: { speechModelMs: 100 } }, { durationSeconds: 10, timings: { speechModelMs: 100 } }], m), null);
+// Setup offers only models this build can run, and keeps the configured one.
+const starters = ["parakeet-tdt-0.6b-v3", "parakeet-tdt-0.6b-v2", "base"];
+const parakeetOnly = ["parakeet-tdt-0.6b-v3", "parakeet-ultra", "parakeet-tdt-0.6b-v2"];
+assert.deepEqual(starterChoices(starters, parakeetOnly, "parakeet-tdt-0.6b-v3"), ["parakeet-tdt-0.6b-v3", "parakeet-tdt-0.6b-v2"], "no Whisper without the feature");
+assert.deepEqual(starterChoices(starters, [...parakeetOnly, "base", "small"], "small"), ["small", ...starters]);
+assert.deepEqual(starterChoices(starters, parakeetOnly, "small"), ["parakeet-tdt-0.6b-v3", "parakeet-tdt-0.6b-v2"], "an unrunnable configured model is not offered");
+assert.deepEqual(starterChoices(starters, [], "small"), ["small", ...starters], "unknown list: offer the starters");
 console.log("model catalog: ok");

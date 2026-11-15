@@ -3,7 +3,7 @@ import "./onboarding.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { accelTokens, keyGlyph, keyWord } from "./shortcuts";
-import { SPEECH_MODELS, formatBytes, isMeasured, speechInfo } from "./modelCatalog";
+import { SPEECH_MODELS, formatBytes, isMeasured, speechInfo, starterChoices } from "./modelCatalog";
 
 // First-run setup in its own window: welcome, permissions, a microphone
 // check, a speech model, a first dictation, the training-data choice, done.
@@ -252,6 +252,9 @@ function enterMic(): void {
   let heard = 0;
   let session = 0;
   let silentSince = 0;
+  // Set when the step is left: a device list or a retry that resolves later
+  // must not open the microphone again.
+  let disposed = false;
   const levels: number[] = Array(36).fill(0);
   const say = (text: string, tone?: "ok" | "warn") => {
     status.textContent = text;
@@ -272,6 +275,7 @@ function enterMic(): void {
     stream = null; context = null;
   };
   const start = async () => {
+    if (disposed) return;
     stop();
     const mine = session;
     heard = 0;
@@ -317,6 +321,7 @@ function enterMic(): void {
   select.addEventListener("change", () => { void start(); });
   void loadDevices(select).then(start);
   leaveStep = () => {
+    disposed = true;
     stop();
     const device = select.value;
     if (settings && device !== (settings.audioDevice ?? "")) void saveSettings({ audioDevice: device }).catch(() => {});
@@ -331,8 +336,10 @@ async function loadDevices(select: HTMLSelectElement): Promise<void> {
   select.value = [...select.options].some((option) => option.value === current) ? current : "";
 }
 
-// Model: three good starting points; the rest live in Models.
+// Model: three good starting points; the rest live in Models. Only those
+// this build can run are offered (starterModels).
 const STARTER_MODELS = ["parakeet-tdt-0.6b-v3", "parakeet-tdt-0.6b-v2", "base"];
+const starters = () => starterChoices(STARTER_MODELS, speech.map((model) => model.model), chosenModel);
 
 function ratingBar(label: string, value: number, measured: boolean): HTMLElement {
   return h("span", { class: "ob-rating", "aria-label": `${label} ${value} of 5${measured ? "" : ", estimated"}` }, [
@@ -352,7 +359,7 @@ function modelState(id: string): "ready" | "downloading" | "failed" | "missing" 
 function renderModel(): void {
   const focusedId = stepHost.contains(document.activeElement) ? document.activeElement?.id : "";
   const list = h("div", { class: "ob-cards ob-models", role: "radiogroup", "aria-label": "Speech model" });
-  const ids = STARTER_MODELS;
+  const ids = starters();
   for (const id of ids) {
     const info = speechInfo(id);
     const state = modelState(id);
@@ -407,7 +414,11 @@ function renderModel(): void {
 /** Saves the choice and starts its download. False when the download could not start. */
 async function chooseModel(): Promise<boolean> {
   if (!settings) await readSettings();
-  if (settings!.model !== chosenModel) await saveSettings({ model: chosenModel, transcriptionLocation: "local" });
+  // Choosing a model here means dictating with it on this computer, even
+  // when it is already the configured one and dictation ran on a host.
+  if (settings!.model !== chosenModel || settings!.transcriptionLocation !== "local") {
+    await saveSettings({ model: chosenModel, transcriptionLocation: "local" });
+  }
   const state = modelState(chosenModel);
   if (state === "ready" || state === "downloading") return true;
   Object.assign(download, { model: chosenModel, percentage: 0, message: "Starting download…", active: true, error: "" });
@@ -698,7 +709,7 @@ async function start(): Promise<void> {
     refreshPermissions(),
   ]);
   if (settings?.model && SPEECH_MODELS.some((model) => model.id === settings!.model)) chosenModel = settings.model;
-  if (!STARTER_MODELS.includes(chosenModel)) STARTER_MODELS.unshift(chosenModel);
+  if (!starters().includes(chosenModel)) chosenModel = starters()[0] ?? chosenModel;
   const wanted = location.hash.slice(1) as Step;
   go(STEPS.includes(wanted) ? wanted : "welcome");
 }

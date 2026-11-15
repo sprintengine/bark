@@ -84,6 +84,12 @@ export function speechInfo(id: string): ModelInfo {
     ?? { id, kind: "speech", name: `Whisper ${id}`, summary: "Speech recognition", publisher: "OpenAI", bytes: 0, language: "multi", languages: "Many languages", speed: 3, accuracy: 3, rank: 50 };
 }
 
+/** Setup's model choices: the starters this build can run (when the list is known), with the configured model first if it isn't one of them. */
+export function starterChoices(starters: string[], available: string[], chosen: string): string[] {
+  const runnable = available.length ? starters.filter((id) => available.includes(id)) : starters;
+  return runnable.includes(chosen) || (available.length && !available.includes(chosen)) ? runnable : [chosen, ...runnable];
+}
+
 export function formatBytes(bytes: number): string {
   if (!bytes) return "—";
   return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
