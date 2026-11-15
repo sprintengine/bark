@@ -248,10 +248,11 @@ final class DictationController {
                 self.history.add(item)
                 let captureID = self.training?.keep(samples: samples, rawText: output.text, finalText: text, model: output.model,
                                                     appBundleID: target?.bundleIdentifier)
-                if case .pasted = delivery, let fieldRead {
-                    self.editWatcher?.arm(await fieldRead.value, insertedAfter: pasteStarted,
-                                          dictation: .init(inserted: text, raw: output.text, speechModel: s.speechModelID,
-                                                           captureID: captureID))
+                if case .pasted = delivery, let fieldRead, let watcher = self.editWatcher {
+                    let dictation = EditWatcher.Dictation(inserted: text, raw: output.text, speechModel: s.speechModelID,
+                                                          captureID: captureID)
+                    // Apart, so a read still running never holds up the result.
+                    Task { watcher.arm(await fieldRead.value, insertedAfter: pasteStarted, dictation: dictation) }
                 }
                 let result = Result(text: text, words: WordCounter.count(text), delivery: delivery, latencyMs: total, placement: placement)
                 if delivery == .shownInApp { self.lastInAppResult = result }

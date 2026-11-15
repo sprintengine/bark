@@ -232,7 +232,7 @@ marker; once applied, accepted or dismissed a pair is never promoted again, so a
 deleted. Corrections, manual and learned, are applied to every dictation after casing.
 
 Never read: password managers, terminals, secure fields, fields without a plain-text value and
-values over 100,000 characters. Every read is time-limited (250 ms) and off the main thread, a read
+values over 100,000 characters. Every read is time-limited (250 ms before insertion, 500 ms after) and off the main thread, a read
 still running when the paste starts is not used, and insertion never waits for it. When the dictation
 was kept for post-training, the edited text is attached to it as `editedText`.
 

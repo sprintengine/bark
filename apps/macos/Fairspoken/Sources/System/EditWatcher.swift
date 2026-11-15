@@ -157,7 +157,7 @@ final class EditWatcher {
     private func evaluate(_ watch: Watch) {
         Task {
             let field = watch.field
-            let read: String?? = await FieldReader.withTimeout(.milliseconds(250)) { FieldReader.currentValue(of: field.element) }
+            let read: String?? = await FieldReader.withTimeout(.milliseconds(500)) { FieldReader.currentValue(of: field.element) }
             guard let value = read ?? nil else { return }
             let anchor = watch.anchor
             let result = await Task.detached(priority: .utility) { () -> (String, EditOutcome)? in
