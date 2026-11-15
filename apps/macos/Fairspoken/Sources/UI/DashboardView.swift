@@ -3,29 +3,26 @@ import FairspokenCore
 import FairspokenUpdates
 import SwiftUI
 
-/// Main window: the sidebar stands on the window's frost (the desktop blurred behind the window,
-/// tinted once); the content is one opaque card beside it, inset by `CardMetrics.gap` so a thin
-/// line of frost frames it.
+/// Main window, the October look: the aurora backdrop fills the window; the sidebar is a
+/// frosted panel floating on it, and each screen sets its translucent cards straight on the
+/// backdrop (`SurfaceStyle.frosted`).
 struct DashboardView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    static let sidebarWidth: CGFloat = 220
+    static let sidebarWidth: CGFloat = 228
 
     var body: some View {
         HStack(spacing: 0) {
             Sidebar()
                 .frame(width: Self.sidebarWidth)
+                .padding([.top, .bottom, .leading], 8)
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Crystal.canvas)
-                .clipShape(.rect(cornerRadius: CardMetrics.radius, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: CardMetrics.radius, style: .continuous).strokeBorder(Crystal.hairline))
-                .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
                 .updateToast(model.updates, style: .client)
-                .padding([.top, .bottom, .trailing], CardMetrics.gap + 2)
         }
-        .background(WindowFrost())
+        .background(AuroraBackground())
+        .environment(\.surfaceStyle, .frosted)
         .ignoresSafeArea()
         .screenshotActive()
         .frame(minWidth: 960, minHeight: 640)
@@ -53,47 +50,60 @@ struct DashboardView: View {
 }
 
 extension AppModel.Section {
-    /// The section's tile colour in the sidebar.
-    var tile: Color {
+    /// The section's glyph in the sidebar: one colour, as in October.
+    var sidebarSymbol: String {
         switch self {
-        case .home: Crystal.Tile.orange
-        case .models: Crystal.Tile.indigo
-        case .training: Crystal.Tile.purple
-        case .settings: Crystal.Tile.gray
+        case .home: "waveform"
+        case .models: "square.stack.3d.up"
+        case .training: "waveform.badge.mic"
+        case .settings: "gearshape"
         }
     }
 }
 
-/// Brand, the sections as rows with coloured icon tiles, and the engine status at the bottom.
+/// The Bark lockup (the dog tile and the Fraunces wordmark), the sections as plain rows, and the
+/// engine status at the bottom, on one frosted panel.
 private struct Sidebar: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Room for the traffic lights, then the brand.
-            HStack(spacing: 8) {
-                BrandMark(size: 22)
-                Text(AppInfo.displayName).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
+            // Room for the traffic lights, then the lockup.
+            HStack(spacing: 10) {
+                BrandMark(size: 30)
+                Text(AppInfo.displayName)
+                    .font(.barkWordmark(22))
+                    .tracking(-0.55)
+                    .foregroundStyle(Crystal.ink)
             }
-            .padding(.horizontal, 6)
-            .padding(.top, 44)
-            .padding(.bottom, 14)
+            .padding(.horizontal, 8)
+            .padding(.top, 46)
+            .padding(.bottom, 18)
             .accessibilityElement(children: .combine)
 
-            VStack(spacing: 2) {
+            VStack(spacing: 3) {
                 ForEach(Array(AppModel.Section.allCases.enumerated()), id: \.element) { index, section in
                     SidebarRow(section: section, index: index)
                 }
             }
             Spacer(minLength: 12)
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
                 SidebarStatus()
                 UpdateSidebarButton(updates: model.updates, style: .client, compact: true)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 8)
             }
         }
         .padding(.horizontal, 10)
         .padding(.bottom, 12)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+            shape.fill(reduceTransparency ? Frost.panelSolid : Frost.panel)
+                .overlay(shape.strokeBorder(Frost.edge.opacity(scheme == .dark ? 1 : 0.8)))
+                .shadow(color: .black.opacity(scheme == .dark ? 0.30 : 0.06), radius: 14, y: 4)
+        }
     }
 }
 
@@ -110,23 +120,26 @@ private struct SidebarRow: View {
         Button {
             model.section = section
         } label: {
-            HStack(spacing: 9) {
-                IconTile(section.symbol, color: section.tile, size: 22)
+            HStack(spacing: 10) {
+                Image(systemName: section.sidebarSymbol)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(selected ? Crystal.ink : Crystal.ink2)
+                    .frame(width: 22)
                 Text(section.title)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .font(.system(size: 14, weight: selected ? .semibold : .regular))
                     .foregroundStyle(Crystal.ink)
                 Spacer(minLength: 4)
                 if updatePending {
                     Circle().fill(Crystal.clientAccent).frame(width: 7, height: 7).accessibilityHidden(true)
                 }
             }
-            .padding(.horizontal, 6)
-            .frame(height: 32)
+            .padding(.horizontal, 8)
+            .frame(height: 34)
             .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(selected ? Crystal.chromeSelected : hovered ? Crystal.chromeHover : .clear)
             }
-            .contentShape(.rect(cornerRadius: 8))
+            .contentShape(.rect(cornerRadius: 9))
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
@@ -138,8 +151,8 @@ private struct SidebarRow: View {
     }
 }
 
-/// The one engine status in the window: what transcribes, whether it's ready, and the shortcut.
-/// It sits on the frost, so it is one translucent step, not a card.
+/// The one engine status in the window: what transcribes, whether it's ready, and the shortcut,
+/// on a small card at the foot of the sidebar.
 private struct SidebarStatus: View {
     @Environment(AppModel.self) private var model
     @State private var hovered = false
@@ -151,25 +164,23 @@ private struct SidebarStatus: View {
         Button {
             if remote { model.settingsTab = .transcription; model.section = .settings } else { model.section = .models }
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 9) {
-                    // The dot sits in the tile column, so the text lines up with the sections'.
-                    Group {
-                        if case .listening = model.dictation.phase {
-                            StatusDot(color: Crystal.live, pulsing: true)
-                        } else {
-                            StatusDot(color: remote ? host.tint : state.tint, pulsing: remote ? host.state == .checking : state.isBusy)
-                        }
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(spacing: 8) {
+                    Image(systemName: remote ? "server.rack" : "brain")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Crystal.clientAccent)
+                        .frame(width: 20)
+                    Text(remote ? "Network device" : model.models.activeModel.shortName)
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
+                    Spacer(minLength: 4)
+                    if case .listening = model.dictation.phase {
+                        StatusDot(color: Crystal.live, pulsing: true)
+                    } else {
+                        StatusDot(color: remote ? host.tint : state.tint, pulsing: remote ? host.state == .checking : state.isBusy)
                     }
-                    .frame(width: 22)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(remote ? "Network device" : model.models.activeModel.shortName)
-                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
-                        statusLine(state: state, remote: remote, host: host)
-                            .font(.system(size: 11)).foregroundStyle(Crystal.ink2).lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
                 }
+                statusLine(state: state, remote: remote, host: host)
+                    .font(.system(size: 11)).foregroundStyle(Crystal.ink2).lineLimit(1)
                 HStack(spacing: 4) {
                     Text(model.settings.settings.recordingShortcutMode == .pushToTalk ? "Hold to dictate" : "Dictate")
                         .font(.system(size: 11)).foregroundStyle(Crystal.ink2)
@@ -177,10 +188,9 @@ private struct SidebarStatus: View {
                     ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
                 }
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 6)
-            .background(hovered ? Crystal.chromeSelected : Crystal.chromeHover, in: .rect(cornerRadius: 10, style: .continuous))
-            .contentShape(.rect(cornerRadius: 10))
+            .padding(12)
+            .cardSurface(cornerRadius: 14, tint: hovered ? Crystal.ink : nil)
+            .contentShape(.rect(cornerRadius: 14))
             .accessibilityElement(children: .combine)
         }
         .buttonStyle(.plain)
@@ -199,12 +209,12 @@ private struct SidebarStatus: View {
         case .transcribing:
             Text("Transcribing…")
         default:
-            Text(remote ? host.stateLabel : state.label)
+            Text(remote ? host.stateLabel : state.isReady ? "Neural Engine · ready" : state.label)
         }
     }
 }
 
 extension UpdateStyle {
-    /// The client's Crystal green, with the Crystal warning colour.
+    /// The client's teal, with the Crystal warning colour.
     static let client = UpdateStyle(accent: Crystal.clientAccent, warning: Crystal.warn)
 }

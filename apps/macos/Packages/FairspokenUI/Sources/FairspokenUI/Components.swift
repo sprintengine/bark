@@ -1,18 +1,19 @@
 import FairspokenCore
 import SwiftUI
 
-/// A solid content card: opaque fill, 12 pt corners, a hairline edge, a 1 pt highlight along the
-/// top and a tight, soft shadow. Cards stand on `Crystal.canvas`; they are never glass, so they
-/// can hold rows, fields and controls directly. `tint` washes the card faintly (a highlighted
-/// choice); `fillHeight` stretches it to its row's height.
+/// A content card. Solid (`SurfaceStyle.solid`, Bark Server): opaque fill, 12 pt corners, a
+/// hairline edge, a 1 pt highlight along the top and a tight, soft shadow, on `Crystal.canvas`.
+/// Frosted (Bark): translucent over the aurora, 22 pt corners, a bright rim and a soft, wide
+/// shadow. Neither is glass, so cards hold rows, fields and controls directly. `tint` washes the
+/// card faintly (a highlighted choice); `fillHeight` stretches it to its row's height.
 public struct Card<Content: View>: View {
-    var cornerRadius: CGFloat
+    var cornerRadius: CGFloat?
     var padding: CGFloat
     var tint: Color?
     var fillHeight: Bool
     @ViewBuilder var content: Content
 
-    public init(cornerRadius: CGFloat = CardMetrics.radius, padding: CGFloat = 16, tint: Color? = nil, fillHeight: Bool = false,
+    public init(cornerRadius: CGFloat? = nil, padding: CGFloat = 16, tint: Color? = nil, fillHeight: Bool = false,
                 @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
         self.padding = padding
@@ -33,29 +34,56 @@ public struct Card<Content: View>: View {
 public typealias GlassCard = Card
 
 public enum CardMetrics {
-    /// One radius for every content card.
+    /// One radius for every solid content card (frosted cards use `Frost.radius`).
     public static let radius: CGFloat = 12
     /// The gap between cards (and between the content column and the window's frost).
     public static let gap: CGFloat = 4
 }
 
 extension View {
-    /// The card material on any shape-sized view: `Crystal.card`, hairline edge, top highlight,
-    /// tight shadow. `selected` draws an accent edge instead of the hairline.
-    public func cardSurface(cornerRadius: CGFloat = CardMetrics.radius, tint: Color? = nil, selected: Color? = nil) -> some View {
+    /// The card material on any shape-sized view, in the environment's `SurfaceStyle`. The
+    /// radius defaults to the style's. `selected` draws an accent edge instead of the hairline.
+    public func cardSurface(cornerRadius: CGFloat? = nil, tint: Color? = nil, selected: Color? = nil) -> some View {
         modifier(CardSurface(cornerRadius: cornerRadius, tint: tint, selected: selected))
     }
 }
 
 private struct CardSurface: ViewModifier {
-    var cornerRadius: CGFloat
+    var cornerRadius: CGFloat?
     var tint: Color?
     var selected: Color?
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.surfaceStyle) private var style
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        content
+        if style == .frosted { frosted(content) } else { solid(content) }
+    }
+
+    private func frosted(_ content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius ?? Frost.radius, style: .continuous)
+        let dark = scheme == .dark
+        return content
+            .background {
+                shape.fill(reduceTransparency ? Frost.cardSolid : Frost.card)
+                    .overlay { if let tint { shape.fill(tint.opacity(dark ? 0.12 : 0.08)) } }
+                    .shadow(color: .black.opacity(dark ? 0.28 : 0.05), radius: 18, y: 8)
+            }
+            .overlay {
+                if let selected {
+                    shape.strokeBorder(selected, lineWidth: 1.5)
+                } else {
+                    // A rim that catches the light at the top and fades down the sides.
+                    shape.strokeBorder(LinearGradient(colors: [Frost.edge, Frost.edge.opacity(dark ? 0.6 : 0.45)],
+                                                      startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    shape.strokeBorder(Crystal.hairline.opacity(dark ? 0.0 : 0.5), lineWidth: 0.5)
+                }
+            }
+    }
+
+    private func solid(_ content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius ?? CardMetrics.radius, style: .continuous)
+        return content
             .background {
                 shape.fill(Crystal.card)
                     .overlay { if let tint { shape.fill(tint.opacity(scheme == .dark ? 0.10 : 0.06)) } }
@@ -84,8 +112,24 @@ public struct IconTile: View {
         self.size = size
     }
 
+    @Environment(\.surfaceStyle) private var style
+
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+        if style == .frosted {
+            // October's soft tile: the symbol in its colour on a wash of it.
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.5, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: size, height: size)
+                .background(color.opacity(0.15), in: shape)
+                .accessibilityHidden(true)
+        } else {
+            solidTile(shape)
+        }
+    }
+
+    private func solidTile(_ shape: RoundedRectangle) -> some View {
         Image(systemName: symbol)
             .font(.system(size: size * 0.52, weight: .semibold))
             .foregroundStyle(.white)
@@ -264,13 +308,26 @@ public struct Chip: View {
         self.text = text; self.symbol = symbol; self.tint = tint; self.dot = dot; self.flat = flat
     }
 
+    @Environment(\.surfaceStyle) private var style
+    @Environment(\.colorScheme) private var scheme
+
     public var body: some View {
         let label = HStack(spacing: 6) {
             if let dot { StatusDot(color: dot) }
             if let symbol { Image(systemName: symbol).imageScale(.small).foregroundStyle(tint ?? Crystal.ink2) }
             Text(text).lineLimit(1)
         }
-        if flat {
+        if flat && style == .frosted {
+            // October's pill: a raised capsule of the card material.
+            label
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Crystal.ink)
+                .padding(.horizontal, 13)
+                .frame(height: 30)
+                .background(Capsule().fill(Frost.cardSolid.opacity(scheme == .dark ? 0.7 : 0.9))
+                    .shadow(color: .black.opacity(scheme == .dark ? 0.25 : 0.06), radius: 8, y: 3))
+                .overlay(Capsule().strokeBorder(Frost.edge))
+        } else if flat {
             label
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Crystal.ink)

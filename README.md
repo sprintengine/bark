@@ -10,7 +10,7 @@ text lands in whatever app you're typing in.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
-    <img src="docs/images/home-light.png" width="800" alt="Bark's Home window: today's pace, words and time saved, the last dictation, and recent dictations with the app each went into">
+    <img src="docs/images/home-light.png" width="800" alt="Bark's Home window: a banner with the dog, a greeting and the shortcut, the last dictation beside a big microphone, the time saved, and today's, this week's, latency and streak tiles">
   </picture>
 </p>
 
@@ -45,7 +45,7 @@ without it.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/pill-dark.png">
-    <img src="docs/images/pill-light.png" width="600" alt="The pill while you dictate: the words so far, the recording level and time, and the shortcuts to stop or cancel">
+    <img src="docs/images/pill-light.png" width="600" alt="The pill while you dictate: the words so far, the voice level and the time">
   </picture>
 </p>
 

@@ -50,14 +50,17 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
             // The grouped form centres its rows in its own width, so it gets exactly the rows'
-            // width plus its 20 pt inset: the wells then line up with the title at every size.
-            .frame(maxWidth: 744, alignment: .leading)
-            // The form's own inset lines its groups up with the title.
-            .padding(.horizontal, Layout.pageH - 20)
+            // width plus its 20 pt inset.
+            .frame(maxWidth: 744, maxHeight: .infinity, alignment: .topLeading)
+            // Settings is one frosted card: its grouped rows are wells on it, as fields are on
+            // any card. The card's edge lines up with the title.
+            .padding(.vertical, 2)
+            .cardSurface()
+            .padding(.horizontal, Layout.pageH)
+            .padding(.top, 4)
+            .padding(.bottom, Layout.pageH - 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        // Settings is one card: its grouped rows are wells on it, as fields are on any card.
-        .background(Crystal.card)
         .onAppear { model.permissions.beginPolling() }
         .onDisappear { model.permissions.endPolling() }
     }

@@ -20,11 +20,14 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         if dashboard == nil {
             let hosting = NSHostingController(rootView: DashboardView().environment(model))
             let window = AppWindow(contentViewController: hosting)
-            // A hidden, transparent title bar: the traffic lights sit on the sidebar's frost.
+            // A hidden, transparent title bar. The empty unified toolbar makes it taller, so the
+            // traffic lights sit inside the sidebar's floating panel rather than on its corner.
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.title = AppInfo.displayName
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
+            window.toolbar = NSToolbar(identifier: "dashboard")
+            window.toolbarStyle = .unified
             window.isReleasedWhenClosed = false
             window.setContentSize(NSSize(width: 1180, height: 820))
             window.minSize = NSSize(width: 960, height: 640)

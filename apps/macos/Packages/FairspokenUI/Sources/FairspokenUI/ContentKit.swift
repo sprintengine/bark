@@ -29,13 +29,16 @@ public struct ContentCard<Content: View>: View {
         self.content = content()
     }
 
+    @Environment(\.surfaceStyle) private var style
+
     public var body: some View {
-        let shape = RoundedRectangle(cornerRadius: ContentMetrics.cornerRadius, style: .continuous)
+        let radius = style == .frosted ? Frost.radius : ContentMetrics.cornerRadius
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .clipShape(shape)
-            .cardSurface(cornerRadius: ContentMetrics.cornerRadius)
+            .cardSurface(cornerRadius: radius)
     }
 }
 
