@@ -1,4 +1,5 @@
 import FairspokenSpeech
+import FairspokenWhisper
 import FairspokenUpdates
 import AppKit
 import FairspokenCore
@@ -77,7 +78,7 @@ final class AppModel {
 
     /// Launch-time work: warm the engine so the first dictation is instant, start Fn if enabled.
     func startServices() {
-        if settings.settings.transcriptionLocation != .remoteHost || FluidAudioEngine.isInstalled(settings.settings.model) {
+        if settings.settings.transcriptionLocation != .remoteHost || SpeechModels.isInstalled(settings.settings.model) {
             models.prepare(settings.settings.model)
         }
         applyFnSetting()
@@ -154,6 +155,6 @@ final class AppModel {
             let host = URL(string: settings.settings.remoteUrl)?.host() ?? "your host"
             return ("Your transcription host", host, .remoteHost)
         }
-        return (models.activeModel.name, "Apple Neural Engine · on this device", .neuralEngine)
+        return (models.activeModel.name, "\(models.activeModel.engine.runtime) · Neural Engine · on this device", .neuralEngine)
     }
 }

@@ -1,4 +1,5 @@
 import FairspokenSpeech
+import FairspokenWhisper
 import FairspokenUI
 import FairspokenUpdates
 import KeyboardShortcuts
@@ -247,7 +248,7 @@ private struct TranscriptionSettings: View {
                         model.models.prepare(v)
                     })) {
                         ForEach(SpeechModelCatalog.all) { info in
-                            Text(info.name + (FluidAudioEngine.isInstalled(info.id) ? "" : " (\(Format.bytes(info.approxBytes)) download)")).tag(info.id)
+                            Text(info.name + (SpeechModels.isInstalled(info.id) ? "" : " (\(Format.bytes(info.approxBytes)) download)")).tag(info.id)
                         }
                     }
                     let state = model.models.engineState

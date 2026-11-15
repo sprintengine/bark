@@ -91,6 +91,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var restoreClipboard = true
     /// Where kept dictations go (`TrainingDataStore`); empty for the app's own folder.
     public var trainingDataFolder = ""
+    /// Starred models in the Models library, by catalogue id (listed first).
+    public var favoriteModels: [String] = []
 
     public init() {}
 
@@ -133,6 +135,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         modelLinks = c.lenient([String: String].self, .modelLinks) ?? d.modelLinks
         restoreClipboard = c.lenient(Bool.self, .restoreClipboard) ?? d.restoreClipboard
         trainingDataFolder = c.lenient(String.self, .trainingDataFolder) ?? d.trainingDataFolder
+        favoriteModels = c.lenient([String].self, .favoriteModels) ?? d.favoriteModels
         self = normalized()
     }
 
@@ -154,6 +157,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         s.modelLinks = ModelLink.normalizeMap(s.modelLinks)
         // Unknown ids (e.g. Whisper models from the Tauri app) fall back to the default, as in Rust.
         if SpeechModelCatalog.model(id: s.model) == nil { s.model = SpeechModelCatalog.defaultModelID }
+        var seen = Set<String>()
+        s.favoriteModels = s.favoriteModels.filter { SpeechModelCatalog.model(id: $0) != nil && seen.insert($0).inserted }
         return s
     }
 
