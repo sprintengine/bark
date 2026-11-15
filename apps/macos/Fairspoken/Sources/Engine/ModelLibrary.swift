@@ -66,6 +66,9 @@ final class ModelLibrary {
 
     /// Runs whichever engine the active model needs; dictation transcribes through it.
     let engine = LocalSpeechRouter()
+    /// Called when a model failed to load and the previous one was put back (its id), so the
+    /// saved choice can follow what is really in use.
+    @ObservationIgnored var onFallback: ((String) -> Void)?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var downloads: [String: Task<Void, Never>] = [:]
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "models")
@@ -118,13 +121,24 @@ final class ModelLibrary {
                     self.lastLoadSeconds = Date().timeIntervalSince(started)
                     self.refresh()
                 }
+            } catch is CancellationError {
+                // A newer choice replaced this one; it reports for itself.
             } catch {
+                // The router puts the previous model back when it can.
+                let fallback = await engine.loadedModelID
                 await MainActor.run {
                     guard let self, self.activeModelID == id else { return }
                     Self.log.error("Model load failed: \(error.localizedDescription, privacy: .public)")
-                    self.engineState = .failed("Couldn't load the model: \(error.localizedDescription)")
-                    // A model that never arrived shows why on its row too.
-                    if !SpeechModels.isInstalled(id) { self.downloadErrors[id] = error.localizedDescription }
+                    let message = "Couldn't load the model: \(error.localizedDescription)"
+                    // The model's row says why, whether or not it arrived.
+                    self.downloadErrors[id] = message
+                    if let fallback, fallback != id {
+                        self.activeModelID = fallback
+                        self.engineState = .ready
+                        self.onFallback?(fallback)
+                    } else {
+                        self.engineState = .failed(message)
+                    }
                     if self.items[id] != .installed { self.items[id] = nil }
                     self.refresh()
                 }

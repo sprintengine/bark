@@ -57,6 +57,8 @@ final class AppModel {
         dictation = DictationController(settings: settings, models: models, history: history, permissions: permissions,
                                         training: training)
         hostStatus = HostStatus(settings: settings)
+        // A model that failed to load leaves the previous one in use; the saved choice follows it.
+        models.onFallback = { [weak settings] id in settings?.update { $0.model = id } }
         hostFinder = HostFinder(settings: settings, hostStatus: hostStatus)
         var updateConfig = UpdateController.Configuration(appName: AppInfo.displayName, version: AppInfo.version, build: AppInfo.build)
         #if DEBUG

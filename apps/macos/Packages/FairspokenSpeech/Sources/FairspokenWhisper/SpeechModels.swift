@@ -55,31 +55,89 @@ public enum SpeechModels {
 }
 
 /// The dictation client's engine: runs the chosen model on FluidAudio (Parakeet) or WhisperKit
-/// (Whisper), with one model loaded at a time.
+/// (Whisper), with one model in memory at a time.
+///
+/// Replacing the model is serialised: one replacement runs at a time, and a newer request
+/// cancels the one in flight and waits for it before starting, so a slow load that finishes late
+/// can never take the place of a newer choice. The previous model is released before the new
+/// weights load (a 16 GB Mac shouldn't hold two), and loaded again if the new one fails, so
+/// dictation keeps working and the caller still gets the error.
 public actor LocalSpeechRouter: SpeechEngine {
-    private let parakeet = FluidAudioEngine()
-    private let whisper = WhisperKitEngine()
+    private let parakeet: any LocalSpeechEngine
+    private let whisper: any LocalSpeechEngine
     private var active: (any LocalSpeechEngine)?
+    private var inFlight: Task<Void, Error>?
+    private var generation = 0
 
-    public init() {}
+    public init() {
+        self.init(parakeet: FluidAudioEngine(), whisper: WhisperKitEngine())
+    }
+
+    /// Engines supplied by the caller (tests).
+    public init(parakeet: any LocalSpeechEngine, whisper: any LocalSpeechEngine) {
+        self.parakeet = parakeet
+        self.whisper = whisper
+    }
 
     public var loadedModelID: String? {
         get async { await active?.loadedModelID }
     }
 
-    /// Download if missing, load and warm up `id` on its engine, then free the other engine's model.
+    /// Makes `id` the loaded model (downloading it first if it is missing). Throws
+    /// `CancellationError` when a newer `load` replaced this request before it finished.
     public func load(_ id: String, progress: @escaping @Sendable (ModelStage) -> Void) async throws {
-        let (engine, other): (any LocalSpeechEngine, any LocalSpeechEngine) = switch SpeechModels.engine(of: id) {
-        case .parakeet: (parakeet, whisper)
-        case .whisper: (whisper, parakeet)
-        case nil: throw SpeechEngineError.unknownModel(id)
+        guard let engine = engine(for: id) else { throw SpeechEngineError.unknownModel(id) }
+        generation += 1
+        let ticket = generation
+        if let previous = inFlight {
+            previous.cancel()
+            _ = try? await previous.value
         }
-        try await engine.load(id, progress: progress)
+        // Another request arrived while this one waited.
+        guard ticket == generation else { throw CancellationError() }
+        let task = Task { try await self.replace(with: id, on: engine, ticket: ticket, progress: progress) }
+        inFlight = task
+        defer { if ticket == generation { inFlight = nil } }
+        try await task.value
+    }
+
+    private func engine(for id: String) -> (any LocalSpeechEngine)? {
+        switch SpeechModels.engine(of: id) {
+        case .parakeet: parakeet
+        case .whisper: whisper
+        case nil: nil
+        }
+    }
+
+    private func isCurrent(_ ticket: Int) -> Bool { ticket == generation && !Task.isCancelled }
+
+    private func replace(with id: String, on engine: any LocalSpeechEngine, ticket: Int,
+                         progress: @escaping @Sendable (ModelStage) -> Void) async throws {
+        let previous = active
+        let previousID = await previous?.loadedModelID
+        if previous === engine, previousID == id { return }
+        // Free the old weights first.
+        if let previous { await previous.unload() }
+        active = nil
+        do {
+            try await engine.load(id, progress: progress)
+        } catch {
+            guard isCurrent(ticket) else { throw CancellationError() }
+            // Put the previous model back so dictation still works; the caller shows the error.
+            if let previous, let previousID, (try? await previous.load(previousID, progress: { _ in })) != nil {
+                active = previous
+            }
+            throw error
+        }
+        // What is in memory is what `active` says, even when a newer request is about to replace it.
         active = engine
-        await other.unload()
+        guard isCurrent(ticket) else { throw CancellationError() }
     }
 
     public func unload() async {
+        generation += 1
+        inFlight?.cancel()
+        _ = try? await inFlight?.value
         await parakeet.unload()
         await whisper.unload()
         active = nil

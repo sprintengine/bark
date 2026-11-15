@@ -186,7 +186,7 @@ function applyToForm(settings: Settings): void {
   maxRecordingSeconds.value = String(settings.maxRecordingSeconds);
   noteRetentionMinutes.value = String(settings.noteRetentionMinutes);
   trainingCapture.checked = settings.trainingCapture;
-  trainingRetentionDays.value = String(settings.trainingRetentionDays);
+  trainingRetentionDays.value = String(settings.trainingKeepDays);
   recordingModeSeg.set(settings.recordingShortcutMode);
   renderShortcutChips(settings);
   insertAtCursor.checked = settings.insertAtCursor;
@@ -253,7 +253,7 @@ function readFromForm(): Settings {
     maxRecordingSeconds: Number(maxRecordingSeconds.value),
     noteRetentionMinutes: Number(noteRetentionMinutes.value),
     trainingCapture: trainingCapture.checked,
-    trainingRetentionDays: Number(trainingRetentionDays.value),
+    trainingKeepDays: Number(trainingRetentionDays.value),
     recordingShortcutMode: recordingModeSeg.get() as RecordingShortcutMode,
     ...readShortcutChips(DEFAULTS),
     useGpu: useGpu.checked,

@@ -14,6 +14,22 @@ final class TrainingLibrary {
     /// False when a chosen folder is missing, e.g. its drive isn't connected.
     private(set) var isAvailable = true
     private(set) var lastError: String?
+    /// A deletion that couldn't move its recordings to the Trash (a volume without one), waiting
+    /// for the user to confirm deleting them permanently. Nothing has been deleted yet.
+    private(set) var needsPermanentDeletion: PendingDeletion?
+
+    /// What a delete removes.
+    enum Deletion: Equatable, Sendable {
+        case one(String)
+        case all
+    }
+
+    /// A deletion bound to the folder it was asked of, so confirming it can never act on a folder
+    /// chosen since.
+    struct PendingDeletion: Equatable, Sendable {
+        let deletion: Deletion
+        let root: URL
+    }
 
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let persists: Bool
@@ -95,22 +111,57 @@ final class TrainingLibrary {
         }
     }
 
-    func delete(_ id: String) {
-        mutate { try $0.delete(id) }
-    }
-
-    func deleteAll() {
-        mutate { try $0.deleteAll() }
-    }
-
-    private func mutate(_ change: @escaping @Sendable (TrainingDataStore) throws -> Void) {
+    /// Moves recordings to the Trash. When that fails, nothing is deleted and
+    /// `needsPermanentDeletion` asks the user before anything is removed for good.
+    func delete(_ deletion: Deletion) {
         guard persists else { return }
-        let store = store()
+        run(deletion, removal: .trash, in: store())
+    }
+
+    /// Only after the user confirmed it, when moving to the Trash failed, and only in the folder
+    /// it was asked of: a prompt left over from another folder is dropped.
+    func deletePermanently(_ pending: PendingDeletion) {
+        needsPermanentDeletion = nil
+        guard persists, pending.root == folder else { return }
+        run(pending.deletion, removal: .permanent, in: TrainingDataStore(root: pending.root))
+    }
+
+    func keepAfterTrashFailed() {
+        needsPermanentDeletion = nil
+    }
+
+    private enum Outcome: Sendable {
+        case done
+        case trashUnavailable
+        case failed(String)
+    }
+
+    private func run(_ deletion: Deletion, removal: TrainingDataStore.Removal, in store: TrainingDataStore) {
         queue.async { [weak self] in
-            let error = (try? change(store)) == nil ? "Couldn't change the recordings in \(store.root.path)." : nil
+            let outcome: Outcome
+            do {
+                switch deletion {
+                case .one(let id): try store.delete(id, removal: removal)
+                case .all: try store.deleteAll(removal: removal)
+                }
+                outcome = .done
+            } catch TrainingDataStore.StoreError.couldNotTrash {
+                outcome = .trashUnavailable
+            } catch {
+                outcome = .failed("Couldn't change the recordings in \(store.root.path): \(error.localizedDescription)")
+            }
             DispatchQueue.main.async {
-                self?.lastError = error
-                self?.refresh()
+                guard let self else { return }
+                switch outcome {
+                case .done: self.lastError = nil
+                case .trashUnavailable:
+                    // Asked of a folder that is no longer the current one: don't offer it.
+                    if store.root == self.folder {
+                        self.needsPermanentDeletion = PendingDeletion(deletion: deletion, root: store.root)
+                    }
+                case .failed(let message): self.lastError = message
+                }
+                self.refresh()
             }
         }
     }
@@ -141,11 +192,13 @@ final class TrainingLibrary {
             return
         }
         settings.update { $0.trainingDataFolder = target.path }
+        needsPermanentDeletion = nil
         refresh()
     }
 
     func useDefaultFolder() {
         settings.update { $0.trainingDataFolder = "" }
+        needsPermanentDeletion = nil
         refresh()
     }
 

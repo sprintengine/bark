@@ -36,7 +36,7 @@ public protocol SpeechEngine: Sendable {
 
 /// One dictation's worth of transcription. Local sessions buffer and transcribe on
 /// `finish`; remote sessions stream frames to the host while the user speaks.
-/// Phase 1 adds a chunked local session (live preview) behind the same protocol.
+/// `LiveTranscriptionSession` also shows the words while the user speaks.
 public protocol TranscriptionSession: AnyObject, Sendable {
     /// Called from the audio thread with 16 kHz mono samples; must not block.
     func append(_ samples16k: [Float])

@@ -93,6 +93,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var trainingDataFolder = ""
     /// Starred models in the Models library, by catalogue id (listed first).
     public var favoriteModels: [String] = []
+    /// Show the words in the recording pill while the user speaks (local transcription only;
+    /// the host protocol has no partial results).
+    public var showTextWhileSpeaking = true
 
     public init() {}
 
@@ -136,6 +139,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         restoreClipboard = c.lenient(Bool.self, .restoreClipboard) ?? d.restoreClipboard
         trainingDataFolder = c.lenient(String.self, .trainingDataFolder) ?? d.trainingDataFolder
         favoriteModels = c.lenient([String].self, .favoriteModels) ?? d.favoriteModels
+        showTextWhileSpeaking = c.lenient(Bool.self, .showTextWhileSpeaking) ?? d.showTextWhileSpeaking
         self = normalized()
     }
 
