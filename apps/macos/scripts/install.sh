@@ -15,12 +15,22 @@ case "$APP" in
   all) names=("$(sed -nE 's/^MV_DISPLAY_NAME = (.*)$/\1/p' Config/Base.xcconfig)" "$(sed -nE 's/^MV_DISPLAY_NAME = (.*)$/\1/p' Config/Server.xcconfig)") ;;
 esac
 mkdir -p "$HOME/Applications"
+plist() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
 for name in "${names[@]}"; do
   SRC="build/Build/Products/Release/$name.app"
   DEST="$HOME/Applications/$name.app"
-  osascript -e "quit app \"$name\"" 2>/dev/null || true
-  pkill -x "$name" 2>/dev/null || true
+  BUNDLE_ID="$(plist "$SRC" CFBundleIdentifier)"
+  EXE="$(plist "$SRC" CFBundleExecutable)"
+  osascript -e "quit app id \"$BUNDLE_ID\"" 2>/dev/null || true
+  pkill -x "$EXE" 2>/dev/null || true
   rm -rf "$DEST"
+  # A copy installed before the rename to Bark is named after the executable, which kept the
+  # old name (Fairspoken.app, Fairspoken Server.app). Remove it if it is the same app.
+  OLD="$HOME/Applications/$EXE.app"
+  if [[ "$OLD" != "$DEST" && -d "$OLD" && "$(plist "$OLD" CFBundleIdentifier)" == "$BUNDLE_ID" ]]; then
+    rm -rf "$OLD"
+    echo "Removed the copy installed under the old name: $OLD"
+  fi
   ditto "$SRC" "$DEST"
   echo "Installed: $DEST"
   open "$DEST"
