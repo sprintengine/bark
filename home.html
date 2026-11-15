@@ -16,17 +16,16 @@
         <!-- Room for the native traffic lights; drags the window. -->
         <div class="sidebar-chrome" data-tauri-drag-region></div>
         <div class="sidebar-brand" data-tauri-drag-region>
-          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10.5v3M7.5 7v10M11 4v16M14.5 8v8M18 5.5v13M21 10.5v3"/></svg></span>
+          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4.5 10.5v3M8 7.5v9M11.5 4.5v15M15 8v8M18.5 10v4"/></svg></span>
           <span class="brand-name">Fairspoken</span>
         </div>
         <nav class="nav" aria-label="Primary">
-          <button class="nav-item" type="button" data-screen="home" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 10.5v3M7.5 7v10M11 4v16M14.5 8v8M18 5.5v13M21 10.5v3"/></svg><span class="nav-label">Home</span></button>
-          <button class="nav-item" type="button" data-screen="notes"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4" stroke-linecap="round"/></svg><span class="nav-label">Notes</span></button>
-          <button class="nav-item" type="button" data-screen="dictionary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h12v17h-12A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M5 18.5A1.5 1.5 0 0 1 6.5 17h12M9.5 13.5l2.5-6.5 2.5 6.5M10.4 11.5h3.2"/></svg><span class="nav-label">Dictionary</span></button>
-          <button class="nav-item" type="button" data-screen="models"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" stroke-linejoin="round"/></svg><span class="nav-label">Models</span></button>
-          <button class="nav-item" type="button" data-screen="activity"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12h4l2.5 7 5-14L17 12h4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="nav-label">Activity</span></button>
-          <button class="nav-item" type="button" data-screen="settings" id="settingsRailButton"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9.81 4.93 10.09 2.59h3.82l.28 2.34 1.26.52 1.85-1.45 2.7 2.7-1.45 1.85.52 1.26 2.34.28v3.82l-2.34.28-.52 1.26 1.45 1.85-2.7 2.7-1.85-1.45-1.26.52-.28 2.34h-3.82l-.28-2.34-1.26-.52-1.85 1.45-2.7-2.7 1.45-1.85-.52-1.26-2.34-.28v-3.82l2.34-.28.52-1.26L4 6.7 6.7 4l1.85 1.45Z"/><circle cx="12" cy="12" r="3.2"/></svg><span class="nav-label">Settings</span><span class="nav-badge" id="settingsUpdateBadge" aria-hidden="true" hidden></span></button>
-          <button class="nav-item" type="button" data-screen="profile"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3.2"/><path d="M6.4 18.6a6.5 6.5 0 0 1 11.2 0"/></svg><span class="nav-label">Profile</span></button>
+          <button class="nav-item" type="button" data-screen="home" aria-current="page"><span class="nav-tile nav-tile--home" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 10.5v3M8.5 7.5v9M12 4.5v15M15.5 8v8M19 10.5v3"/></svg></span><span class="nav-label">Home</span></button>
+          <button class="nav-item" type="button" data-screen="notes"><span class="nav-tile nav-tile--notes" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="3.5" width="13" height="17" rx="2.5"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/></svg></span><span class="nav-label">Notes</span></button>
+          <button class="nav-item" type="button" data-screen="dictionary"><span class="nav-tile nav-tile--dictionary" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14.5H7.5A2.5 2.5 0 0 0 5 20Z"/><path d="M5 20a1.5 1.5 0 0 0 1.5 1H19"/><path d="m9.5 13.5 2.5-6 2.5 6M10.3 11.6h3.4"/></svg></span><span class="nav-label">Dictionary</span></button>
+          <button class="nav-item" type="button" data-screen="models"><span class="nav-tile nav-tile--models" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.5 8 4.25-8 4.25-8-4.25Z"/><path d="m4 12 8 4.25L20 12M4 16.25l8 4.25 8-4.25"/></svg></span><span class="nav-label">Models</span></button>
+          <button class="nav-item" type="button" data-screen="activity"><span class="nav-tile nav-tile--activity" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5h4l2.5 5.5 5-12 2.5 6.5h4"/></svg></span><span class="nav-label">Activity</span></button>
+          <button class="nav-item" type="button" data-screen="settings" id="settingsRailButton"><span class="nav-tile nav-tile--settings" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9.81 4.93 10.09 2.59h3.82l.28 2.34 1.26.52 1.85-1.45 2.7 2.7-1.45 1.85.52 1.26 2.34.28v3.82l-2.34.28-.52 1.26 1.45 1.85-2.7 2.7-1.85-1.45-1.26.52-.28 2.34h-3.82l-.28-2.34-1.26-.52-1.85 1.45-2.7-2.7 1.45-1.85-.52-1.26-2.34-.28v-3.82l2.34-.28.52-1.26L4 6.7 6.7 4l1.85 1.45Z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="nav-label">Settings</span><span class="nav-badge" id="settingsUpdateBadge" aria-hidden="true" hidden></span></button>
         </nav>
         <div class="nav-spacer"></div>
         <div class="sidebar-foot">
@@ -60,6 +59,10 @@
           <p class="page-subtitle" id="screenSubtitle" hidden></p>
         </div>
         <p id="settingsSaveStatus" class="settings-save-status" role="status" hidden></p>
+        <div class="topbar-actions" id="homeActions">
+          <button class="btn" data-open="voicetest" type="button">Accuracy test</button>
+          <button class="btn" data-open="speedtest" type="button">Speed test</button>
+        </div>
         <div class="search" id="notesSearch" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg>
           <input id="notesSearchInput" type="search" placeholder="Search notes" aria-label="Search notes" />
@@ -70,73 +73,67 @@
         <!-- ════ HOME (stats, driven by homeStats.ts) ════ -->
         <section class="screen active" id="screen-home">
           <div class="empty" id="homeEmpty" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19V9M9 19V5M14 19v-7M19 19v-11" stroke-linecap="round"/></svg>
+            <span class="empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4.5 10.5v3M8 7.5v9M11.5 4.5v15M15 8v8M18.5 10v4"/></svg></span>
             <div class="e-title">Start with your voice</div>
-            <div class="e-sub">Dictate with your shortcut. Your stats appear here.</div>
-            <button class="btn btn-primary" data-open="speedtest" type="button">Run a speed test</button>
+            <div class="e-sub">Press your shortcut in any app and speak. Your pace, words and time saved appear here.</div>
+            <div class="e-actions">
+              <button class="btn btn-primary" data-open="onboarding" type="button">Set up Fairspoken</button>
+              <button class="btn" data-open="speedtest" type="button">Run a speed test</button>
+            </div>
           </div>
 
           <div id="homeStats" hidden>
-            <div class="home-top">
-              <section class="glass-card hero" aria-labelledby="timeSavedLabel">
-                <h2 class="eyebrow" id="timeSavedLabel">Time saved</h2>
-                <div class="value num" id="statTimeSaved">—</div>
-                <div class="sub" id="statTimeSavedSub"></div>
-                <div class="hero-actions">
-                  <button class="btn btn-primary" data-open="speedtest" type="button">Speed test</button>
-                  <button class="btn" data-open="voicetest" type="button">Accuracy test</button>
+            <!-- Four headline figures in one card, split by hairlines. -->
+            <section class="card stat-strip" aria-label="Your dictation">
+              <div class="stat"><div class="stat-label">Average pace</div><div class="stat-value"><span class="num" id="statWpm">0</span><span class="stat-unit">wpm</span></div><div class="stat-meta">measured as you speak</div></div>
+              <div class="stat"><div class="stat-label">Words</div><div class="stat-value"><span class="num" id="statTotalWords">0</span></div><div class="stat-meta" id="statWeekDelta"></div></div>
+              <div class="stat"><div class="stat-label">Apps used</div><div class="stat-value"><span class="num" id="statApps">–</span></div><div class="stat-meta" id="statAppsMeta"></div></div>
+              <div class="stat stat--accent"><div class="stat-label">Time saved</div><div class="stat-value num" id="statTimeSaved">—</div><div class="stat-meta" id="statTimeSavedSub"></div></div>
+            </section>
+
+            <!-- The last few dictations as cards, each with its app, when, and copy. -->
+            <section class="home-section" aria-labelledby="recentTitle" id="recentSection" hidden>
+              <div class="section-head">
+                <h2 id="recentTitle">Recent dictations</h2>
+                <button class="link-btn" type="button" data-route="notes">See all</button>
+              </div>
+              <ol class="recent-list" id="recentList"></ol>
+            </section>
+
+            <div class="home-grid">
+              <section class="card home-card" aria-labelledby="weekChartTitle">
+                <div class="card-head">
+                  <h2 id="weekChartTitle">This week</h2>
+                  <span class="card-meta num" id="statThisWeek"></span>
                 </div>
+                <div class="chart" id="statChart" aria-label="Words per day"></div>
               </section>
-              <section class="glass-card totals" aria-labelledby="totalsTitle">
-                <h2 class="eyebrow" id="totalsTitle">All time</h2>
+              <section class="card home-card" aria-labelledby="totalsTitle">
+                <div class="card-head"><h2 id="totalsTitle">All time</h2></div>
                 <dl class="totals-list">
-                  <div><dt>Words dictated</dt><dd class="num" id="statTotalWords">0</dd></div>
+                  <div><dt>Streak</dt><dd class="num"><span id="statStreak">0</span> days <span class="totals-aside" id="statBestStreak"></span></dd></div>
                   <div><dt>Spoken time</dt><dd class="num" id="statSpokenTime">0 m</dd></div>
                   <div><dt>Money saved</dt><dd class="num" id="statMoneySaved">$0</dd></div>
+                  <div id="statZeroEditTile" hidden><dt>Sent without edits</dt><dd class="num"><span id="statZeroEdit">–</span> <span class="totals-aside" id="statZeroEditMeta"></span></dd></div>
                 </dl>
                 <p class="totals-note" id="statMoneySavedMeta">vs cloud transcription</p>
               </section>
             </div>
-            <section class="glass-card metric-strip" aria-labelledby="usageTitle">
-              <h2 id="usageTitle" class="sr-only">Usage</h2>
-              <div class="stat"><div class="stat-label">This week</div><div class="stat-value"><span class="num" id="statThisWeek">0</span><span class="stat-unit">words</span></div><div class="stat-meta" id="statWeekDelta"></div></div>
-              <div class="stat"><div class="stat-label">Speaking pace</div><div class="stat-value"><span class="num" id="statWpm">0</span><span class="stat-unit">wpm</span></div><div class="stat-meta">measured as you speak</div></div>
-              <div class="stat"><div class="stat-label">Streak</div><div class="stat-value"><span class="num" id="statStreak">0</span><span class="stat-unit">days</span></div><div class="stat-meta" id="statBestStreak"></div></div>
-              <div class="stat" id="statZeroEditTile" hidden><div class="stat-label">Zero-edit</div><div class="stat-value"><span class="num" id="statZeroEdit">–</span></div><div class="stat-meta" id="statZeroEditMeta">last 30 days</div></div>
-            </section>
-            <section class="settings-section" aria-labelledby="performanceTitle" id="performanceSection" hidden>
-              <div class="settings-section-header">
+
+            <section class="home-section" aria-labelledby="performanceTitle" id="performanceSection" hidden>
+              <div class="section-head">
                 <h2 id="performanceTitle">Last dictation</h2>
-                <span class="settings-section-meta" id="perfSummary"></span>
+                <span class="section-meta" id="perfSummary"></span>
               </div>
-              <div class="glass-card metric-strip">
+              <div class="card stat-strip stat-strip--compact">
                 <div class="stat"><div class="stat-label">Wait after release</div><div class="stat-value num" id="perfTotal">–</div><div class="stat-meta" id="perfTotalMeta"></div></div>
                 <div class="stat"><div class="stat-label">Final transcription</div><div class="stat-value num" id="perfTranscribe">–</div><div class="stat-meta" id="perfTranscribeMeta"></div></div>
                 <div class="stat"><div class="stat-label">Speech model</div><div class="stat-value num" id="perfModel">–</div><div class="stat-meta" id="perfModelMeta"></div></div>
                 <div class="stat"><div class="stat-label">Polish</div><div class="stat-value num" id="perfPolish">–</div><div class="stat-meta" id="perfPolishMeta"></div></div>
               </div>
             </section>
-            <section class="settings-section" aria-labelledby="weekChartTitle">
-              <h2 id="weekChartTitle">This week</h2>
-              <div class="glass-card">
-                <div class="chart" id="statChart" aria-label="Words per day"></div>
-              </div>
-            </section>
           </div>
           <section id="monthlyUsage" aria-label="Monthly dictation activity"></section>
-        </section>
-
-        <section class="screen" id="screen-profile" aria-label="Your profile">
-          <div class="profile-content">
-            <div class="profile-heading"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><div><p>Everything stays on this device</p></div></div>
-            <section class="settings-section" aria-label="Account">
-              <div class="settings-card">
-                <div class="row"><div class="row-text"><div class="row-label">Appearance</div></div><div class="row-control"><button class="btn" type="button" data-route="settings" data-settings-target="appearance">Change</button></div></div>
-                <div class="row"><div class="row-text"><div class="row-label">Dictionary</div></div><div class="row-control"><button type="button" class="btn" data-route="dictionary">Open</button></div></div>
-                <div class="row"><div class="row-text"><div class="row-label">Settings</div></div><div class="row-control"><button type="button" class="btn" data-route="settings">Open</button></div></div>
-              </div>
-            </section>
-          </div>
         </section>
 
         <!-- ════ NOTES (library, driven by notes.ts) ════ -->
@@ -210,7 +207,7 @@
           <div class="settings-card">
             <div class="row">
               <div class="row-text">
-                <div class="row-label" id="activitySummary">All clear</div>
+                <div class="row-label" id="activitySummary"></div>
               </div>
               <div class="row-control">
                 <button class="btn btn-ghost" id="clearActivityButton" type="button">Clear</button>
@@ -220,40 +217,54 @@
           </div>
         </section>
 
+        <!-- ════ MODELS (a library table, driven by modelDashboard.ts) ════ -->
         <section class="screen" id="screen-models" aria-label="Models">
-          <section class="settings-section" aria-label="Find models">
-            <div class="settings-card model-search-card">
-              <div class="row row--field">
-                <span class="ds-field-box" id="modelSearchBox">
-                  <svg class="model-search-hint" viewBox="0 0 11 11" fill="none" aria-hidden="true"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M7 7l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                  <input id="modelSearch" class="ds-input ds-input--seamless" type="search" placeholder="Search models on this device and Hugging Face" autocomplete="off" maxlength="120" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="modelSearchListbox" aria-label="Search speech models on this device and Hugging Face." aria-describedby="modelSearchStatus" />
-                  <button type="button" id="modelSearchClear" class="model-search-clear" hidden>Clear</button>
-                </span>
-                <button class="btn" id="refreshModels" type="button">Refresh</button>
-              </div>
-              <div class="model-search-status" id="modelSearchStatus" role="status" aria-live="polite"></div>
-              <div id="modelSearchListbox" class="ds-popover model-search-popover" role="listbox" aria-label="Model search results" hidden></div>
-              <div id="modelSearchResults" aria-busy="false"></div>
+          <div class="model-toolbar">
+            <span class="ds-field-box" id="modelSearchBox">
+              <svg class="model-search-hint" viewBox="0 0 11 11" fill="none" aria-hidden="true"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M7 7l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <input id="modelSearch" class="ds-input ds-input--seamless" type="search" placeholder="Search models" autocomplete="off" maxlength="120" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="modelSearchListbox" aria-label="Search models on this device and Hugging Face." aria-describedby="modelSearchStatus" />
+              <button type="button" id="modelSearchClear" class="model-search-clear" hidden>Clear</button>
+            </span>
+            <div class="seg" id="modelKindFilter" role="group" aria-label="Kind">
+              <button type="button" data-value="all" aria-pressed="true">All</button>
+              <button type="button" data-value="speech" aria-pressed="false">Speech</button>
+              <button type="button" data-value="polish" aria-pressed="false">Polish</button>
             </div>
-          </section>
+            <select id="modelLanguageFilter" class="setting-select" aria-label="Language">
+              <option value="all">All languages</option>
+              <option value="en">English only</option>
+              <option value="multi">Multilingual</option>
+            </select>
+            <button type="button" class="filter-chip" id="modelDownloadedFilter" aria-pressed="false">Downloaded</button>
+            <button type="button" class="filter-chip" id="modelLocalFilter" aria-pressed="false">On this device</button>
+            <span class="model-toolbar-spacer"></span>
+            <button class="icon-btn" id="refreshModels" type="button" aria-label="Refresh from Hugging Face" title="Refresh from Hugging Face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg></button>
+          </div>
+          <div class="model-search-status" id="modelSearchStatus" role="status" aria-live="polite"></div>
+          <div id="modelSearchListbox" class="ds-popover model-search-popover" role="listbox" aria-label="Model search results" hidden></div>
           <p id="modelFeedback" class="model-feedback" role="status" aria-live="polite"></p>
-          <section class="settings-section" aria-labelledby="dictationModelsTitle">
-            <h2 id="dictationModelsTitle">Dictation</h2>
-            <p class="settings-section-help" id="dictationProvider"></p>
-            <div class="settings-card" id="dictationModels"></div>
-          </section>
-          <section class="settings-section" aria-labelledby="polishModelsTitle">
-            <h2 id="polishModelsTitle">Text polish</h2>
-            <div class="settings-card" id="polishModelsCard">
-              <div class="row">
-                <div class="row-text">
-                  <div class="row-label">Polish</div>
-                  <div class="row-help" id="polishProvider"></div>
-                </div>
-                <div class="row-control" id="polishProviderActions"></div>
-              </div>
-              <div id="polishModels"></div>
+          <div class="model-summary" id="modelSummary">
+            <span id="dictationProvider"></span>
+            <span id="polishProvider"></span>
+            <span class="model-summary-actions" id="polishProviderActions"></span>
+          </div>
+          <div class="card model-table" id="modelTable" role="table" aria-label="Models" aria-describedby="modelFootnote">
+            <div class="model-table-head" role="row" id="modelSort">
+              <span role="columnheader"><span class="sr-only">Favourite</span></span>
+              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="name">Model</button></span>
+              <span role="columnheader">Kind</span>
+              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="speed" aria-describedby="modelFootnote">Speed</button></span>
+              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="accuracy" aria-describedby="modelFootnote">Accuracy</button></span>
+              <span role="columnheader" class="col-size"><button type="button" class="model-sort-btn" data-sort="size">Size</button></span>
+              <span role="columnheader">Runs on</span>
+              <span role="columnheader"><span class="sr-only">Action</span></span>
             </div>
+            <div id="modelRows" role="rowgroup"></div>
+          </div>
+          <p class="model-footnote" id="modelFootnote">Speech ratings come from reference measurements: word error rate and speed on 20 English clips, through the Mac app's engines on an M4 Mac. This app runs some models differently, so read them as a comparison. est. marks an estimate. A model's details show its speed on this computer once it has transcribed here.</p>
+          <section class="home-section" aria-labelledby="hubTitle" id="hubSection" hidden>
+            <div class="section-head"><h2 id="hubTitle">From Hugging Face</h2></div>
+            <div class="card" id="modelSearchResults" aria-busy="false"></div>
           </section>
         </section>
 
@@ -299,7 +310,15 @@
           </select>
         </div>
       </div>
+      <div class="row">
+        <div class="row-text">
+          <div class="row-label">Setup guide</div>
+          <div class="row-help">Permissions, microphone, model and a first dictation.</div>
+        </div>
+        <div class="row-control"><button class="btn" type="button" data-open="onboarding">Open</button></div>
+      </div>
     </div>
+    <p class="settings-section-help general-privacy">Your dictations, notes and settings are stored on this computer.</p>
   </section>
   <details class="settings-section settings-disclosure" aria-labelledby="trainingDataTitle">
     <summary><h2 id="trainingDataTitle">Training data</h2></summary>

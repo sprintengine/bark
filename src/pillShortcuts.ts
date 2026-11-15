@@ -102,6 +102,8 @@ export async function registerGlobalShortcuts(settings = shortcutSettings): Prom
     }
     shortcutSettings = normalized;
     pillHint.textContent = shortcutHint(activeBindings.recording || normalized.recordingShortcut);
+    // The recording capsule's hint reads "Stop" or "Release" by mode (pill.css).
+    document.body.dataset.recordMode = normalized.recordingShortcutMode;
   });
 }
 

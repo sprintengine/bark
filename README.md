@@ -12,13 +12,18 @@ there is an optional hosted service, **Fairspoken Cloud**, that you can sign in
 to and pay for with credits. It is off by default and the app is fully usable
 without it.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/app-home-dark.png">
+  <img alt="The Fairspoken window: a frosted sidebar of places beside Home, which shows average pace, words, apps used and time saved, then the latest dictations with copy buttons." src="docs/images/app-home-light.png">
+</picture>
+
 ## Features
 
 - **Local transcription** with Parakeet TDT 0.6B v3 (ONNX Runtime, in-process).
-  The Models screen groups Parakeet and Whisper variants, with v3 recommended
-  by default and English-only Parakeet v2 also available. Search Hugging Face
-  for other speech models; results indicate which have a supported local format.
-  Whisper (whisper.cpp) is also included; choose its variant in Models.
+  The Models screen lists every Parakeet and Whisper model in one library,
+  with v3 recommended by default and English-only Parakeet v2 also available.
+  Search Hugging Face for other speech models; results indicate which have a
+  supported local format. Whisper (whisper.cpp) is also included.
 - **Insert anywhere**: text goes straight into the focused app (Accessibility
   insert → ⌘V → AppleScript fallback), with your clipboard as a backup. When it
   can't be inserted, the pill says it is on the clipboard to paste yourself.
@@ -30,6 +35,22 @@ without it.
 - **Fairspoken Cloud (optional, paid)**: hosted transcription, AI polish
   (filler-word and self-correction cleanup with one-click "Undo AI edit"), and
   app-aware tone. Polish and context awareness are off unless you turn them on.
+
+### First run and models
+
+A setup window walks through permissions, a microphone check, a speech model
+and a first dictation. Models is a library of every speech and polish model,
+with ratings, sizes and one-click downloads.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/app-onboarding-dark.png">
+  <img alt="Three steps of first-run setup: permissions with live status, choosing a speech model, and trying a first dictation." src="docs/images/app-onboarding-light.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/app-models-dark.png">
+  <img alt="The Models library: a table of speech and polish models with favourites, badges, speed and accuracy ratings, sizes and download buttons." src="docs/images/app-models-light.png">
+</picture>
 
 ## Install
 
