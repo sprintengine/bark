@@ -49,6 +49,20 @@ model cache.
   [ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp).
 - License: MIT (Whisper model weights and whisper.cpp).
 
+### OpenAI Whisper via WhisperKit (native macOS client)
+
+- Models: OpenAI Whisper (tiny, base, small and medium, with their English-only
+  `.en` versions, large-v2, large-v3 and large-v3-turbo) and Hugging Face's
+  Distil-Whisper large-v3, in the Core ML conversions published by Argmax at
+  [argmaxinc/whisperkit-coreml](https://huggingface.co/argmaxinc/whisperkit-coreml)
+  (MIT; the compressed variants where offered). Whisper's weights are MIT
+  ([openai/whisper](https://github.com/openai/whisper)); Distil-Whisper is MIT
+  ([distil-whisper/distil-large-v3](https://huggingface.co/distil-whisper/distil-large-v3)).
+- Tokenizers: `tokenizer.json` and its config from the
+  [openai/whisper-*](https://huggingface.co/openai) repositories, Apache License 2.0.
+- Downloaded on demand from the app's Models library into
+  `~/Library/Application Support/Fairspoken/Models/WhisperKit/`.
+
 ## Local polish (cleanup) models
 
 Optional; downloaded on demand from Hugging Face at a pinned revision and
@@ -75,6 +89,11 @@ the [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) release `b10930`
 - **Inter** typeface (`@fontsource/inter`) — SIL Open Font License 1.1.
 - **FluidAudio** 0.17.5 ([FluidInference/FluidAudio](https://github.com/FluidInference/FluidAudio),
   native macOS apps only) — Apache License 2.0, © FluidInference.
+- **WhisperKit** 1.1.1 ([argmaxinc/WhisperKit](https://github.com/argmaxinc/WhisperKit),
+  native macOS client only) — MIT, © Argmax, Inc. Its `ArgmaxCore` includes code
+  derived from [huggingface/swift-transformers](https://github.com/huggingface/swift-transformers)
+  (Hub download and tokenizers), Apache License 2.0, © Hugging Face SAS, as
+  listed in WhisperKit's `NOTICES` file.
 - **KeyboardShortcuts** 1.10.0 ([sindresorhus/KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts),
   native macOS client only) — MIT, © Sindre Sorhus.
 

@@ -1,4 +1,5 @@
 import FairspokenSpeech
+import FairspokenWhisper
 import FairspokenUpdates
 import AppKit
 import FairspokenCore
@@ -56,6 +57,8 @@ final class AppModel {
         dictation = DictationController(settings: settings, models: models, history: history, permissions: permissions,
                                         training: training)
         hostStatus = HostStatus(settings: settings)
+        // A model that failed to load leaves the previous one in use; the saved choice follows it.
+        models.onFallback = { [weak settings] id in settings?.update { $0.model = id } }
         hostFinder = HostFinder(settings: settings, hostStatus: hostStatus)
         var updateConfig = UpdateController.Configuration(appName: AppInfo.displayName, version: AppInfo.version, build: AppInfo.build)
         #if DEBUG
@@ -77,7 +80,7 @@ final class AppModel {
 
     /// Launch-time work: warm the engine so the first dictation is instant, start Fn if enabled.
     func startServices() {
-        if settings.settings.transcriptionLocation != .remoteHost || FluidAudioEngine.isInstalled(settings.settings.model) {
+        if settings.settings.transcriptionLocation != .remoteHost || SpeechModels.isInstalled(settings.settings.model) {
             models.prepare(settings.settings.model)
         }
         applyFnSetting()
@@ -154,6 +157,6 @@ final class AppModel {
             let host = URL(string: settings.settings.remoteUrl)?.host() ?? "your host"
             return ("Your transcription host", host, .remoteHost)
         }
-        return (models.activeModel.name, "Apple Neural Engine · on this device", .neuralEngine)
+        return (models.activeModel.name, "\(models.activeModel.engine.runtime) · Neural Engine · on this device", .neuralEngine)
     }
 }

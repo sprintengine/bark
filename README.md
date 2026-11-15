@@ -25,7 +25,8 @@ without it.
   Search Hugging Face for other speech models; results indicate which have a
   supported local format. Whisper (whisper.cpp) is also included.
 - **Insert anywhere**: text goes straight into the focused app (Accessibility
-  insert → ⌘V → AppleScript fallback), with your clipboard as a backup.
+  insert → ⌘V → AppleScript fallback), with your clipboard as a backup. When it
+  can't be inserted, the pill says it is on the clipboard to paste yourself.
 - **Dictionary and snippets**: custom corrections and trigger phrases
   ("my email" → your address), applied after transcription.
 - **History and notes**: recent transcripts, copy-again, and a notes view.

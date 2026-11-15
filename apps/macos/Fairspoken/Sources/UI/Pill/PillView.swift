@@ -3,50 +3,80 @@ import FairspokenCore
 import SwiftUI
 
 /// The floating recording pill: listening (live level + timer) → transcribing → inserted / error.
-/// One Liquid Glass capsule that morphs between states.
+/// One Liquid Glass capsule that morphs between states. With "Show text while speaking" it
+/// grows to show the newest line or two of the words so far, under the level bars.
+/// Callers place it (it takes only the room it needs).
 struct PillView: View {
     var dictation: DictationController
     var shortcut: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Width of the live text, and how many characters of it the pill shows (two lines of
+    /// callout text at this width, so the newest words are never cut off).
+    static let liveTextWidth: CGFloat = 380
+    static let liveTextCharacters = 104
+    static let height: CGFloat = 46
+
     var body: some View {
         content
             .padding(.horizontal, 16)
-            .frame(height: 46)
-            .glassEffect(dictation.phase.isListening ? .regular.tint(Crystal.live.opacity(0.08)) : .regular, in: .capsule)
+            .padding(.vertical, showsLiveText ? 11 : 0)
+            .frame(minHeight: Self.height)
+            .glassEffect(dictation.phase.isListening ? .regular.tint(Crystal.live.opacity(0.08)) : .regular,
+                         in: RoundedRectangle(cornerRadius: Self.height / 2, style: .continuous))
         .animation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.82), value: stateKey)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: liveText)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    private var liveText: String {
+        LiveTranscript.displayTail(dictation.liveText, maxCharacters: Self.liveTextCharacters)
+    }
+
+    private var showsLiveText: Bool {
+        switch dictation.phase {
+        case .listening, .transcribing: !liveText.isEmpty
+        default: false
+        }
     }
 
     @ViewBuilder private var content: some View {
         switch dictation.phase {
         case .listening(let since):
-            HStack(spacing: 12) {
-                StatusDot(color: Crystal.live, pulsing: true)
-                LevelBars(meter: dictation.meter, active: true, bars: 22, color: Crystal.live)
-                    .frame(width: 118, height: 24)
-                TimelineView(.periodic(from: since, by: 1)) { ctx in
-                    Text(Self.clock(ctx.date.timeIntervalSince(since)))
-                        .font(.system(.callout, design: .rounded).weight(.semibold).monospacedDigit())
-                        .foregroundStyle(Crystal.ink2)
+            VStack(spacing: 8) {
+                HStack(spacing: 12) {
+                    StatusDot(color: Crystal.live, pulsing: true)
+                    LevelBars(meter: dictation.meter, active: true, bars: 22, color: Crystal.live)
+                        .frame(width: 118, height: 24)
+                    TimelineView(.periodic(from: since, by: 1)) { ctx in
+                        Text(Self.clock(ctx.date.timeIntervalSince(since)))
+                            .font(.system(.callout, design: .rounded).weight(.semibold).monospacedDigit())
+                            .foregroundStyle(Crystal.ink2)
+                    }
                 }
+                .accessibilityLabel("Listening")
+                liveTextView
             }
-            .accessibilityLabel("Listening")
         case .transcribing:
-            HStack(spacing: 10) {
-                ProgressView().controlSize(.small)
-                Text("Transcribing").font(.callout.weight(.semibold))
+            VStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text("Transcribing").font(.callout.weight(.semibold))
+                }
+                .accessibilityLabel("Transcribing")
+                liveTextView
             }
-            .accessibilityLabel("Transcribing")
         case .done(let result):
             HStack(spacing: 9) {
                 Image(systemName: icon(for: result.delivery)).foregroundStyle(Crystal.ok)
                     .symbolEffect(.bounce, value: result.text)
                 Text(headline(for: result)).font(.callout.weight(.semibold)).lineLimit(1)
-                Text("\(result.words) words · \(Format.ms(Double(result.latencyMs)))")
-                    .font(.callout).foregroundStyle(Crystal.ink2).lineLimit(1)
+                // A copy-only message tells the user what to do; it gets the room.
+                if case .copied = result.delivery {} else {
+                    Text("\(result.words) words · \(Format.ms(Double(result.latencyMs)))")
+                        .font(.callout).foregroundStyle(Crystal.ink2).lineLimit(1)
+                }
             }
         case .failed(let message):
             HStack(spacing: 9) {
@@ -60,6 +90,21 @@ struct PillView: View {
                 Text("Ready").font(.callout.weight(.medium))
                 Text(shortcut).font(.callout).foregroundStyle(Crystal.ink2)
             }
+        }
+    }
+
+    @ViewBuilder private var liveTextView: some View {
+        if showsLiveText {
+            Text(liveText)
+                .font(.callout)
+                .foregroundStyle(Crystal.ink)
+                .lineLimit(2)
+                .truncationMode(.head)
+                .multilineTextAlignment(.leading)
+                .frame(width: Self.liveTextWidth, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .transition(.opacity)
+                .accessibilityLabel(dictation.liveText)
         }
     }
 

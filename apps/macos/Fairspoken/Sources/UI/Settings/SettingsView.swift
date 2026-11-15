@@ -1,4 +1,5 @@
 import FairspokenSpeech
+import FairspokenWhisper
 import FairspokenUI
 import FairspokenUpdates
 import KeyboardShortcuts
@@ -107,12 +108,15 @@ private struct GeneralSettings: View {
             Section("Dictation") {
                 Toggle("Paste into the current app", isOn: binding(\.insertAtCursor))
                     .tint(Crystal.clientAccent)
-                    .help("Sends ⌘V to the frontmost app. Needs Accessibility. Never pastes into password fields.")
+                    .help("Sends ⌘V to the frontmost app. Needs Accessibility. Never pastes into password fields; with no text field focused, leaves the text on the clipboard.")
                 Toggle("Restore clipboard afterwards", isOn: binding(\.restoreClipboard))
                     .tint(Crystal.clientAccent)
                     .disabled(!store.settings.insertAtCursor)
                 Toggle("Start and stop sounds", isOn: binding(\.interactionSounds))
                     .tint(Crystal.clientAccent)
+                Toggle("Show text while speaking", isOn: binding(\.showTextWhileSpeaking))
+                    .tint(Crystal.clientAccent)
+                    .help("The recording pill shows your words as you speak. The text that is inserted still comes from the whole recording. Not available with a remote host.")
             }
             Section("Permissions") {
                 PermissionRow(kind: .microphone)
@@ -247,7 +251,7 @@ private struct TranscriptionSettings: View {
                         model.models.prepare(v)
                     })) {
                         ForEach(SpeechModelCatalog.all) { info in
-                            Text(info.name + (FluidAudioEngine.isInstalled(info.id) ? "" : " (\(Format.bytes(info.approxBytes)) download)")).tag(info.id)
+                            Text(info.name + (SpeechModels.isInstalled(info.id) ? "" : " (\(Format.bytes(info.approxBytes)) download)")).tag(info.id)
                         }
                     }
                     let state = model.models.engineState

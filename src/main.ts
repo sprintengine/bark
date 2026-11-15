@@ -7,6 +7,7 @@ import { copyOriginalTranscript, dropPolishUndoOffer, offerPolishUndo, polishUnd
 import { addEvent, addEventWithId, eventSeverity, type EventLevel } from "./events";
 import { required } from "./dom";
 import { errorMessage } from "./errors";
+import { deliveryNotice, type DictationDelivery, type DictationOutcome } from "./delivery";
 
 // The pill window: the recording state machine and its capsule layout. The
 // wave meter, global shortcuts and the AI polish undo offer live in
@@ -39,7 +40,8 @@ interface TranscriptHistoryUpdatedEvent {
   item: TranscriptHistoryItem;
 }
 
-type PillLayout = "idle" | "hover" | "starting" | "recording" | "transcribing" | "copied" | "polished" | "error";
+type PillLayout = "idle" | "hover" | "starting" | "recording" | "transcribing" | "copied" | "notice" | "polished" | "error";
+
 
 interface AudioLevelEvent {
   peak: number;
@@ -49,6 +51,7 @@ interface AudioLevelEvent {
 interface RecordingAutoStoppedEvent {
   committed: boolean;
   message: string;
+  delivery: DictationDelivery | null;
 }
 
 const recordBtn = required<HTMLButtonElement>("recordBtn");
@@ -64,6 +67,8 @@ let timerInterval: ReturnType<typeof setInterval> | null = null;
 let maxRecordingTimer: ReturnType<typeof setTimeout> | null = null;
 let copiedStatusTimer: ReturnType<typeof setTimeout> | null = null;
 let copiedShowing = false;
+// The flash is a longer notice the user has to act on ("press ⌘V"), in the wider layout.
+let copiedNotice = false;
 let pillHovering = false;
 let appliedPillLayout: PillLayout | null = null;
 let recordingSeconds = 0;
@@ -146,7 +151,7 @@ function computePillLayout(): PillLayout {
   if (appState === "transcribing") return "transcribing";
   if (appState === "error") return "error";
   if (polishUndoOffered()) return "polished";
-  if (copiedShowing) return "copied";
+  if (copiedShowing) return copiedNotice ? "notice" : "copied";
   return pillHovering ? "hover" : "idle";
 }
 
@@ -245,13 +250,22 @@ function formatTime(seconds: number): string {
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }
 
-function showCopiedStatus(): void {
-  // The polished state carries the undo affordance instead of the Copied
-  // flash — but this function is the success path's ONLY transition out of
-  // "transcribing", and the history event that sets the offer arrives
-  // BEFORE the stop invoke resolves. So the offer must still complete the
-  // idle transition here, or the pill wedges in "Transcribing" forever.
-  if (polishUndoOffered()) {
+const COPIED_FLASH_MS = 1400;
+const NOTICE_MS = 4000;
+const PASTE_KEYS = navigator.userAgent.includes("Mac") ? "⌘V" : "Ctrl+V";
+
+// `notice` replaces the Copied flash with a longer message the user has to
+// act on: the text did not reach the cursor.
+function showCopiedStatus(notice: string | null = null): void {
+  if (notice !== null) {
+    // Telling the user where the text is matters more than the undo offer.
+    dropPolishUndoOffer();
+  } else if (polishUndoOffered()) {
+    // The polished state carries the undo affordance instead of the Copied
+    // flash — but this function is the success path's ONLY transition out of
+    // "transcribing", and the history event that sets the offer arrives
+    // BEFORE the stop invoke resolves. So the offer must still complete the
+    // idle transition here, or the pill wedges in "Transcribing" forever.
     setState("idle", "AI polished");
     return;
   }
@@ -259,16 +273,18 @@ function showCopiedStatus(): void {
     clearTimeout(copiedStatusTimer);
   }
   copiedShowing = true;
-  setState("idle", "Copied");
+  copiedNotice = notice !== null;
+  setState("idle", notice ?? "Copied");
   copiedStatusTimer = setTimeout(() => {
     copiedStatusTimer = null;
     copiedShowing = false;
+    copiedNotice = false;
     if (appState === "idle") {
       setState("idle", "Ready");
     } else {
       updatePillLayout();
     }
-  }, 1400);
+  }, notice !== null ? NOTICE_MS : COPIED_FLASH_MS);
 }
 
 // The AI polish undo offer (polishUndo.ts) takes over the Copied flash.
@@ -296,6 +312,7 @@ async function undoPolishedTranscript(): Promise<void> {
     return;
   }
   copiedShowing = true;
+  copiedNotice = false;
   setState("idle", "Original copied");
   copiedStatusTimer = setTimeout(() => {
     copiedStatusTimer = null;
@@ -401,14 +418,14 @@ async function stopAndTranscribe(): Promise<void> {
   setState("transcribing");
 
   try {
-    const transcript = await invoke<string>("stop_and_transcribe");
+    const { transcript, delivery } = await invoke<DictationOutcome>("stop_and_transcribe");
     if (cancelTranscriptionRequestPending) {
       setState("idle", "Ready");
       return;
     }
     if (transcript) {
-      addEvent("info", "Transcript copied to clipboard");
-      showCopiedStatus();
+      if (delivery !== "notCopied") addEvent("info", "Transcript copied to clipboard");
+      showCopiedStatus(deliveryNotice(delivery, PASTE_KEYS));
     } else {
       addEvent("warning", "No transcript returned");
       setState("idle", "Ready");
@@ -550,7 +567,7 @@ void listen<RecordingAutoStoppedEvent>("recording-auto-stopped", (event) => {
   stopRecordingRequestPending = false;
   cancelTranscriptionRequestPending = false;
   if (event.payload.committed) {
-    showCopiedStatus();
+    showCopiedStatus(deliveryNotice(event.payload.delivery, PASTE_KEYS));
   } else {
     setState("idle", "Ready");
   }

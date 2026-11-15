@@ -14,7 +14,7 @@ struct ModelsView: View {
                         .padding(.bottom, 4)
                     // Three catalogue entries: equal columns, equal heights.
                     HStack(alignment: .top, spacing: Layout.gap) {
-                        ForEach(SpeechModelCatalog.all) { info in
+                        ForEach(SpeechModelCatalog.parakeet) { info in
                             ModelCard(info: info, onDelete: { pendingDelete = info })
                                 .frame(maxWidth: .infinity)
                         }
