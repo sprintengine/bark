@@ -5,7 +5,7 @@ Swift packages:
 
 | App | Bundle id (Release / Debug) | What it is |
 |---|---|---|
-| **Bark** (`Bark.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a dashboard of translucent cards on a soft teal-to-lavender backdrop beside a floating sidebar (Home, with the dog banner, Models, Post-training, Settings), a setup guide, a floating recording pill, and optional transcription on your own host |
+| **Bark** (`Bark.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a black-and-white dashboard with one pink accent beside a native, collapsible sidebar (Home, with the dog banner, Models, Post-training, Settings), a setup guide, a floating recording pill, and optional transcription on your own host |
 | **Bark Server** (`Bark Server.app`, scheme `FairspokenServer`) | `ie.fairspoken.server` / `.dev` | A transcription server for a practice or a team: the host protocol of `src-tauri/src/host/PROTOCOL.md` on Parakeet and the Neural Engine, with a live view of who is dictating, models, configuration and the address clients need |
 
 Bark (Mac), the Windows and Linux desktop app and the web dashboard all talk to Bark

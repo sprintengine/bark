@@ -3,7 +3,7 @@ import FairspokenUI
 import FairspokenCore
 import SwiftUI
 
-/// Home, the October look: the dog banner with the greeting, the date, how to dictate and the
+/// Home: the dog banner with the greeting, the date, how to dictate and the
 /// status; a dictation card with the big microphone beside the time saved; four stat tiles; the
 /// recent dictations beside the speech engine and the speed test. Before the first dictation it
 /// leads with one thing to do instead: finish setting up, or try the shortcut.
@@ -44,7 +44,7 @@ struct HomeView: View {
             .frame(maxWidth: Layout.readable, alignment: .leading)
             .onGeometryChange(for: Bool.self) { $0.size.width >= 780 } action: { wide = $0 }
             .padding(.horizontal, Layout.pageH)
-            .padding(.top, 28)
+            .padding(.top, 8)
             .padding(.bottom, Layout.pageH)
             .frame(maxWidth: .infinity)
         }
@@ -87,7 +87,7 @@ private struct HomeBanner: View {
     @State private var width: CGFloat = 900
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Frost.radius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Plain.radius, style: .continuous)
         ZStack(alignment: .leading) {
             Color.black
             GeometryReader { geo in
@@ -133,7 +133,7 @@ private struct HomeBanner: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .clipShape(shape)
         .overlay(shape.strokeBorder(.white.opacity(0.08)))
-        .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+        .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
         // Keycaps, chips and menus drawn for a dark surface in both themes.
         .environment(\.colorScheme, .dark)
     }
@@ -329,7 +329,7 @@ private struct DictationCard: View {
                 Text("or hold")
                 Keycap(label: "fn")
             }
-            // Wraps beside the keys rather than truncating, as in October.
+            // Wraps beside the keys rather than truncating.
             Text("in any app, or click the mic.")
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 2)
@@ -375,7 +375,7 @@ private struct DictationCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 8) {
                         Tag(text: "\(result.words) words", symbol: "text.word.spacing", color: Crystal.ink2)
-                        Tag(text: "\(Format.ms(Double(result.latencyMs))) to text", symbol: "bolt.fill", color: Crystal.clientAccent)
+                        Tag(text: "\(Format.ms(Double(result.latencyMs))) to text", symbol: "bolt.fill", color: Crystal.ink2)
                         Button(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc") {
                             TextInserter.copy(result.text)
                             copied = true
@@ -394,14 +394,13 @@ private struct DictationCard: View {
     }
 }
 
-/// The big microphone: teal at rest inside two soft rings; coral with a stop glyph while
+/// The big microphone: a flat pink disc inside one quiet ring at rest; a stop glyph while
 /// listening, with rings that spread with the voice.
 private struct MicButton: View {
     var dictation: DictationController
     var size: CGFloat = 104
     var action: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let listening = dictation.phase.isListening
@@ -414,23 +413,18 @@ private struct MicButton: View {
             Button(action: action) {
                 ZStack {
                     if busy {
-                        ProgressView().controlSize(.large).tint(.white)
+                        ProgressView().controlSize(.large).tint(Crystal.onAccent)
                     } else {
                         Image(systemName: listening ? "stop.fill" : "mic.fill")
                             .font(.system(size: size * 0.3, weight: .semibold))
                             .contentTransition(.symbolEffect(.replace))
                     }
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(Crystal.onAccent)
                 .frame(width: size, height: size)
                 .background {
-                    // Dark mode's accent is a light teal; darkened so the white glyph keeps 3:1 or more.
-                    let accent = scheme == .dark ? Crystal.clientAccent.mix(with: .black, by: 0.4) : Crystal.clientAccent
-                    let colors = listening ? [Crystal.live.mix(with: .white, by: 0.06), Crystal.live.mix(with: .black, by: 0.14)]
-                                           : [accent.mix(with: .white, by: 0.12), accent.mix(with: Crystal.clientSecondary, by: 0.3)]
-                    Circle().fill(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 0.5))
-                        .shadow(color: (listening ? Crystal.live : Crystal.clientAccent).opacity(0.4), radius: 16, y: 7)
+                    // A flat pink disc: no gradient, no glow.
+                    Circle().fill(Crystal.live)
                 }
                 .contentShape(.circle)
             }
@@ -456,10 +450,8 @@ private struct MicButton: View {
                             gc.stroke(circle(r), with: .color(Crystal.live.opacity((1 - phase) * (0.25 + Double(level) * 0.5))), lineWidth: 2)
                         }
                     } else {
-                        let tint = listening ? Crystal.live : Crystal.clientAccent
-                        for (i, extra) in [14.0, 30.0].enumerated() {
-                            gc.stroke(circle(size / 2 + extra), with: .color(tint.opacity(0.26 - Double(i) * 0.1)), lineWidth: 1)
-                        }
+                        // One quiet ring at rest.
+                        gc.stroke(circle(size / 2 + 12), with: .color(Crystal.live.opacity(0.22)), lineWidth: 1)
                     }
                 }
             }
@@ -617,7 +609,7 @@ private struct StatTile: View {
     var footnote: String
 
     var body: some View {
-        Card(cornerRadius: Frost.radius, padding: 18, fillHeight: true) {
+        Card(cornerRadius: Plain.radius, padding: 18, fillHeight: true) {
             VStack(alignment: .leading, spacing: 6) {
                 Eyebrow(text: title, symbol: symbol)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -640,7 +632,7 @@ private struct WeekTile: View {
 
     var body: some View {
         let series = usage.series(days: 7)
-        Card(cornerRadius: Frost.radius, padding: 18, fillHeight: true) {
+        Card(cornerRadius: Plain.radius, padding: 18, fillHeight: true) {
             VStack(alignment: .leading, spacing: 6) {
                 Eyebrow(text: "This week", symbol: "calendar")
                 HStack(alignment: .bottom, spacing: 8) {
@@ -650,7 +642,7 @@ private struct WeekTile: View {
                     Spacer(minLength: 0)
                     Chart(Array(series.enumerated()), id: \.offset) { i, day in
                         BarMark(x: .value("Day", day.date, unit: .day), y: .value("Words", day.bucket.words), width: 5)
-                            .foregroundStyle(i == series.count - 1 ? Crystal.clientAccent : Crystal.clientAccent.opacity(0.32))
+                            .foregroundStyle(i == series.count - 1 ? Crystal.clientAccent : Crystal.ink3.opacity(0.4))
                             .clipShape(Capsule())
                     }
                     .chartXAxis(.hidden)
@@ -774,7 +766,7 @@ private struct EngineCard: View {
                         .cardButton().controlSize(.small)
                 }
                 HStack(spacing: 12) {
-                    IconTile(summary.placement == .remoteHost ? "server.rack" : "brain", color: Crystal.clientAccent, size: 44)
+                    IconTile(summary.placement == .remoteHost ? "server.rack" : "brain", color: Crystal.ink2, size: 44)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(summary.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
                         Text(summary.detail).font(.system(size: 11)).foregroundStyle(Crystal.ink2).lineLimit(2)
@@ -819,8 +811,8 @@ private struct EngineCard: View {
     }
 }
 
-/// The round dictate button: accent at rest, the live colour with a stop glyph while listening,
-/// a ring that follows the voice.
+/// The round dictate button: a flat pink disc, with a stop glyph and a ring that follows the
+/// voice while listening.
 struct DictateButton: View {
     var dictation: DictationController
     var size: CGFloat = 34
@@ -833,22 +825,16 @@ struct DictateButton: View {
         Button(action: action) {
             ZStack {
                 if busy {
-                    ProgressView().controlSize(.small).tint(.white)
+                    ProgressView().controlSize(.small).tint(Crystal.onAccent)
                 } else {
                     Image(systemName: listening ? "stop.fill" : "mic.fill")
                         .font(.system(size: size * 0.4, weight: .semibold))
                         .contentTransition(.symbolEffect(.replace))
                 }
             }
-            .foregroundStyle(listening ? Color.white : Crystal.onAccent)
+            .foregroundStyle(Crystal.onAccent)
             .frame(width: size, height: size)
-            .background {
-                let base = listening ? Crystal.live : Crystal.clientAccent
-                Circle().fill(LinearGradient(colors: [base.mix(with: .white, by: 0.08), base.mix(with: .black, by: 0.10)],
-                                             startPoint: .top, endPoint: .bottom))
-                    .overlay(Circle().strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
-                    .shadow(color: base.opacity(0.25), radius: 3, y: 1)
-            }
+            .background(Circle().fill(Crystal.live))
             .background {
                 if listening && !reduceMotion {
                     TimelineView(.animation(minimumInterval: 1 / 30)) { _ in

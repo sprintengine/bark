@@ -34,6 +34,11 @@ final class AppModel {
     }
     /// Home's "See all": every kept dictation, searchable, instead of the overview.
     var homeShowsAllDictations = false
+    /// The main window's sidebar is shown (View › Show Sidebar, ⌃⌘S, or the toolbar's sidebar
+    /// button). Remembered across launches.
+    var sidebarVisible = !UserDefaults.standard.bool(forKey: "SidebarHidden") {
+        didSet { UserDefaults.standard.set(!sidebarVisible, forKey: "SidebarHidden") }
+    }
     var settingsTab: SettingsView.Tab = .general
 
     let settings: SettingsStore

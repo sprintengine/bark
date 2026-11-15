@@ -19,14 +19,20 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         if let section { model.section = section }
         if dashboard == nil {
             let hosting = NSHostingController(rootView: DashboardView().environment(model))
-            let window = AppWindow(contentViewController: hosting)
-            // A hidden, transparent title bar. The empty unified toolbar makes it taller, so the
-            // traffic lights sit inside the sidebar's floating panel rather than on its corner.
+            let window = DashboardWindow(contentViewController: hosting)
+            window.onToggleSidebar = { [weak self] in self?.model.sidebarVisible.toggle() }
+            window.isSidebarVisible = { [weak self] in self?.model.sidebarVisible ?? true }
+            // A hidden, transparent title bar over a full-height sidebar. The unified toolbar holds
+            // the system's sidebar button, beside the traffic lights.
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.title = AppInfo.displayName
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
-            window.toolbar = NSToolbar(identifier: "dashboard")
+            let toolbar = NSToolbar(identifier: "dashboard")
+            toolbar.delegate = self
+            toolbar.displayMode = .iconOnly
+            toolbar.allowsUserCustomization = false
+            window.toolbar = toolbar
             window.toolbarStyle = .unified
             window.isReleasedWhenClosed = false
             window.setContentSize(NSSize(width: 1180, height: 820))
@@ -137,9 +143,42 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     }
 }
 
+extension WindowCoordinator: NSToolbarDelegate {
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.toggleSidebar] }
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.toggleSidebar] }
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? { nil }
+}
+
+/// The main window. It answers `toggleSidebar:` (the toolbar's sidebar button and View › Show or
+/// Hide Sidebar, ⌃⌘S), as a split view controller would, and names the menu item for the state.
+final class DashboardWindow: AppWindow {
+    var onToggleSidebar: (() -> Void)?
+    var isSidebarVisible: (() -> Bool)?
+
+    @objc func toggleSidebar(_ sender: Any?) {
+        onToggleSidebar?()
+    }
+
+    override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(toggleSidebar(_:)) {
+            menuItem.title = isSidebarVisible?() ?? true ? "Hide Sidebar" : "Show Sidebar"
+            return true
+        }
+        return super.validateMenuItem(menuItem)
+    }
+
+    // The toolbar's sidebar button is validated here, not in `validateMenuItem`, and NSWindow
+    // turns down an action it doesn't implement itself, which would leave the button disabled.
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(toggleSidebar(_:)) { return true }
+        return super.validateUserInterfaceItem(item)
+    }
+}
+
 /// The app's windows. `appearsActive` (screenshot runs only) draws them as the key window even
 /// when the session can't activate the app (a locked screen), so captures show live controls.
-final class AppWindow: NSWindow {
+class AppWindow: NSWindow {
     static var appearsActive = false
     override var isKeyWindow: Bool { Self.appearsActive || super.isKeyWindow }
     override var isMainWindow: Bool { Self.appearsActive || super.isMainWindow }

@@ -27,6 +27,8 @@ final class ScreenshotHarness {
         AppWindow.appearsActive = true
         Self.drawAsActiveApp()
         model.models.prepare(model.settings.settings.model)
+        // Every shot shows the sidebar unless it says otherwise.
+        model.sidebarVisible = true
         NSApp.setActivationPolicy(.regular)
         Task {
             windows.showDashboard(.home)
@@ -99,6 +101,13 @@ final class ScreenshotHarness {
         if let window = windows.dashboard { await capture(window, as: "home-listening-\(suffix)") }
         feeder.cancel()
         model.dictation.showcase(.idle)
+        // The sidebar collapsed, through the action the toolbar's sidebar button and View › Hide
+        // Sidebar (⌃⌘S) send.
+        NSApp.sendAction(#selector(DashboardWindow.toggleSidebar(_:)), to: nil, from: nil)
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "home-sidebar-hidden-\(suffix)") }
+        model.sidebarVisible = true
         // "See all": every dictation by day.
         model.homeShowsAllDictations = true
         try? await Task.sleep(for: .milliseconds(900))
@@ -534,13 +543,13 @@ private struct PillShowcase: View {
     var controllers: [DictationController]
     var shortcut: String
 
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         ZStack {
-            // A quiet, wallpaper-like backdrop: cool slate with a soft sage glow.
-            LinearGradient(colors: [Color(red: 0.36, green: 0.42, blue: 0.47), Color(red: 0.58, green: 0.63, blue: 0.66),
-                                    Color(red: 0.80, green: 0.82, blue: 0.80)],
+            // A quiet, wallpaper-like backdrop in neutral greys: graphite in dark mode, pale in light.
+            LinearGradient(colors: scheme == .dark ? [Color(white: 0.11), Color(white: 0.24)] : [Color(white: 0.80), Color(white: 0.93)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
-            Circle().fill(Color(red: 0.55, green: 0.75, blue: 0.64).opacity(0.35)).frame(width: 420).blur(radius: 90).offset(x: -220, y: -120)
             VStack(spacing: 18) {
                 ForEach(Array(controllers.enumerated()), id: \.offset) { _, c in
                     PillView(dictation: c, shortcut: shortcut).frame(width: 520).frame(minHeight: 76)

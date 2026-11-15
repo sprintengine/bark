@@ -3,9 +3,11 @@ import FairspokenCore
 import FairspokenUpdates
 import SwiftUI
 
-/// Main window, the October look: the aurora backdrop fills the window; the sidebar is a
-/// frosted panel floating on it, and each screen sets its translucent cards straight on the
-/// backdrop (`SurfaceStyle.frosted`).
+/// Main window: a native sidebar beside a plain ground. The sidebar runs the full height of the
+/// window, under the traffic lights, on the system's translucent sidebar material (opaque with
+/// Reduce Transparency); it collapses with the toolbar's sidebar button, View › Hide Sidebar or
+/// ⌃⌘S. Each screen sets its cards straight on the ground (`SurfaceStyle.plain`): near-black in
+/// dark mode, white in light, with pink as the one colour.
 struct DashboardView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -14,16 +16,26 @@ struct DashboardView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Sidebar()
-                .frame(width: Self.sidebarWidth)
-                .padding([.top, .bottom, .leading], 8)
+            if model.sidebarVisible {
+                Sidebar()
+                    .frame(width: Self.sidebarWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(SidebarBackground())
+                    // The sidebar's edge: one hairline, as a native sidebar has.
+                    .overlay(alignment: .trailing) {
+                        Rectangle().fill(Crystal.hairline).frame(width: 1).ignoresSafeArea()
+                    }
+                    .ignoresSafeArea(edges: [.top, .bottom])
+                    .transition(.move(edge: .leading))
+            }
+            // The content starts under the toolbar and scrolls beneath it.
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .updateToast(model.updates, style: .client)
         }
-        .background(AuroraBackground())
-        .environment(\.surfaceStyle, .frosted)
-        .ignoresSafeArea()
+        .background(PlainBackground())
+        .environment(\.surfaceStyle, .plain)
+        .animation(Motion.unlessReduced(Motion.normal, reduceMotion), value: model.sidebarVisible)
         .screenshotActive()
         .frame(minWidth: 960, minHeight: 640)
         .onAppear { if model.settings.settings.transcriptionLocation == .remoteHost { model.hostStatus.refresh() } }
@@ -50,7 +62,10 @@ struct DashboardView: View {
 }
 
 extension AppModel.Section {
-    /// The section's glyph in the sidebar: one colour, as in October.
+    /// The section's glyph in the sidebar, in one neutral colour.
+    /// Its key with ⌘ (View menu): 1 for Home through 4 for Settings.
+    var shortcutNumber: Int { (Self.allCases.firstIndex(of: self) ?? 0) + 1 }
+
     var sidebarSymbol: String {
         switch self {
         case .home: "waveform"
@@ -61,16 +76,14 @@ extension AppModel.Section {
     }
 }
 
-/// The Bark lockup (the dog tile and the Fraunces wordmark), the sections as plain rows, and the
-/// engine status at the bottom, on one frosted panel.
+/// The Bark lockup (the dog tile and the Fraunces wordmark) under the traffic lights, the
+/// sections as plain rows, and the engine status at the bottom, straight on the sidebar material.
 private struct Sidebar: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Room for the traffic lights, then the lockup.
+            // Room for the traffic lights and the toolbar, then the lockup.
             HStack(spacing: 10) {
                 BrandMark(size: 30)
                 Text(AppInfo.displayName)
@@ -79,13 +92,13 @@ private struct Sidebar: View {
                     .foregroundStyle(Crystal.ink)
             }
             .padding(.horizontal, 8)
-            .padding(.top, 46)
+            .padding(.top, 58)
             .padding(.bottom, 18)
             .accessibilityElement(children: .combine)
 
-            VStack(spacing: 3) {
-                ForEach(Array(AppModel.Section.allCases.enumerated()), id: \.element) { index, section in
-                    SidebarRow(section: section, index: index)
+            VStack(spacing: 2) {
+                ForEach(AppModel.Section.allCases) { section in
+                    SidebarRow(section: section)
                 }
             }
             Spacer(minLength: 12)
@@ -95,21 +108,14 @@ private struct Sidebar: View {
                     .padding(.horizontal, 8)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 14)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background {
-            let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-            shape.fill(reduceTransparency ? Frost.panelSolid : Frost.panel)
-                .overlay(shape.strokeBorder(Frost.edge.opacity(scheme == .dark ? 1 : 0.8)))
-                .shadow(color: .black.opacity(scheme == .dark ? 0.30 : 0.06), radius: 14, y: 4)
-        }
     }
 }
 
 private struct SidebarRow: View {
     var section: AppModel.Section
-    var index: Int
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered = false
@@ -134,7 +140,7 @@ private struct SidebarRow: View {
                 }
             }
             .padding(.horizontal, 8)
-            .frame(height: 34)
+            .frame(height: 32)
             .background {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(selected ? Crystal.chromeSelected : hovered ? Crystal.chromeHover : .clear)
@@ -144,8 +150,8 @@ private struct SidebarRow: View {
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
         .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hovered)
-        .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
-        .help("\(section.title) (⌘\(index + 1))")
+        // ⌘1…⌘4 live in the View menu, so they work with the sidebar hidden too.
+        .help("\(section.title) (⌘\(section.shortcutNumber))")
         .accessibilityLabel(updatePending ? "\(section.title), update available" : section.title)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
@@ -168,7 +174,7 @@ private struct SidebarStatus: View {
                 HStack(spacing: 8) {
                     Image(systemName: remote ? "server.rack" : "brain")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Crystal.clientAccent)
+                        .foregroundStyle(Crystal.ink2)
                         .frame(width: 20)
                     Text(remote ? "Network device" : model.models.activeModel.shortName)
                         .font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
@@ -189,7 +195,8 @@ private struct SidebarStatus: View {
                 }
             }
             .padding(12)
-            .cardSurface(cornerRadius: 14, tint: hovered ? Crystal.ink : nil)
+            .background(hovered ? Crystal.chromeSelected : Crystal.chromeHover, in: .rect(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Crystal.hairline))
             .contentShape(.rect(cornerRadius: 14))
             .accessibilityElement(children: .combine)
         }
@@ -215,6 +222,6 @@ private struct SidebarStatus: View {
 }
 
 extension UpdateStyle {
-    /// The client's teal, with the Crystal warning colour.
+    /// The client's pink, with the Crystal warning colour.
     static let client = UpdateStyle(accent: Crystal.clientAccent, warning: Crystal.warn)
 }

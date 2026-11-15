@@ -32,7 +32,7 @@ public struct ContentCard<Content: View>: View {
     @Environment(\.surfaceStyle) private var style
 
     public var body: some View {
-        let radius = style == .frosted ? Frost.radius : ContentMetrics.cornerRadius
+        let radius = style == .plain ? Plain.radius : ContentMetrics.cornerRadius
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
             .padding(padding)
@@ -52,12 +52,13 @@ public struct Hairline: View {
     }
 }
 
-/// A 1…5 score as five short segments, filled up to `value`.
+/// A 1…5 score as five short segments, filled up to `value`: neutral by default, so a list of
+/// them stays black and white.
 public struct ScoreBar: View {
     var value: Int
     var tint: Color
     var label: String
-    public init(value: Int, tint: Color = Crystal.clientAccent, label: String) {
+    public init(value: Int, tint: Color = Crystal.ink2, label: String) {
         self.value = value
         self.tint = tint
         self.label = label

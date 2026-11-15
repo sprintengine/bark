@@ -1,5 +1,5 @@
 // Composes a README showcase image: an app capture with rounded corners and a soft
-// drop shadow on a coloured backdrop.
+// drop shadow on a plain neutral backdrop.
 //
 //   swift docs/images/src/compose.swift <capture.png> <out.png> <light|dark> \
 //     [--crop x,y,w,h] [--radius px] [--pad px] [--width px]
@@ -47,12 +47,13 @@ if let cropArg {
     image = cut
 }
 
-// The backdrop: the app's own, teal into lavender, soft in the light theme and deep in the dark one.
+// The backdrop: plain and neutral, as the app is. Near-black to graphite in the dark theme,
+// white to a soft light grey in the light one.
 let colors: [CGColor] = dark
-    ? [CGColor(srgbRed: 0x1D / 255, green: 0x4A / 255, blue: 0x4B / 255, alpha: 1),
-       CGColor(srgbRed: 0x1C / 255, green: 0x1A / 255, blue: 0x33 / 255, alpha: 1)]
-    : [CGColor(srgbRed: 0xCF / 255, green: 0xE9 / 255, blue: 0xE8 / 255, alpha: 1),
-       CGColor(srgbRed: 0xDA / 255, green: 0xD8 / 255, blue: 0xF2 / 255, alpha: 1)]
+    ? [CGColor(srgbRed: 0x0B / 255, green: 0x0B / 255, blue: 0x0C / 255, alpha: 1),
+       CGColor(srgbRed: 0x1F / 255, green: 0x1F / 255, blue: 0x22 / 255, alpha: 1)]
+    : [CGColor(srgbRed: 0xE6 / 255, green: 0xE7 / 255, blue: 0xEA / 255, alpha: 1),
+       CGColor(srgbRed: 0xF7 / 255, green: 0xF7 / 255, blue: 0xF8 / 255, alpha: 1)]
 
 let w = CGFloat(image.width), h = CGFloat(image.height)
 let pad = padArg.flatMap { Double($0) }.map { CGFloat($0) } ?? (max(w, h) * 0.07).rounded()

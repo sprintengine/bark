@@ -1,14 +1,15 @@
 import FairspokenUI
 import SwiftUI
 
-/// Layout constants for the client's October look: large frosted cards (`Frost.radius`), 8 for
-/// rows and fields, generous spacing.
+/// Layout constants for the client: large plain cards (`Plain.radius`), 8 for rows and fields,
+/// generous spacing.
 enum Layout {
-    static let card: CGFloat = Frost.radius
+    static let card: CGFloat = Plain.radius
     static let row: CGFloat = 8
     static let gap: CGFloat = 16
     static let pageH: CGFloat = 32
-    static let pageTop: CGFloat = 40
+    /// Below the toolbar band, which the content starts under.
+    static let pageTop: CGFloat = 16
     /// The content column's width cap, so lines never run the width of a big window.
     static let readable: CGFloat = 1120
 }
@@ -21,7 +22,7 @@ extension Font {
     }
 }
 
-/// A screen title, October style: large and bold, with at most one quiet line under it.
+/// A screen title: large and bold, with at most one quiet line under it.
 struct PageTitle<Trailing: View>: View {
     var title: String
     var subtitle: String?

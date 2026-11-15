@@ -10,7 +10,8 @@ The clients and the server differ only in the accent, so you can tell them apart
 
 | Surface | Accent hint |
 | --- | --- |
-| Clients (Bark for Mac, desktop app, Android) | **Green** (sage / emerald) |
+| Bark for Mac | **Pink** (magenta), on a black-and-white window |
+| Other clients (desktop app, Android) | **Green** (sage / emerald) |
 | Server (Bark Server, the host web dashboard) | **Red** (garnet) |
 
 No orange/blue gradients, no saturated colour blobs, no rainbow charts.
@@ -123,34 +124,47 @@ Status colours are functional, never decorative. On the server, errors keep an i
 - Android: the backdrop library's glass for chrome only, a 1px highlight edge; content on
   opaque cards.
 
-## Bark for Mac: a frosted sidebar beside solid content
+## Bark for Mac: black and white, with a pink accent
 
-The Mac client keeps glass to the window's chrome and to small floating pieces. Content is opaque,
-so it reads crisply and nothing translucent stacks on anything translucent.
+The Mac client is plain: a native sidebar beside a black or white ground, neutral greys, and one
+colour, pink. No gradients, no colour washes behind the content. Glass is kept for small floating
+pieces (the recording pill, toasts and popovers) and the system's own toolbar.
 
-- **Frost:** the window's background is the desktop blurred behind the window
-  (`NSVisualEffectView`, material `.sidebar`, blending `.behindWindow`), with `frostTint` (the page
-  tone at 52%) laid over it **once**. The sidebar stands on it directly. With Reduce Transparency
-  the frost is `frostSolid`, the same tone, opaque.
-- **Content:** one opaque card (`canvas`) beside the sidebar, inset 4 pt from the window's edges so
-  a thin line of frost frames it. Inside it, solid cards (`card`): 12 pt corners, a `hairline`
-  edge (8–10%, stronger with Increase Contrast), a 1 pt highlight along the top edge and a tight,
-  soft shadow. Rows inside cards hover with `rowHover`; rows on the frost use `chromeHover` and
-  `chromeSelected`, one alpha step over the tint.
-- **Glass** only for the recording pill, toasts and popovers.
-- **Sidebar:** each section has a coloured rounded-square icon tile (Home orange, Models indigo,
-  Post-training purple, Settings grey); the engine status sits at the bottom.
-- **Type:** system font, 13 pt body, six steps: 11 / 12 / 13 / 15 / 20 / 28 (`TypeScale`).
+- **Sidebar:** full height, flush to the window's edges and running under the traffic lights, on
+  the system's sidebar material (`NSVisualEffectView`, material `.sidebar`, blending
+  `.behindWindow`) with `Plain.sidebarTint` laid over it once, and a hairline along its edge. It
+  collapses with the toolbar's sidebar button, View › Hide Sidebar or ⌃⌘S, and stays as it was
+  left. With Reduce Transparency it is `Plain.sidebarSolid`, opaque. The sections are plain rows
+  with one neutral glyph each; the engine status sits at the bottom.
+- **Ground and cards** (`SurfaceStyle.plain`): the content stands on `Plain.ground` (near-black or
+  white); cards are one grey step off it (`Plain.card`), 22 pt corners, a faint hairline edge
+  (`Plain.edge`, stronger with Increase Contrast), no shadow. The dog banner on Home stays black in
+  both themes.
+- **Pink** (`Crystal.clientAccent`, also `Crystal.live`) marks what matters: the dictation state
+  (the listening pill's edge, its level bars and dot, the microphone on Home), primary actions,
+  links such as "See all", toggles and progress, update prompts, and the speaking side of the time
+  saved and the speed test. Everything else is neutral. Fills are solid. Text on a pink fill is
+  `Crystal.onAccent`: white on the light theme's deep magenta, near-black on the dark theme's
+  bright pink.
+- **Status colours** stay as they are: green for ready, amber for a warning, red for an error.
+- **Type:** system font, 13 pt body, six steps: 11 / 12 / 13 / 15 / 20 / 28 (`TypeScale`); the
+  Bark wordmark and Home's greeting in Fraunces.
 - **Motion:** 120 / 180 / 260 ms on one ease-out curve (`Motion`), none with Reduce Motion.
-- **Primary action:** one per screen, an accent capsule drawn with an explicit fill
-  (`PrimaryButtonStyle`).
 
 | Token | Light | Dark |
 | --- | --- | --- |
-| `canvas` | `#F5F6F8` | `#111316` |
-| `card` | `#FFFFFF` | `#1A1D21` |
-| `frostTint` | `#EAEEF2` at 52% | `#090A0C` at 52% |
-| `hairline` | `rgba(16,24,32,0.10)` | `rgba(255,255,255,0.09)` |
+| `Plain.ground` | `#FFFFFF` | `#0A0A0B` |
+| `Plain.card` | `#F4F5F7` | `#151517` |
+| `Plain.sidebarTint` | `#F4F5F7` at 45% | `#0D0D0E` at 55% |
+| `Plain.sidebarSolid` | `#F4F5F7` | `#111113` |
+| `Plain.edge` | `rgba(0,0,0,0.06)` | `rgba(255,255,255,0.07)` |
+| `hairline` | `rgba(0,0,0,0.09)` | `rgba(255,255,255,0.085)` |
+| `ink` / `ink2` / `ink3` | `#141416` / `#5C5C62` / `#68686E` | `#F2F2F3` / `#A3A3A9` / `#8E8E94` |
+| `clientAccent` | `#B0186A` (6.6:1 on white) | `#FF5AAE` (7.3:1 on black) |
+| `onAccent` | `#FFFFFF` | `#16070F` |
+
+Bark Server keeps opaque cards (`card`, 12 pt corners) on an opaque `canvas` with its garnet
+accent; it shares the neutral inks and hairlines above.
 
 ## Writing
 

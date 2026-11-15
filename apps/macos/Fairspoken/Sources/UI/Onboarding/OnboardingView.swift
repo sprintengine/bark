@@ -28,8 +28,8 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // The main window's October backdrop, with its frosted cards.
-            AuroraBackground()
+            // The main window's plain ground, with its cards.
+            PlainBackground()
             VStack(spacing: 0) {
                 StepProgress(step: step)
                     .padding(.top, 44)
@@ -68,7 +68,7 @@ struct OnboardingView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .environment(\.surfaceStyle, .frosted)
+        .environment(\.surfaceStyle, .plain)
         .ignoresSafeArea()
         .screenshotActive()
         .onAppear { model.permissions.beginPolling() }
@@ -204,7 +204,6 @@ private struct WelcomeStep: View {
     var body: some View {
         VStack(spacing: 18) {
             BrandMark(size: 104)
-                .shadow(color: Crystal.clientAccent.opacity(0.25), radius: 24, y: 10)
                 .padding(.bottom, 6)
             Text("Welcome to \(Text(AppInfo.displayName).font(.barkWordmark(46)).tracking(-1.15))")
                 .font(.system(size: 38, weight: .bold)).tracking(-0.6)
@@ -493,7 +492,7 @@ private struct ModelChoiceCard: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .cardSurface(tint: chosen ? Crystal.clientAccent : nil, selected: chosen ? Crystal.clientAccent.opacity(0.7) : nil)
+        .cardSurface(selected: chosen ? Crystal.clientAccent.opacity(0.8) : nil)
         .overlay {
             if hovered && !chosen {
                 RoundedRectangle(cornerRadius: CardMetrics.radius, style: .continuous).fill(Crystal.rowHover).allowsHitTesting(false)
@@ -673,7 +672,7 @@ private struct ModeCard: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .cardSurface(tint: selected ? Crystal.clientAccent : nil, selected: selected ? Crystal.clientAccent.opacity(0.7) : nil)
+        .cardSurface(selected: selected ? Crystal.clientAccent.opacity(0.8) : nil)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
