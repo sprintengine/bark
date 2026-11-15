@@ -25,7 +25,7 @@ struct DashboardView: View {
         .environment(\.surfaceStyle, .frosted)
         .ignoresSafeArea()
         .screenshotActive()
-        .frame(minWidth: 1000, minHeight: 680)
+        .frame(minWidth: 960, minHeight: 640)
         .onAppear { if model.settings.settings.transcriptionLocation == .remoteHost { model.hostStatus.refresh() } }
         // On the dashboard rather than Home, so moving to another section never drops the test
         // without ending it.
