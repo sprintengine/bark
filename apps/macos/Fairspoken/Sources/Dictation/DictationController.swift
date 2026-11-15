@@ -59,6 +59,8 @@ final class DictationController {
     @ObservationIgnored private var session: (any TranscriptionSession)?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private var resetTask: Task<Void, Never>?
+    /// The recording is for this app's own window (Home, the setup guide), not another app.
+    var isForThisApp: Bool { targetApp == nil }
     /// What started the current recording (the pill says how to end it).
     private(set) var trigger: Trigger = .button
     @ObservationIgnored private var targetApp: NSRunningApplication?
@@ -157,6 +159,7 @@ final class DictationController {
         }
         session = newSession
         self.trigger = trigger
+        if phase.isActive { targetApp = nil }
         resetTask?.cancel()
         phase = .listening(since: Date())
         hotkeys?.setCancelEnabled(true)
@@ -303,6 +306,9 @@ final class DictationController {
     }
 
     // MARK: Demo/screenshot support
+
+    /// Screenshots: forgets the in-app result (a first use).
+    func showcaseClearResult() { lastInAppResult = nil }
 
     func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "", trigger: Trigger = .hotkey) {
         resetTask?.cancel()

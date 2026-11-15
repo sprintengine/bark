@@ -79,15 +79,19 @@ private struct SavingCard: View {
         let on = model.settings.settings.trainingCapture
         Card(cornerRadius: Layout.card) {
             VStack(alignment: .leading, spacing: 14) {
-                Toggle(isOn: Binding(get: { on }, set: { v in model.settings.update { $0.trainingCapture = v } })) {
+                HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Save recordings for post-training").cardHeading()
+                        Text("Save recordings to improve models").cardHeading()
                         Text("Keeps the audio of each dictation and what the model heard, so it can learn your voice later. Nothing is uploaded.")
-                            .font(.callout).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
+                            .font(TypeScale.body).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
                     }
+                    Spacer(minLength: 0)
+                    Toggle("Save recordings to improve models",
+                           isOn: Binding(get: { on }, set: { v in model.settings.update { $0.trainingCapture = v } }))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .tint(Crystal.clientAccent)
                 }
-                .toggleStyle(.switch)
-                .tint(Crystal.clientAccent)
 
                 Divider().overlay(Crystal.hairline)
                 HStack(spacing: 10) {
@@ -186,8 +190,7 @@ private struct TrainCard: View {
                 Spacer(minLength: 0)
                 HStack(spacing: 12) {
                     Button("Post-train") {}
-                        .buttonStyle(.borderedProminent)
-                        .tint(Crystal.clientAccent)
+                        .buttonStyle(PrimaryButtonStyle())
                         .disabled(true)
                     Text(status)
                         .font(.caption).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)

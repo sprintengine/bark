@@ -70,7 +70,7 @@ private struct Sidebar: View {
                 BrandMark(size: 22)
                 Text(AppInfo.displayName).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 6)
             .padding(.top, 44)
             .padding(.bottom, 14)
             .accessibilityElement(children: .combine)
@@ -147,12 +147,20 @@ private struct SidebarStatus: View {
             if remote { model.settingsTab = .transcription; model.section = .settings } else { model.section = .models }
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    StatusDot(color: remote ? host.tint : state.tint, pulsing: remote ? host.state == .checking : state.isBusy)
+                HStack(spacing: 9) {
+                    // The dot sits in the tile column, so the text lines up with the sections'.
+                    Group {
+                        if case .listening = model.dictation.phase {
+                            StatusDot(color: Crystal.live, pulsing: true)
+                        } else {
+                            StatusDot(color: remote ? host.tint : state.tint, pulsing: remote ? host.state == .checking : state.isBusy)
+                        }
+                    }
+                    .frame(width: 22)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(remote ? "Network device" : model.models.activeModel.shortName)
                             .font(.system(size: 12, weight: .semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
-                        Text(remote ? host.stateLabel : state.label)
+                        statusLine(state: state, remote: remote, host: host)
                             .font(.system(size: 11)).foregroundStyle(Crystal.ink2).lineLimit(1)
                     }
                     Spacer(minLength: 0)
@@ -164,7 +172,8 @@ private struct SidebarStatus: View {
                     ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
                 }
             }
-            .padding(10)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 6)
             .background(hovered ? Crystal.chromeSelected : Crystal.chromeHover, in: .rect(cornerRadius: 10, style: .continuous))
             .contentShape(.rect(cornerRadius: 10))
             .accessibilityElement(children: .combine)
@@ -173,6 +182,20 @@ private struct SidebarStatus: View {
         .onHover { hovered = $0 }
         .help(remote ? "Host settings" : "Models")
         .accessibilityHint(remote ? "Opens host settings" : "Opens Models")
+    }
+
+    /// "Ready", "Downloading 40%", or "Listening 0:07" while a dictation records.
+    @ViewBuilder private func statusLine(state: ModelLibrary.EngineState, remote: Bool, host: HostStatus) -> some View {
+        switch model.dictation.phase {
+        case .listening(let since):
+            TimelineView(.periodic(from: since, by: 1)) { ctx in
+                Text("Listening \(PillView.clock(ctx.date.timeIntervalSince(since)))").monospacedDigit()
+            }
+        case .transcribing:
+            Text("Transcribing…")
+        default:
+            Text(remote ? host.stateLabel : state.label)
+        }
     }
 }
 

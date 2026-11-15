@@ -39,18 +39,30 @@ struct OnboardingView: View {
                     .padding(.top, 44)
                     .frame(height: 76, alignment: .top)
                 Group {
-                    switch step {
-                    case .welcome: WelcomeStep()
-                    case .permissions: PermissionsStep()
-                    case .microphone: MicrophoneStep(heard: $micHeard)
-                    case .model: ModelStep()
-                    case .shortcut: ShortcutStep()
-                    case .tryIt: TryItStep(showcase: showcase)
-                    case .finish: FinishStep(micHeard: micHeard, go: go(to:))
+                    if step == .tryIt {
+                        // The thread fills the window; it scrolls itself.
+                        TryItStep(showcase: showcase).padding(.horizontal, 56)
+                    } else {
+                        // On a short screen the step scrolls and the buttons stay put.
+                        ScrollView {
+                            Group {
+                                switch step {
+                                case .welcome: WelcomeStep()
+                                case .permissions: PermissionsStep()
+                                case .microphone: MicrophoneStep(heard: $micHeard)
+                                case .model: ModelStep()
+                                case .shortcut: ShortcutStep()
+                                case .tryIt: EmptyView()
+                                case .finish: FinishStep(micHeard: micHeard, go: go(to:))
+                                }
+                            }
+                            .padding(.horizontal, 56)
+                            .padding(.bottom, 12)
+                        }
+                        .scrollBounceBehavior(.basedOnSize)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.horizontal, 56)
                 .id(step)
                 .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity.combined(with: .offset(x: 16)),
                                                                   removal: .opacity.combined(with: .offset(x: -16))))
@@ -187,7 +199,7 @@ private struct StepHeader: View {
 private struct WelcomeStep: View {
     var body: some View {
         VStack(spacing: 18) {
-            Spacer(minLength: 40)
+            Spacer(minLength: 0).frame(height: 120)
             BrandMark(size: 96)
                 .padding(.bottom, 10)
             Text(AppInfo.displayName)
@@ -204,9 +216,9 @@ private struct WelcomeStep: View {
                 Chip(text: "25 languages", symbol: "globe", flat: true)
             }
             .padding(.top, 6)
-            Spacer(minLength: 40)
             Text("Setup takes about two minutes.")
                 .font(TypeScale.meta).foregroundStyle(Crystal.ink3)
+                .padding(.top, 28)
         }
         .frame(maxWidth: .infinity)
     }
@@ -303,7 +315,8 @@ private struct MicrophoneStep: View {
                     LevelBars(meter: test.meter, active: test.running, bars: 44,
                               color: check == .hearing ? Crystal.clientAccent : Crystal.ink2, minHeight: 4)
                         .frame(height: 72)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
                         .frame(maxWidth: .infinity)
                         .background(Crystal.well, in: .rect(cornerRadius: 10, style: .continuous))
                     MicCheckLine(check: check, retry: restart)
@@ -321,7 +334,8 @@ private struct MicrophoneStep: View {
     }
 
     private func restart() {
-        guard !AppInfo.isDemo else { return }
+        // Never during a dictation: they share the microphone.
+        guard !AppInfo.isDemo, !model.dictation.phase.isActive else { return }
         if model.permissions.microphone.isGranted {
             model.micTest.start(deviceName: model.settings.settings.audioDevice)
         }
@@ -402,9 +416,17 @@ private struct ModelStep: View {
                         .font(TypeScale.body).foregroundStyle(Crystal.ink)
                 }
             } else {
-                ForEach(choices) { info in ModelChoiceCard(info: info, chosen: info.id == chosen) }
+                // The recommendation first; the alternatives one click away.
+                let recommended = choices.filter { $0.id == SpeechModelCatalog.defaultModelID }
+                let others = choices.filter { $0.id != SpeechModelCatalog.defaultModelID }
+                ForEach(recommended) { info in ModelChoiceCard(info: info, chosen: info.id == chosen) }
                 ModelProgressLine()
-                    .padding(.top, 6)
+                    .padding(.vertical, 6)
+                SectionHeading("Other models") {
+                    Text("All \(SpeechModelCatalog.all.count) are in Models").font(TypeScale.meta).foregroundStyle(Crystal.ink3)
+                }
+                .padding(.top, 4)
+                ForEach(others) { info in ModelChoiceCard(info: info, chosen: info.id == chosen) }
             }
         }
         .onAppear {
@@ -435,7 +457,7 @@ private struct ModelChoiceCard: View {
                         .lineLimit(1)
                     HStack(spacing: 4) {
                         if info.id == SpeechModelCatalog.defaultModelID { Badge("Recommended", style: .accent) }
-                        Badge(info.engine.label)
+                        if !info.name.contains(info.engine.label) { Badge(info.engine.label) }
                         if info.englishOnly { Badge("EN", style: .outline).help("English only") }
                     }
                     Text(info.summary).font(TypeScale.meta).foregroundStyle(Crystal.ink2)
@@ -532,14 +554,22 @@ private struct ShortcutStep: View {
     var body: some View {
         let s = model.settings.settings
         VStack(alignment: .leading, spacing: 12) {
-            StepHeader(title: "Your shortcut", subtitle: "Use it in any app to start dictating. Esc cancels.")
+            StepHeader(title: "Your shortcut",
+                       subtitle: "Use it in any app to start dictating. \(SetupGuide.keyLabel(HotkeyController.cancelShortcutSymbols ?? "⎋").capitalized) cancels.")
             Card(padding: 20) {
                 VStack(spacing: 16) {
-                    ShortcutCaps(description: HotkeyController.currentShortcutSymbols, large: true)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                    if HotkeyController.hasShortcut {
+                        ShortcutCaps(description: HotkeyController.currentShortcutSymbols, large: true)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    } else {
+                        Label("No shortcut is set. Record one below.", systemImage: "exclamationmark.triangle.fill")
+                            .font(TypeScale.body).foregroundStyle(Crystal.warn)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
                     HStack {
-                        Text("Change it").font(TypeScale.body).foregroundStyle(Crystal.ink2)
+                        Text("Record a new shortcut").font(TypeScale.body).foregroundStyle(Crystal.ink2)
                         Spacer()
                         KeyboardShortcuts.Recorder(for: .dictation) { _ in model.mirrorShortcut() }
                     }
@@ -557,9 +587,14 @@ private struct ShortcutStep: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Also hold fn to dictate").font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink)
-                            Text("Needs Input Monitoring.").font(TypeScale.meta).foregroundStyle(Crystal.ink2)
+                            Text(s.fnPushToTalk && model.permissions.inputMonitoring.isGranted ? "Input Monitoring is allowed."
+                                 : "Needs Input Monitoring.")
+                                .font(TypeScale.meta).foregroundStyle(Crystal.ink2)
                         }
                         Spacer()
+                        if s.fnPushToTalk && !model.permissions.inputMonitoring.isGranted {
+                            Button("Allow") { model.permissions.request(.inputMonitoring) }
+                        }
                         Toggle("Also hold fn to dictate", isOn: Binding(get: { s.fnPushToTalk }, set: { v in
                             model.settings.update { $0.fnPushToTalk = v }
                             if v && !model.permissions.inputMonitoring.isGranted { model.permissions.request(.inputMonitoring) }
@@ -570,7 +605,6 @@ private struct ShortcutStep: View {
                         .tint(Crystal.clientAccent)
                     }
                     if s.fnPushToTalk {
-                        PermissionRow(kind: .inputMonitoring)
                         if Permissions.globeKeyAction != 0 {
                             Label("fn is set to “\(Permissions.globeKeyActionName)”. Set it to Do Nothing in Keyboard settings.",
                                   systemImage: "exclamationmark.triangle")
@@ -621,6 +655,7 @@ private struct ModeCard: View {
 /// as you said it, with how long it took.
 private struct TryItStep: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var messages: [Message]
     @State private var draft = ""
     @FocusState private var fieldFocused: Bool
@@ -648,6 +683,11 @@ private struct TryItStep: View {
             }
             .cardSurface()
             .padding(.bottom, 4)
+            if case .failed(let message) = model.dictation.phase {
+                Label("\(message). Try again, or check the microphone in the previous steps.", systemImage: "exclamationmark.triangle.fill")
+                    .font(TypeScale.meta).foregroundStyle(Crystal.warn)
+                    .padding(.top, 6)
+            }
             if case .preparing(let fraction) = model.modelProgress {
                 Label(fraction.map { "The model is still downloading (\(Int($0 * 100))%). Dictation starts working when it's done." }
                       ?? "The model is getting ready. Dictation starts working in a moment.", systemImage: "arrow.down.circle")
@@ -684,7 +724,9 @@ private struct TryItStep: View {
             }
             .frame(minHeight: 260, maxHeight: .infinity)
             .onChange(of: messages) { _, list in
-                if let last = list.last { withAnimation(Motion.normal) { proxy.scrollTo(last.id, anchor: .bottom) } }
+                if let last = list.last {
+                    withAnimation(Motion.unlessReduced(Motion.normal, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
             }
         }
     }
@@ -770,6 +812,7 @@ private struct FinishStep: View {
             StepHeader(title: ready ? "You're all set" : "Almost there",
                        subtitle: ready
                            ? "\(model.settings.settings.recordingShortcutMode == .pushToTalk ? "Hold" : "Press") \(HotkeyController.currentShortcutSymbols) in any app to dictate. \(AppInfo.displayName) lives in the menu bar."
+                               + (model.permissions.accessibility.isGranted ? "" : " Until you allow typing into apps, each dictation is copied for you to paste.")
                            : "\(AppInfo.displayName) can't dictate until the items marked below are done.")
             Card(padding: 6) {
                 VStack(spacing: 0) {

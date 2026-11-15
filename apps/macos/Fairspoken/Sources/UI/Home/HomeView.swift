@@ -212,12 +212,13 @@ private struct StatTile: View {
 /// A slim card to dictate into this window: the shortcut, a mic button, the words.
 private struct DictateBar: View {
     var body: some View {
-        Card(padding: 12) { DictateBarContent() }
+        Card(padding: 14) { DictateBarContent() }
     }
 }
 
 private struct DictateBarContent: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var copied = false
 
     var body: some View {
@@ -228,7 +229,7 @@ private struct DictateBarContent: View {
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .animation(Motion.normal, value: dictation.phase.isListening)
+        .animation(Motion.unlessReduced(Motion.normal, reduceMotion), value: dictation.phase.isListening)
     }
 
     @ViewBuilder private var content: some View {
@@ -316,7 +317,7 @@ struct DictateButton: View {
                     TimelineView(.animation(minimumInterval: 1 / 30)) { _ in
                         let level = CGFloat(dictation.meter.snapshot().level)
                         Circle().stroke(Crystal.live.opacity(0.35), lineWidth: 2)
-                            .frame(width: size + 4 + level * 14, height: size + 4 + level * 14)
+                            .frame(width: size + 4 + level * 8, height: size + 4 + level * 8)
                     }
                 }
             }
@@ -394,6 +395,7 @@ private struct DictationCard: View {
             }
         }
         .onHover { hovered = $0 }
+        .help(item.text)
         .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hovered)
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: "Copy") { copy() }
@@ -475,12 +477,15 @@ private struct DictationRow: View {
     @Environment(AppModel.self) private var model
     @State private var hovered = false
     @State private var copied = false
+    /// Clicking a row shows the whole dictation.
+    @State private var expanded = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             AppIconView(bundleID: item.appBundleId, size: 24)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.text).font(TypeScale.body).foregroundStyle(Crystal.ink).lineLimit(2)
+                Text(item.text).font(TypeScale.body).foregroundStyle(Crystal.ink).lineLimit(expanded ? nil : 2)
+                    .textSelection(.enabled)
                 Text("\(item.appName ?? AppInfo.displayName) · \(item.wordCount) words")
                     .font(.system(size: 11)).foregroundStyle(Crystal.ink3).lineLimit(1)
             }
@@ -497,10 +502,12 @@ private struct DictationRow: View {
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.borderless)
-            .opacity(hovered || copied ? 1 : 0)
+            .opacity(hovered || copied ? 1 : 0.0001)
             .help("Copy")
             .accessibilityLabel("Copy dictation")
         }
+        .contentShape(.rect)
+        .onTapGesture { expanded.toggle() }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(hovered ? Crystal.rowHover : .clear, in: .rect(cornerRadius: 8, style: .continuous))

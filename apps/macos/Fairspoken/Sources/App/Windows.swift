@@ -50,7 +50,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
             let hosting = NSHostingController(rootView: view)
             hosting.sizingOptions = []
             window.contentViewController = hosting
-            window.setContentSize(OnboardingView.size)
+            window.setContentSize(Self.onboardingSize())
         } else {
             let hosting = NSHostingController(rootView: view)
             // The window keeps the guide's size; the view fills it.
@@ -62,7 +62,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
             window.titlebarAppearsTransparent = true
             window.isMovableByWindowBackground = true
             window.isReleasedWhenClosed = false
-            window.setContentSize(OnboardingView.size)
+            window.setContentSize(Self.onboardingSize())
             window.center()
             window.delegate = self
             onboarding = window
@@ -76,10 +76,17 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         present(onboarding!)
     }
 
-    /// Closing, minimising or hiding the guide stops its microphone test and any dictation it started.
+    /// Closing, minimising or hiding the guide stops its microphone test, and a dictation into
+    /// the guide itself ("Try it"). A dictation into another app carries on.
     private func stopOnboardingAudio() {
         model.micTest.stop()
-        if model.dictation.phase.isActive { model.dictation.cancel() }
+        if model.dictation.phase.isListening, model.dictation.isForThisApp { model.dictation.cancel() }
+    }
+
+    /// The guide's size, no taller than the screen (its steps scroll and its buttons stay visible).
+    static func onboardingSize() -> NSSize {
+        let available = (NSScreen.main?.visibleFrame.height ?? 1000) - 40
+        return NSSize(width: OnboardingView.size.width, height: min(OnboardingView.size.height, max(560, available)))
     }
 
     func windowDidMiniaturize(_ notification: Notification) {

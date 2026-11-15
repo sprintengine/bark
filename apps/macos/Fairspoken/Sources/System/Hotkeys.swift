@@ -68,6 +68,8 @@ final class HotkeyController {
         return AcceleratorString(modifiers: mods, code: code).string
     }
 
+    static var hasShortcut: Bool { KeyboardShortcuts.getShortcut(for: .dictation) != nil }
+
     static var currentShortcutSymbols: String {
         KeyboardShortcuts.getShortcut(for: .dictation)?.description ?? "Not set"
     }

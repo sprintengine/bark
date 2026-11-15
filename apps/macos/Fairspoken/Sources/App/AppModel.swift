@@ -78,10 +78,11 @@ final class AppModel {
         // Carry an imported Tauri shortcut over once (KeyboardShortcuts owns it afterwards).
         if settings.importedFromTauri { HotkeyController.adoptAccelerator(settings.settings.recordingShortcut) }
 
-        hotkeys.onPress = { [weak self] in self?.dictation.hotkeyPressed() }
+        // A dictation takes the microphone from the setup guide's test.
+        hotkeys.onPress = { [weak self] in self?.micTest.stop(); self?.dictation.hotkeyPressed() }
         hotkeys.onRelease = { [weak self] in self?.dictation.hotkeyReleased() }
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
-        hotkeys.onFnPress = { [weak self] in self?.dictation.fnPressed() }
+        hotkeys.onFnPress = { [weak self] in self?.micTest.stop(); self?.dictation.fnPressed() }
         hotkeys.onFnRelease = { [weak self] in self?.dictation.fnReleased() }
     }
 

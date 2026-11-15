@@ -118,23 +118,28 @@ public struct PrimaryButtonStyle: ButtonStyle {
         var tint: Color
         var large: Bool
         @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @State private var hovered = false
 
         var body: some View {
             configuration.label
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Crystal.onAccent)
+                .foregroundStyle(isEnabled ? Crystal.onAccent : Crystal.ink3)
                 .padding(.horizontal, large ? 18 : 12)
                 .frame(minHeight: large ? 32 : 26)
                 .background {
-                    Capsule().fill(tint.mix(with: .black, by: configuration.isPressed ? 0.18 : hovered ? 0.08 : 0))
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
-                        .shadow(color: tint.opacity(0.25), radius: 2, y: 1)
+                    if isEnabled {
+                        Capsule().fill(tint.mix(with: .black, by: configuration.isPressed ? 0.18 : hovered ? 0.08 : 0))
+                            .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+                            .shadow(color: tint.opacity(0.25), radius: 2, y: 1)
+                    } else {
+                        // Unavailable reads as neutral, never as a quieter version of the action.
+                        Capsule().fill(Crystal.well).overlay(Capsule().strokeBorder(Crystal.hairline))
+                    }
                 }
-                .opacity(isEnabled ? 1 : 0.45)
                 .contentShape(.capsule)
                 .onHover { hovered = $0 }
-                .animation(Motion.fast, value: configuration.isPressed)
+                .animation(reduceMotion ? nil : Motion.fast, value: configuration.isPressed)
         }
     }
 }

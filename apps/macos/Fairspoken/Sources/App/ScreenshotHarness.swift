@@ -91,10 +91,22 @@ final class ScreenshotHarness {
         model.homeShowsAllDictations = false
         // Before the first dictation.
         model.history.showcaseEmpty(true)
+        model.dictation.showcaseClearResult()
         try? await Task.sleep(for: .milliseconds(900))
         await freshFrame()
         if let window = windows.dashboard { await capture(window, as: "home-first-use-\(suffix)") }
         model.history.showcaseEmpty(false)
+        // `--small-windows`: Home and Models at the smallest window size, for layout review.
+        if AppInfo.arguments.contains("--small-windows") {
+            windows.dashboard?.setContentSize(NSSize(width: 960, height: 640))
+            for section in [AppModel.Section.home, .models, .settings] {
+                windows.showDashboard(section)
+                try? await Task.sleep(for: .milliseconds(1000))
+                await freshFrame()
+                if let window = windows.dashboard { await capture(window, as: "small-\(section.rawValue)-\(suffix)") }
+            }
+            windows.dashboard?.setContentSize(NSSize(width: 1180, height: 800))
+        }
         model.settingsTab = .transcription
         windows.showDashboard(.settings)
         try? await Task.sleep(for: .milliseconds(1000))
@@ -269,9 +281,11 @@ final class ScreenshotHarness {
     /// active, so AppKit draws every switch and button as in a background window. Reporting the
     /// app as active for this run draws them as a person sees them.
     private static func drawAsActiveApp() {
+        #if DEBUG
         guard let method = class_getInstanceMethod(NSApplication.self, #selector(getter: NSApplication.isActive)) else { return }
         let block: @convention(block) (AnyObject) -> Bool = { _ in true }
         method_setImplementation(method, imp_implementationWithBlock(block))
+        #endif
     }
 
     private func feedLevels(into meter: LevelMeter) -> Task<Void, Never> {

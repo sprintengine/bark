@@ -194,7 +194,8 @@ struct ModelRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(info.name).font(.contentBody.weight(.medium)).foregroundStyle(Crystal.ink).lineLimit(1)
                     .truncationMode(.middle)
-                ModelBadges(info: info, inUse: library.activeModelID == info.id, engine: columns.engine ? nil : info.engine)
+                // "In use" is said once, in the action column.
+                ModelBadges(info: info, inUse: false, engine: columns.engine ? nil : info.engine)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)
@@ -401,18 +402,16 @@ struct ModelDetailSheet: View {
                     ProgressView().controlSize(.small)
                     Text(state == .compiling ? "Optimising for this device…" : "Unpacking…").font(.contentBody).foregroundStyle(Crystal.ink2)
                 case .available:
-                    // The link editor has its own Download.
-                    if model.linkEditorModel != info.id {
-                        Button("Download") { library.download(info.id) }
-                    }
+                    // "Download and Use" is the action; downloading without using stays in the row.
+                    EmptyView()
                 case .installed:
                     EmptyView()
                 }
-                Button(active ? "In use" : "Use this model") {
+                Button(active ? "In Use" : state == .installed ? "Use This Model" : "Download and Use") {
                     model.useModel(info.id)
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent).tint(Crystal.clientAccent)
+                .buttonStyle(PrimaryButtonStyle(large: true))
                 .disabled(active || state.isBusy)
                 .help(state == .available ? "Downloads the model, then uses it for dictation" : "Use it for dictation")
             }

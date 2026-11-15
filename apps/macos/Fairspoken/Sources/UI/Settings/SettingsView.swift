@@ -49,10 +49,13 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
-            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: 780, alignment: .leading)
+            // The form's own inset lines its groups up with the title.
             .padding(.horizontal, Layout.pageH - 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // Settings is one card: its grouped rows are wells on it, as fields are on any card.
+        .background(Crystal.card)
         .onAppear { model.permissions.beginPolling() }
         .onDisappear { model.permissions.endPolling() }
     }
@@ -124,12 +127,12 @@ private struct GeneralSettings: View {
                     Text("Keeps each dictation's audio and text on this Mac, for training a model on your voice. Nothing is uploaded.")
                 }
                 .tint(Crystal.clientAccent)
-                LabeledContent("Saved to") {
-                    Button(model.training.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) {
-                        model.section = .training
-                    }
-                    .buttonStyle(.link)
-                    .help("Choose the folder and review recordings in Post-training")
+                LabeledContent {
+                    Button("Review Recordings…") { model.section = .training }
+                        .help("Choose the folder and review recordings in Post-training")
+                } label: {
+                    Text("Saved to")
+                    Text(model.training.folder.lastPathComponent)
                 }
             } header: {
                 Text("Recordings")
@@ -138,7 +141,7 @@ private struct GeneralSettings: View {
                 PermissionRow(kind: .microphone)
                 PermissionRow(kind: .accessibility)
                 PermissionRow(kind: .inputMonitoring)
-                Button("Setup guide…") { model.openOnboarding?() }
+                Button("Setup Guide…") { model.openOnboarding?() }
             }
         }
     }
@@ -260,7 +263,7 @@ private struct TranscriptionSettings: View {
                     Text("Network device").tag(TranscriptionLocation.remoteHost)
                 }
                 .pickerStyle(.segmented)
-                .tint(Crystal.clientAccent)
+                
                 if !remote {
                     Picker("Model", selection: Binding(get: { s.model }, set: { v in
                         model.useModel(v)
@@ -526,7 +529,7 @@ private struct VocabularySettings: View {
                 }
             } header: {
                 HStack {
-                    Text("Vocabulary")
+                    Text("Your terms")
                     Spacer()
                     Text("\(hints.count) of 50").monospacedDigit()
                 }
@@ -623,9 +626,15 @@ struct PermissionRow: View {
             }
             Spacer()
             if status.isGranted {
-                Label("Allowed", systemImage: "checkmark").foregroundStyle(Crystal.ok).font(.callout.weight(.medium))
+                Label("Allowed", systemImage: "checkmark.circle.fill").foregroundStyle(Crystal.ok).font(.system(size: 13, weight: .medium))
             } else {
-                Button(status == .notDetermined ? "Allow" : "Open Settings") { model.permissions.request(kind) }
+                // One verb everywhere: Allow asks (or opens the pane); only a microphone that was
+                // refused needs System Settings.
+                if kind == .microphone && status == .denied {
+                    Button("Open Settings") { model.permissions.openSettings(kind) }
+                } else {
+                    Button("Allow") { model.permissions.request(kind) }
+                }
             }
         }
         .accessibilityElement(children: .combine)

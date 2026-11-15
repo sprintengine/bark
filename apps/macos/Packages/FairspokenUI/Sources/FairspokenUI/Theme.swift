@@ -23,8 +23,8 @@ public enum Crystal {
     public static let ink = Color(hex: 0x16191D, dark: 0xECEEF0, highContrast: (0x000000, 0xFFFFFF))
     /// Secondary text: at least 4.5:1 on `card` and `canvas` in both themes.
     public static let ink2 = Color(hex: 0x575F68, dark: 0xA3ABB3, highContrast: (0x2E343A, 0xD4D9DE))
-    /// Tertiary text and glyphs: captions that are never the only cue.
-    public static let ink3 = Color(hex: 0x7C858E, dark: 0x7A838C, highContrast: (0x4A525A, 0xB0B8C0))
+    /// Tertiary text: timestamps and captions. Still 4.5:1 on `card` and `canvas`.
+    public static let ink3 = Color(hex: 0x656D76, dark: 0x8C959E, highContrast: (0x464E56, 0xB0B8C0))
     /// Dividers and outlines (8–10%, stronger with Increase Contrast).
     public static let hairline = Color(
         light: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.10),
@@ -68,7 +68,7 @@ public enum Crystal {
     // MARK: Accents and status
 
     /// The clients' hint (Fairspoken for Mac): sage green.
-    public static let clientAccent = Color(hex: 0x2E8B5E, dark: 0x5CCB94, highContrast: (0x1D6B45, 0x7FE0AE))
+    public static let clientAccent = Color(hex: 0x2A7F56, dark: 0x5CCB94, highContrast: (0x1D6B45, 0x7FE0AE))
     /// Text and glyphs on an accent fill: white on the light theme's deep green, near-black on the
     /// dark theme's light green (4.5:1 or better on both).
     public static let onAccent = Color(hex: 0xFFFFFF, dark: 0x08140E)
