@@ -266,6 +266,10 @@ download, Use (… › Delete…, with confirmation) or In use. Search, engine, 
 On this Mac filters, and sorting by name, speed, accuracy or size, are `ModelCatalogueQuery`.
 Clicking a row opens a detail sheet: description, figures and where they come from, languages,
 download, memory, licence, source repository, Download from Link… (Parakeet) and **Use this model**.
+Every way of choosing a model (the library, the sheet, Settings, onboarding, launch) goes through
+`ModelLibrary.use` (`ModelActivation`): a model that isn't downloaded is downloaded on its row first
+(cancellable) and then used, and a choice made while a dictation is recording or transcribing is
+loaded once it ends.
 
 `--selftest <wav> --model large-v3-turbo` runs any catalogue model through the same engine as
 dictation (downloading it first if needed).

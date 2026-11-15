@@ -69,6 +69,10 @@ final class ModelLibrary {
     /// Called when a model failed to load and the previous one was put back (its id), so the
     /// saved choice can follow what is really in use.
     @ObservationIgnored var onFallback: ((String) -> Void)?
+    /// True while a dictation is recording or transcribing (set by the app); a model chosen then
+    /// is loaded when it ends.
+    @ObservationIgnored var isDictating: () -> Bool = { false }
+    @ObservationIgnored private var activation = ModelActivation()
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var downloads: [String: Task<Void, Never>] = [:]
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "models")
@@ -168,7 +172,27 @@ final class ModelLibrary {
         }
     }
 
-    /// Library download (not activated).
+    /// Makes `id` the model dictation uses: downloaded first as a library download (shown on its
+    /// row, cancellable) if it is missing, and loaded only between dictations. Every way of
+    /// choosing a model goes through here. An id the catalogue doesn't know means the default.
+    func use(_ requested: String) {
+        let id = SpeechModelCatalog.resolve(requested).id
+        perform(activation.request(id, installed: SpeechModels.isInstalled(id), downloading: isDownloading(id),
+                                   dictationActive: isDictating()))
+    }
+
+    /// The dictation in progress ended: load a model chosen during it.
+    func dictationEnded() { perform(activation.dictationEnded()) }
+
+    private func perform(_ step: ModelActivation.Step) {
+        switch step {
+        case .none: break
+        case .download(let id): download(id)
+        case .load(let id): prepare(id)
+        }
+    }
+
+    /// Library download (not activated unless `use` asked for it).
     func download(_ id: String) {
         guard state(of: id) == .available, SpeechModelCatalog.model(id: id) != nil else { return }
         items[id] = .downloading(0)
@@ -194,10 +218,14 @@ final class ModelLibrary {
                 failure = Task.isCancelled ? nil : error.localizedDescription
             }
             await MainActor.run { [weak self] in
-                self?.downloads[id] = nil
-                self?.items[id] = nil
-                self?.downloadErrors[id] = failure
-                self?.refresh()
+                guard let self else { return }
+                self.downloads[id] = nil
+                self.items[id] = nil
+                self.downloadErrors[id] = failure
+                self.refresh()
+                // A model chosen before it was downloaded is used now (or after the dictation).
+                self.perform(self.activation.downloadFinished(id, success: SpeechModels.isInstalled(id),
+                                                              dictationActive: self.isDictating()))
             }
         }
     }

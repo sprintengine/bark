@@ -166,3 +166,54 @@ struct ModelStorageTests {
         #expect(ModelStorage.contained(models.appendingPathComponent("whisper/a"), in: alias) != nil)
     }
 }
+
+@Suite("Choosing a model")
+struct ModelActivationTests {
+    @Test func anInstalledModelLoadsAtOnceBetweenDictations() {
+        var a = ModelActivation()
+        #expect(a.request("large-v3", installed: true, downloading: false, dictationActive: false) == .load("large-v3"))
+        #expect(a == ModelActivation())
+    }
+
+    /// "Use" during a dictation waits for it to end; only the latest choice is loaded.
+    @Test func aChoiceDuringDictationWaitsForItToEnd() {
+        var a = ModelActivation()
+        #expect(a.request("large-v3", installed: true, downloading: false, dictationActive: true) == .none)
+        #expect(a.request("small.en", installed: true, downloading: false, dictationActive: true) == .none)
+        #expect(a.waitingForDictation == "small.en")
+        #expect(a.dictationEnded() == .load("small.en"))
+        #expect(a.dictationEnded() == .none)
+    }
+
+    /// A model that isn't downloaded goes through the library's tracked download, then loads.
+    @Test func aMissingModelDownloadsFirstThenLoads() {
+        var a = ModelActivation()
+        #expect(a.request("large-v3", installed: false, downloading: false, dictationActive: false) == .download("large-v3"))
+        #expect(a.downloadFinished("other", success: true, dictationActive: false) == .none)
+        #expect(a.downloadFinished("large-v3", success: true, dictationActive: false) == .load("large-v3"))
+        // Already downloading: no second download.
+        #expect(a.request("medium", installed: false, downloading: true, dictationActive: false) == .none)
+        #expect(a.waitingForDownload == "medium")
+    }
+
+    @Test func aCancelledOrFailedDownloadActivatesNothing() {
+        var a = ModelActivation()
+        _ = a.request("large-v3", installed: false, downloading: false, dictationActive: false)
+        #expect(a.downloadFinished("large-v3", success: false, dictationActive: false) == .none)
+        #expect(a == ModelActivation())
+    }
+
+    @Test func aDownloadThatFinishesMidDictationWaitsToo() {
+        var a = ModelActivation()
+        _ = a.request("large-v3", installed: false, downloading: false, dictationActive: false)
+        #expect(a.downloadFinished("large-v3", success: true, dictationActive: true) == .none)
+        #expect(a.dictationEnded() == .load("large-v3"))
+    }
+
+    @Test func aNewerChoiceReplacesOneWaitingForItsDownload() {
+        var a = ModelActivation()
+        _ = a.request("large-v3", installed: false, downloading: false, dictationActive: false)
+        #expect(a.request("parakeet-tdt-0.6b-v3", installed: true, downloading: false, dictationActive: false) == .load("parakeet-tdt-0.6b-v3"))
+        #expect(a.downloadFinished("large-v3", success: true, dictationActive: false) == .none)
+    }
+}
