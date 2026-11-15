@@ -138,7 +138,7 @@ export function releasePageUrl({ repo, tag }) {
   return `https://github.com/${repo}/releases/tag/${encodeURIComponent(tag)}`
 }
 
-// The file-name stem every packaged file shares: "Fairspoken" ->
+// The file-name stem every packaged file shares: "Bark" ->
 // "fairspoken". GitHub rewrites spaces in asset names, so none are used.
 export function productSlug(productName) {
   const slug = String(productName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -403,7 +403,7 @@ export function macAppNameFromXcconfig(text) {
   return /^MV_DISPLAY_NAME = (\S.*?)\s*$/m.exec(String(text ?? ''))?.[1] ?? null
 }
 
-// The file-name stem of the server app ("Fairspoken Server.app"): the client's
+// The file-name stem of the server app ("Bark Server.app"): the client's
 // name with -Server, as release.sh --app server names its files.
 export function macServerName(appName) {
   return appName ? `${appName}-Server` : null
@@ -415,7 +415,7 @@ export function macServerName(appName) {
 export const SPARKLE_APPS = [
   {
     kind: 'client',
-    title: 'Fairspoken',
+    title: 'Bark',
     bundleId: 'ie.fairspoken.mac',
     metadata: 'sparkle-fairspoken.json',
     appcast: 'appcast-fairspoken.xml',
@@ -423,7 +423,7 @@ export const SPARKLE_APPS = [
   },
   {
     kind: 'server',
-    title: 'Fairspoken Server',
+    title: 'Bark Server',
     bundleId: 'ie.fairspoken.server',
     metadata: 'sparkle-fairspoken-server.json',
     appcast: 'appcast-fairspoken-server.xml',

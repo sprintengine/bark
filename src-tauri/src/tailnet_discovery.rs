@@ -1,4 +1,4 @@
-//! Finds Fairspoken transcription hosts on the user's tailnet and pairs with
+//! Finds Bark transcription hosts on the user's tailnet and pairs with
 //! one (PROTOCOL.md "Discovery and pairing"). The Tailscale CLI lists the
 //! tailnet's machines; each online computer is probed for `GET /v1/hello`
 //! on its MagicDNS name (HTTPS, then HTTP, for a host published with
@@ -44,7 +44,7 @@ pub struct DiscoveredHost {
     pub is_self: bool,
 }
 
-/// Lists every Fairspoken host on this computer and the tailnet. When
+/// Lists every Bark host on this computer and the tailnet. When
 /// Tailscale can't be used, hosts on this computer are still listed; with
 /// none, the Tailscale problem is the error.
 pub fn discover_hosts() -> Result<Vec<DiscoveredHost>, String> {
@@ -67,7 +67,7 @@ pub fn discover_hosts() -> Result<Vec<DiscoveredHost>, String> {
     }
 }
 
-/// Ports to probe on `127.0.0.1`: Fairspoken Server's configured port
+/// Ports to probe on `127.0.0.1`: Bark Server's configured port
 /// (release and debug builds, macOS), then the default port.
 fn local_host_ports() -> Vec<u16> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
@@ -154,7 +154,7 @@ pub fn probe_address(input: &str) -> Result<DiscoveredHost, String> {
         .next()
         .ok_or_else(|| {
             format!(
-                "No Fairspoken host answered at {}. Check the name, that the host is running, and that it accepts connections from your tailnet.",
+                "No Bark host answered at {}. Check the name, that the host is running, and that it accepts connections from your tailnet.",
                 input.trim()
             )
         })
@@ -609,7 +609,7 @@ fn endpoint(base_url: &str, path: &str) -> Result<Url, String> {
         .map_err(|err| format!("Invalid host URL: {err}"))
 }
 
-/// `GET <url>/v1/hello`; only a Fairspoken host's answer counts.
+/// `GET <url>/v1/hello`; only a Bark host's answer counts.
 fn probe_hello(client: &Client, base_url: &str) -> Option<Hello> {
     let response = client
         .get(endpoint(base_url, "v1/hello").ok()?)

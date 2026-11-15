@@ -185,7 +185,7 @@ class DockWindow(
             InsertService.Result.Pasted -> "Pasted"
             InsertService.Result.NoField -> {
                 window.context.getSystemService(ClipboardManager::class.java)
-                    .setPrimaryClip(ClipData.newPlainText("Fairspoken", text))
+                    .setPrimaryClip(ClipData.newPlainText("Bark", text))
                 "Copied"
             }
         }

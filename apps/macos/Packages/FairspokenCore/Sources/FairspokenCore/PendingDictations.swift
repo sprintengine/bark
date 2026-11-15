@@ -160,7 +160,7 @@ public struct PendingDictationStore: Sendable {
             if item.state == .recording { WAVFile.repairHeader(audioURL(id)) }
             item.durationSeconds = WAVFile.durationSeconds(audioURL(id)) ?? item.durationSeconds
             item.state = .failed
-            item.lastError = item.lastError ?? "Fairspoken quit before this dictation was transcribed"
+            item.lastError = item.lastError ?? "Bark quit before this dictation was transcribed"
             try? save(item)
         }
         return all()

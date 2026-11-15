@@ -243,6 +243,6 @@ private fun versionLine(): String {
     val context = LocalContext.current
     return remember {
         val version = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
-        if (version != null) "Fairspoken $version" else "Fairspoken"
+        if (version != null) "Bark $version" else "Bark"
     }
 }

@@ -84,8 +84,8 @@ test('the build number is the UTC minute, twelve digits, and only grows', () => 
 
 test('the releases repository comes from the stable desktop feed endpoint and nowhere else', () => {
   assert.equal(
-    releasesRepoFromEndpoint('https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-stable.json'),
-    'sprintengine/speakeasy',
+    releasesRepoFromEndpoint('https://github.com/sprintengine/bark/releases/download/update-feeds/desktop-stable.json'),
+    'sprintengine/bark',
   )
   assert.equal(releasesRepoFromEndpoint('https://github.com/acme/multi-voice.app/releases/download/update-feeds/desktop-stable.json'), 'acme/multi-voice.app')
   for (const wrong of [
@@ -100,20 +100,20 @@ test('the releases repository comes from the stable desktop feed endpoint and no
 })
 
 test('file names carry no spaces, whatever the product is called', () => {
-  assert.equal(productSlug('Fairspoken'), 'fairspoken')
+  assert.equal(productSlug('Bark'), 'bark')
   assert.equal(productSlug('  Hush!  '), 'hush')
   assert.throws(() => productSlug('***'), /Cannot name files/)
 })
 
 test('release notes say which train a build is on', () => {
   const notes = (channel) =>
-    buildReleaseNotes({ productName: 'Fairspoken', version: '0.5.0', channel, sourceRepo: 'o/r', sha: SHA, sourcePrivate: true })
-  assert.match(notes('nightly'), /^Nightly build of Fairspoken 0\.5\.0\./)
-  assert.match(notes('stable'), /^Fairspoken 0\.5\.0\.\n/)
+    buildReleaseNotes({ productName: 'Bark', version: '0.5.0', channel, sourceRepo: 'o/r', sha: SHA, sourcePrivate: true })
+  assert.match(notes('nightly'), /^Nightly build of Bark 0\.5\.0\./)
+  assert.match(notes('stable'), /^Bark 0\.5\.0\.\n/)
 })
 
 test('the source sha round-trips through the release body', () => {
-  const body = buildReleaseNotes({ productName: 'Fairspoken', version: '0.4.0', channel: 'stable', sourceRepo: 'o/r', sha: SHA, sourcePrivate: true })
+  const body = buildReleaseNotes({ productName: 'Bark', version: '0.4.0', channel: 'stable', sourceRepo: 'o/r', sha: SHA, sourcePrivate: true })
   assert.equal(sourceShaFromBody(body), SHA)
   assert.equal(sourceShaFromBody('no marker here'), null)
   assert.equal(sourceShaFromBody(null), null)
@@ -121,7 +121,7 @@ test('the source sha round-trips through the release body', () => {
 
 test('release notes list commit subjects only when the source is public', () => {
   const commits = [{ sha: 'b'.repeat(40), subject: 'Private subject line' }]
-  const base = { productName: 'Fairspoken', version: '0.4.0', channel: 'stable', sourceRepo: 'o/r', sha: SHA, commits }
+  const base = { productName: 'Bark', version: '0.4.0', channel: 'stable', sourceRepo: 'o/r', sha: SHA, commits }
   const privateBody = buildReleaseNotes({ ...base, sourcePrivate: true })
   assert.ok(!privateBody.includes('Private subject line'))
   assert.ok(!privateBody.includes('github.com/o/r'))
@@ -196,10 +196,10 @@ function releaseAssets(version = '0.4.0') {
     `fairspoken-${version}-transcription-host-windows-x64.zip`,
     `fairspoken-${version}-transcription-host-macos-arm64.tar.gz`,
     HOST_MANIFEST,
-    `Fairspoken-${version}-macos-arm64.zip`,
-    `Fairspoken-${version}-macos-arm64.dmg`,
-    `Fairspoken-Server-${version}-macos-arm64.zip`,
-    `Fairspoken-Server-${version}-macos-arm64.dmg`,
+    `Bark-${version}-macos-arm64.zip`,
+    `Bark-${version}-macos-arm64.dmg`,
+    `Bark-Server-${version}-macos-arm64.zip`,
+    `Bark-Server-${version}-macos-arm64.dmg`,
   ]
 }
 const RELEASE_ASSETS = releaseAssets()
@@ -320,7 +320,7 @@ test('the host archive layout names the one folder and the binary inside it', ()
   )
 })
 
-const ZIP = 'Fairspoken-0.4.0-macos-arm64.zip'
+const ZIP = 'Bark-0.4.0-macos-arm64.zip'
 const sparkleMeta = (overrides = {}) => ({
   bundleId: 'ie.fairspoken.mac',
   version: '202610051230',
@@ -337,22 +337,22 @@ test('Sparkle metadata must describe a notarized zip on the release, for the rig
   const [client, server] = SPARKLE_APPS
   assert.equal(client.appcast, 'appcast-fairspoken.xml')
   assert.equal(server.appcast, 'appcast-fairspoken-server.xml')
-  const assets = [{ name: ZIP, size: 1234 }, { name: 'Fairspoken-0.4.0-macos-arm64-unsigned.zip', size: 9 }]
+  const assets = [{ name: ZIP, size: 1234 }, { name: 'Bark-0.4.0-macos-arm64-unsigned.zip', size: 9 }]
   const check = (meta, app = client) => checkSparkleMetadata(JSON.stringify(meta), { app, version: '0.4.0', assets })
   assert.deepEqual(check(sparkleMeta()), [])
   assert.deepEqual(check(sparkleMeta(), server), ['is for ie.fairspoken.mac, not ie.fairspoken.server'])
   assert.deepEqual(check(sparkleMeta({ version: '41' })), ['has build 41, not a YYYYMMDDHHMM build number'])
   assert.deepEqual(check(sparkleMeta({ length: 99 })), [`says ${ZIP} is 99 bytes, the release has 1234`])
   assert.deepEqual(check(sparkleMeta({ edSignature: 'abc' })), ['has no 64-byte edSignature'])
-  assert.deepEqual(check(sparkleMeta({ file: 'Fairspoken-0.4.0-macos-arm64-unsigned.zip', length: 9 })), [
-    'names Fairspoken-0.4.0-macos-arm64-unsigned.zip, not a notarized .zip',
+  assert.deepEqual(check(sparkleMeta({ file: 'Bark-0.4.0-macos-arm64-unsigned.zip', length: 9 })), [
+    'names Bark-0.4.0-macos-arm64-unsigned.zip, not a notarized .zip',
   ])
   assert.deepEqual(check(sparkleMeta({ shortVersionString: '0.3.9' })), ['names version 0.3.9, expected 0.4.0'])
   assert.deepEqual(check(sparkleMeta({ minimumSystemVersion: '' })), ['has no minimumSystemVersion'])
 })
 
 test('missingInstallers wants every product and the metadata the feeds are rendered from', () => {
-  const options = { slug: SLUG, version: '0.4.0', macAppName: 'Fairspoken' }
+  const options = { slug: SLUG, version: '0.4.0', macAppName: 'Bark' }
   assert.deepEqual(missingInstallers(RELEASE_ASSETS, options), [])
   assert.deepEqual(missingInstallers([], options), [
     'the desktop NSIS installer (fairspoken-0.4.0-windows-x64-setup.exe)',
@@ -364,10 +364,10 @@ test('missingInstallers wants every product and the metadata the feeds are rende
     'the windows-x64 transcription host (fairspoken-0.4.0-transcription-host-windows-x64.zip)',
     'the macos-arm64 transcription host (fairspoken-0.4.0-transcription-host-macos-arm64.tar.gz)',
     'the transcription host manifest (host-manifest.json)',
-    'the native macOS app .zip (Fairspoken-0.4.0-macos-arm64.zip)',
-    'the native macOS app .dmg (Fairspoken-0.4.0-macos-arm64.dmg)',
-    'the native macOS server app .zip (Fairspoken-Server-0.4.0-macos-arm64.zip)',
-    'the native macOS server app .dmg (Fairspoken-Server-0.4.0-macos-arm64.dmg)',
+    'the native macOS app .zip (Bark-0.4.0-macos-arm64.zip)',
+    'the native macOS app .dmg (Bark-0.4.0-macos-arm64.dmg)',
+    'the native macOS server app .zip (Bark-Server-0.4.0-macos-arm64.zip)',
+    'the native macOS server app .dmg (Bark-Server-0.4.0-macos-arm64.dmg)',
   ])
   // A commit from before apps/macos existed ships no native app.
   assert.equal(missingInstallers(RELEASE_ASSETS, { ...options, macAppName: null }).length, 0)
@@ -377,42 +377,42 @@ test('missingInstallers wants every product and the metadata the feeds are rende
 })
 
 test('the Tauri macOS app is no longer asked for, and its files do not stand in for anything', () => {
-  const options = { slug: SLUG, version: '0.4.0', macAppName: 'Fairspoken' }
+  const options = { slug: SLUG, version: '0.4.0', macAppName: 'Bark' }
   assert.ok(!RELEASE_ASSETS.some((name) => /^fairspoken-.*-macos-(arm64|x64)(\.dmg|\.app\.tar\.gz)$/.test(name)))
   for (const target of ['macos-arm64']) {
     const name = `fairspoken-0.4.0-transcription-host-${target}.tar.gz`
     assert.deepEqual(missingInstallers(RELEASE_ASSETS.filter((asset) => asset !== name), options), [`the ${target} transcription host (${name})`])
   }
-  const tauriDmgOnly = [...RELEASE_ASSETS.filter((name) => name !== 'Fairspoken-0.4.0-macos-arm64.dmg'), 'fairspoken-0.4.0-macos-arm64.dmg']
-  assert.deepEqual(missingInstallers(tauriDmgOnly, options), ['the native macOS app .dmg (Fairspoken-0.4.0-macos-arm64.dmg)'])
+  const tauriDmgOnly = [...RELEASE_ASSETS.filter((name) => name !== 'Bark-0.4.0-macos-arm64.dmg'), 'fairspoken-0.4.0-macos-arm64.dmg']
+  assert.deepEqual(missingInstallers(tauriDmgOnly, options), ['the native macOS app .dmg (Bark-0.4.0-macos-arm64.dmg)'])
 })
 
 test("the client's and the server's packages never stand in for each other", () => {
-  const options = { slug: SLUG, version: '0.4.0', macAppName: 'Fairspoken' }
-  const withoutClient = RELEASE_ASSETS.filter((name) => !name.startsWith('Fairspoken-0.4.0-'))
+  const options = { slug: SLUG, version: '0.4.0', macAppName: 'Bark' }
+  const withoutClient = RELEASE_ASSETS.filter((name) => !name.startsWith('Bark-0.4.0-'))
   assert.deepEqual(missingInstallers(withoutClient, options), [
-    'the native macOS app .zip (Fairspoken-0.4.0-macos-arm64.zip)',
-    'the native macOS app .dmg (Fairspoken-0.4.0-macos-arm64.dmg)',
+    'the native macOS app .zip (Bark-0.4.0-macos-arm64.zip)',
+    'the native macOS app .dmg (Bark-0.4.0-macos-arm64.dmg)',
   ])
-  const serverDmgOnly = RELEASE_ASSETS.filter((name) => name !== 'Fairspoken-Server-0.4.0-macos-arm64.dmg')
-  assert.deepEqual(missingInstallers(serverDmgOnly, options), ['the native macOS server app .dmg (Fairspoken-Server-0.4.0-macos-arm64.dmg)'])
+  const serverDmgOnly = RELEASE_ASSETS.filter((name) => name !== 'Bark-Server-0.4.0-macos-arm64.dmg')
+  assert.deepEqual(missingInstallers(serverDmgOnly, options), ['the native macOS server app .dmg (Bark-Server-0.4.0-macos-arm64.dmg)'])
 })
 
 test('ad-hoc signed native apps complete a release, are named as such, and are not missing Sparkle metadata', () => {
-  const options = { slug: SLUG, version: '0.4.0', macAppName: 'Fairspoken' }
-  const unsigned = RELEASE_ASSETS.map((name) => name.replace(/^(Fairspoken(?:-Server)?-0\.4\.0-macos-arm64)/, '$1-unsigned'))
+  const options = { slug: SLUG, version: '0.4.0', macAppName: 'Bark' }
+  const unsigned = RELEASE_ASSETS.map((name) => name.replace(/^(Bark(?:-Server)?-0\.4\.0-macos-arm64)/, '$1-unsigned'))
   assert.deepEqual(missingInstallers(unsigned, options), [])
   assert.deepEqual(unsignedMacApps(unsigned, options), [
-    'Fairspoken-0.4.0-macos-arm64-unsigned.zip',
-    'Fairspoken-0.4.0-macos-arm64-unsigned.dmg',
-    'Fairspoken-Server-0.4.0-macos-arm64-unsigned.zip',
-    'Fairspoken-Server-0.4.0-macos-arm64-unsigned.dmg',
+    'Bark-0.4.0-macos-arm64-unsigned.zip',
+    'Bark-0.4.0-macos-arm64-unsigned.dmg',
+    'Bark-Server-0.4.0-macos-arm64-unsigned.zip',
+    'Bark-Server-0.4.0-macos-arm64-unsigned.dmg',
   ])
   assert.deepEqual(unsignedMacApps(RELEASE_ASSETS, options), [])
   assert.deepEqual(macAppsWithoutSparkle(unsigned, options), [])
-  assert.deepEqual(macAppsWithoutSparkle(RELEASE_ASSETS, options), ['Fairspoken', 'Fairspoken Server'])
-  assert.deepEqual(macAppsWithoutSparkle([...RELEASE_ASSETS, 'sparkle-fairspoken.json'], options), ['Fairspoken Server'])
-  const unnotarized = RELEASE_ASSETS.map((name) => name.replace(/^(Fairspoken(?:-Server)?-0\.4\.0-macos-arm64)/, '$1-unnotarized'))
+  assert.deepEqual(macAppsWithoutSparkle(RELEASE_ASSETS, options), ['Bark', 'Bark Server'])
+  assert.deepEqual(macAppsWithoutSparkle([...RELEASE_ASSETS, 'sparkle-fairspoken.json'], options), ['Bark Server'])
+  const unnotarized = RELEASE_ASSETS.map((name) => name.replace(/^(Bark(?:-Server)?-0\.4\.0-macos-arm64)/, '$1-unnotarized'))
   assert.equal(missingInstallers(unnotarized, options).length, 4)
 })
 
@@ -423,16 +423,16 @@ test('host archives and native app packages are named per platform, with no spac
   )
   assert.equal(hostArchiveName({ slug: SLUG, version: '0.5.0', target: 'windows-x64' }), 'fairspoken-0.5.0-transcription-host-windows-x64.zip')
   assert.throws(() => hostArchiveName({ slug: SLUG, version: '0.5.0', target: 'linux-riscv64' }), /Unknown transcription host target/)
-  assert.equal(macAppFileName({ appName: 'Fairspoken', version: '0.5.0', signed: false, extension: '.zip' }), 'Fairspoken-0.5.0-macos-arm64-unsigned.zip')
+  assert.equal(macAppFileName({ appName: 'Bark', version: '0.5.0', signed: false, extension: '.zip' }), 'Bark-0.5.0-macos-arm64-unsigned.zip')
   assert.throws(() => macAppFileName({ appName: 'Fair spoken', version: '0.5.0', extension: '.zip' }), /Cannot name files/)
-  assert.throws(() => macAppFileName({ appName: 'Fairspoken', version: '0.5.0', extension: '.pkg' }), /Unknown macOS app package/)
-  assert.equal(macServerName('Fairspoken'), 'Fairspoken-Server')
+  assert.throws(() => macAppFileName({ appName: 'Bark', version: '0.5.0', extension: '.pkg' }), /Unknown macOS app package/)
+  assert.equal(macServerName('Bark'), 'Bark-Server')
   assert.equal(macServerName(null), null)
 })
 
 test("the native app's name is read from MV_DISPLAY_NAME in its xcconfig", () => {
-  const xcconfig = '// PRODUCT NAME\nMV_DISPLAY_NAME = Fairspoken\nMV_BUNDLE_ID_BASE = ie.fairspoken.mac\n'
-  assert.equal(macAppNameFromXcconfig(xcconfig), 'Fairspoken')
+  const xcconfig = '// PRODUCT NAME\nMV_DISPLAY_NAME = Bark\nMV_BUNDLE_ID_BASE = ie.fairspoken.mac\n'
+  assert.equal(macAppNameFromXcconfig(xcconfig), 'Bark')
   assert.equal(macAppNameFromXcconfig('MARKETING_VERSION = 0.1.0\n'), null)
   assert.equal(macAppNameFromXcconfig(undefined), null)
 })

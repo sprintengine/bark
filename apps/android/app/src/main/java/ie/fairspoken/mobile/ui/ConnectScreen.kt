@@ -79,7 +79,7 @@ fun ConnectScreen(
                 return@launch
             }
             error = when {
-                found == null -> if (tailnet.connected) "No Fairspoken host answered at $target" else "Tailscale is off"
+                found == null -> if (tailnet.connected) "No Bark host answered at $target" else "Tailscale is off"
                 found.hello.auth == "none" -> {
                     app.store.save(SavedHost(found.url, found.hello.name, null))
                     null
@@ -121,7 +121,7 @@ fun ConnectScreen(
         Spacer(Modifier.height(40.dp))
         BasicText("Connect to your host", style = Type.largeTitle)
         Spacer(Modifier.height(8.dp))
-        BasicText("The computer running Fairspoken on your tailnet.", style = Type.body)
+        BasicText("The computer running Bark on your tailnet.", style = Type.body)
         Spacer(Modifier.height(32.dp))
 
         GlassCard(backdrop, Modifier.fillMaxWidth(), padding = PaddingValues(horizontal = 18.dp), spacing = 0.dp) {

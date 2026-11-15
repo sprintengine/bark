@@ -1,3 +1,5 @@
+> The product is now called **Bark**. These notes are a record of the earlier Fairspoken name and are kept as written.
+
 # Fairspoken brand identity
 
 October 2026. Brand, website prototype and macOS 26 Liquid Glass mockups for **Fairspoken**: Irish, open-source, local-first push-to-talk dictation.

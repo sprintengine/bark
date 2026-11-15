@@ -252,7 +252,7 @@ public struct StatusDot: View {
     }
 }
 
-/// Capsule chip. Glass where it floats over a backdrop (Fairspoken Server's window); `flat` on a
+/// Capsule chip. Glass where it floats over a backdrop (Bark Server's window); `flat` on a
 /// solid card, where glass would sit on an opaque surface.
 public struct Chip: View {
     var text: String
@@ -309,7 +309,7 @@ public struct Tag: View {
 }
 
 /// Brand mark: a small copy of the app icon, the sheepdog photo on its black tile with a
-/// light hairline edge. The photo is the client's `BrandTile` image, so only Fairspoken
+/// light hairline edge. The photo is the client's `BrandTile` image, so only Bark
 /// itself can show this; elsewhere use `FairspokenMark`.
 public struct BrandMark: View {
     var size: CGFloat = 28
@@ -378,7 +378,7 @@ public enum Format {
     }
 }
 
-/// The Fairspoken mark, fitted to a square: the sheepdog mark in one colour (`Crystal.ink`
+/// The Bark mark, fitted to a square: the sheepdog mark in one colour (`Crystal.ink`
 /// unless `monochrome` says otherwise). On a dark surface its shapes are the dog's white
 /// markings; on a light one they read as a dark-marked dog.
 public struct FairspokenMark: View {

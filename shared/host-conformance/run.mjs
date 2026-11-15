@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Conformance suite for the Fairspoken transcription host protocol
+// Conformance suite for the Bark transcription host protocol
 // (src-tauri/src/host/PROTOCOL.md). Runs against any host URL.
 //
 //   node shared/host-conformance/run.mjs --url http://127.0.0.1:48173 [--token T]

@@ -12,7 +12,7 @@ let browser;
     window.smokeSettings = { vocabularyHints: ['Hypercube'], transcriptCorrections: [], snippets: [], enabledPacks: ['software-engineering'] };
     const packs = [
       { id: 'ie-general-practice', name: 'Irish general practice', description: 'Medicines authorised in Ireland.', version: '2026.10.06.1', licence: 'CC-BY-4.0', attribution: 'Contains information from the HPRA.', sources: [{ name: 'HPRA', url: '', licence: 'CC-BY-4.0', used_for: '' }], termCount: 4737, alwaysOn: [] },
-      { id: 'software-engineering', name: 'Software engineering', description: 'Languages, frameworks and tools.', version: '2026.10.1', licence: 'MIT', attribution: 'Curated by the Fairspoken contributors.', sources: [{ name: 'Curated', url: '', licence: 'MIT', used_for: '' }], termCount: 440, alwaysOn: [] },
+      { id: 'software-engineering', name: 'Software engineering', description: 'Languages, frameworks and tools.', version: '2026.10.1', licence: 'MIT', attribution: 'Curated by the Bark contributors.', sources: [{ name: 'Curated', url: '', licence: 'MIT', used_for: '' }], termCount: 440, alwaysOn: [] },
     ];
     const terms = [{ term: 'kubectl', category: 'identifier', spokenForms: ['cube control'] }, { term: 'PostgreSQL', category: 'product', spokenForms: ['postgres'] }];
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Brand tokens for the dictation client: the Crystal theme's green hint, and the live
-/// microphone colour. Fairspoken Server uses `Crystal.serverAccent` (design/crystal/README.md).
+/// microphone colour. Bark Server uses `Crystal.serverAccent` (design/crystal/README.md).
 public enum Brand {
     public static var accent: Color { Crystal.clientAccent }
     public static var secondary: Color { Crystal.ink2 }
@@ -67,12 +67,12 @@ public enum Crystal {
 
     // MARK: Accents and status
 
-    /// The clients' hint (Fairspoken for Mac): sage green.
+    /// The clients' hint (Bark for Mac): sage green.
     public static let clientAccent = Color(hex: 0x2A7F56, dark: 0x5CCB94, highContrast: (0x1D6B45, 0x7FE0AE))
     /// Text and glyphs on an accent fill: white on the light theme's deep green, near-black on the
     /// dark theme's light green (4.5:1 or better on both).
     public static let onAccent = Color(hex: 0xFFFFFF, dark: 0x08140E)
-    /// The server's hint (Fairspoken Server): garnet.
+    /// The server's hint (Bark Server): garnet.
     public static let serverAccent = Color(hex: 0xB2453E, dark: 0xF07F76)
 
     public static let ok = Color(hex: 0x2B7F57, dark: 0x5CCB94)
@@ -133,7 +133,7 @@ public enum Motion {
 
 /// The still backdrop behind a Crystal window: a silver sheen with one faint wash of `accent`
 /// in the top-leading corner, so Liquid Glass has something to refract. Drawn once (no
-/// animation) to keep idle CPU at zero. Fairspoken Server's window stands on it.
+/// animation) to keep idle CPU at zero. Bark Server's window stands on it.
 public struct CrystalBackground: View {
     @Environment(\.colorScheme) private var scheme
     public var accent: Color

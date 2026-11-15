@@ -338,7 +338,7 @@ struct DictationRecoveryTests {
         let found = PendingDictationStore(directory: store.directory).recoverInterrupted()
         #expect(found.map(\.id) == ["dictation-2"])
         #expect(found.first?.state == .failed)
-        #expect(found.first?.lastError == "Fairspoken quit before this dictation was transcribed")
+        #expect(found.first?.lastError == "Bark quit before this dictation was transcribed")
         #expect(found.first?.durationSeconds == 0.5)
         #expect(try store.samples("dictation-2").count == 8_000)
         // The repaired header is a normal WAV now.

@@ -291,7 +291,7 @@ public struct CaptureOwnership: Sendable {
 
 extension Array where Element == TranscriptHistoryItem {
     /// How many different apps these dictations went into (by bundle id, else name). Dictations
-    /// kept in Fairspoken's own window count as no app.
+    /// kept in Bark's own window count as no app.
     public var appsUsed: Int {
         Set(compactMap { item -> String? in
             if let id = item.appBundleId, !id.isEmpty { return id.lowercased() }

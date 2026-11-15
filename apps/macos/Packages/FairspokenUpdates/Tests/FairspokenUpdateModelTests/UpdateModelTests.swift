@@ -95,8 +95,8 @@ struct UpdateStateTests {
     }
 
     @Test func displayNameCarriesTheOfferedVersionsChannel() {
-        #expect(updateDisplayName(appName: "Fairspoken", version: "0.3.0") == "Fairspoken 0.3.0")
-        #expect(updateDisplayName(appName: "Fairspoken", version: "0.3.0-nightly.20261005.4") == "Fairspoken 0.3.0-nightly.20261005.4 (Nightly)")
+        #expect(updateDisplayName(appName: "Bark", version: "0.3.0") == "Bark 0.3.0")
+        #expect(updateDisplayName(appName: "Bark", version: "0.3.0-nightly.20261005.4") == "Bark 0.3.0-nightly.20261005.4 (Nightly)")
     }
 }
 
@@ -112,14 +112,14 @@ struct UpdateSampleTests {
 @Suite("Update presentation")
 struct UpdatePresentationTests {
     private func make(_ state: UpdateState, channel: UpdateChannel = .stable) -> UpdatePresentation {
-        UpdatePresentation.make(state: state, appName: "Fairspoken", currentVersion: "0.2.0", channel: channel)
+        UpdatePresentation.make(state: state, appName: "Bark", currentVersion: "0.2.0", channel: channel)
     }
 
     @Test func idleIsSyncAndChecks() {
         let p = make(.idle)
         #expect(p.symbol == UpdatePresentation.syncSymbol)
         #expect(!p.spinning && p.isEnabled && p.badge == .none && !p.showsRing)
-        #expect(p.accessibilityLabel.contains("Fairspoken 0.2.0 (Stable)"))
+        #expect(p.accessibilityLabel.contains("Bark 0.2.0 (Stable)"))
     }
 
     @Test func checkingSpinsAndIsDisabled() {
@@ -133,7 +133,7 @@ struct UpdatePresentationTests {
         let p = make(.available(version: "0.3.0-nightly.20261005.4"))
         #expect(p.symbol == UpdatePresentation.downloadSymbol)
         #expect(p.badge == .count(1) && p.isEnabled)
-        #expect(p.accessibilityLabel == "Update available: Fairspoken 0.3.0-nightly.20261005.4 (Nightly) — click to install")
+        #expect(p.accessibilityLabel == "Update available: Bark 0.3.0-nightly.20261005.4 (Nightly) — click to install")
     }
 
     @Test func downloadingShowsTheRing() {
@@ -148,7 +148,7 @@ struct UpdatePresentationTests {
         let p = make(.ready(version: "0.3.0"))
         #expect(p.symbol == UpdatePresentation.restartSymbol)
         #expect(p.badge == .dot && p.isEnabled)
-        #expect(p.menuTitle == "Restart to Install Fairspoken 0.3.0")
+        #expect(p.menuTitle == "Restart to Install Bark 0.3.0")
     }
 
     @Test func errorIsSyncWithAWarningDotAndTheMessage() {

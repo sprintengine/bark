@@ -59,7 +59,7 @@ where
     }
 }
 
-// Fairspoken patch (the only change to this vendored copy of tiny_http
+// Bark patch (the only change to this vendored copy of tiny_http
 // 0.12.0): upstream drained the unread body into `vec![0; remaining]`, so a
 // client-chosen `Content-Length` decided the allocation. 18446744073709551615
 // panicked with "capacity overflow" and large values aborted the process or

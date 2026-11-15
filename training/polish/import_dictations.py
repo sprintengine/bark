@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train on my own dictations: turn a Fairspoken training-data export into polish examples.
+"""Train on my own dictations: turn a Bark training-data export into polish examples.
 
     python3 -I import_dictations.py <export.zip | export dir | manifest.jsonl> --out mine.jsonl
         [--vocabulary terms.txt] [--no-change-share 0.4] [--keep-rewrites]

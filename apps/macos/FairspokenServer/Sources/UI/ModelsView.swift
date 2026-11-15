@@ -58,7 +58,7 @@ struct ModelsView: View {
                             presenting: confirmDelete) { id in
             Button("Delete", role: .destructive) { controller.delete(id) }
         } message: { _ in
-            Text("Fairspoken on this device uses the same files. You can download it again.")
+            Text("Bark on this device uses the same files. You can download it again.")
         }
     }
 

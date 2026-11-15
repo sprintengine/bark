@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Fairspoken Server</title>
+<title>Bark Server</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#EDEFF2" media="(prefers-color-scheme: light)">
@@ -599,7 +599,7 @@
       <span class="logo" aria-hidden="true">
         <img class="logo-photo" src="data:image/jpeg;base64,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" alt="">
       </span>
-      <span class="brand-name">Fairspoken</span>
+      <span class="brand-name">Bark</span>
       <span class="brand-sub">Server</span>
     </div>
     <div class="top-right">
@@ -2071,7 +2071,7 @@
 
   const renderChrome = (stats) => {
     const uptime = (Date.now() - stats.startedAt) / 1000;
-    $("footVersion").textContent = `Fairspoken Server ${stats.serverVersion || "?"} · ${stats.bindAddr || "—"}`;
+    $("footVersion").textContent = `Bark Server ${stats.serverVersion || "?"} · ${stats.bindAddr || "—"}`;
     $("footUptime").textContent = fmtUptime(uptime);
     $("editConfig").disabled = false;
   };
@@ -2707,7 +2707,7 @@
     const state = U.restarting ? "restarting" : s.state;
     const a = s.available;
     const pct = s.progress && s.progress.percentage != null ? s.progress.percentage : null;
-    const current = `Fairspoken Server ${s.currentVersion} (${channelLabel(s.channel)})`;
+    const current = `Bark Server ${s.currentVersion} (${channelLabel(s.channel)})`;
     const label = {
       idle: s.lastCheckedMs ? `${current} is up to date. Check for updates` : `${current}. Check for updates`,
       checking: "Checking for updates…",
@@ -2821,8 +2821,8 @@
     if (!DEMO) return null;
     const now = Date.now();
     const offer = (channel) => (channel === "nightly"
-      ? { version: "0.3.0-nightly.20261005.4", channel: "nightly", notes: "https://github.com/sprintengine/speakeasy/releases/tag/v0.3.0-nightly.20261005.4", pubDate: "2026-10-05T12:00:00Z", switchToStable: false }
-      : { version: "0.3.0", channel: "stable", notes: "https://github.com/sprintengine/speakeasy/releases/tag/v0.3.0", pubDate: "2026-10-01T12:00:00Z", switchToStable: false });
+      ? { version: "0.3.0-nightly.20261005.4", channel: "nightly", notes: "https://github.com/sprintengine/bark/releases/tag/v0.3.0-nightly.20261005.4", pubDate: "2026-10-05T12:00:00Z", switchToStable: false }
+      : { version: "0.3.0", channel: "stable", notes: "https://github.com/sprintengine/bark/releases/tag/v0.3.0", pubDate: "2026-10-01T12:00:00Z", switchToStable: false });
     const st = { currentVersion: "0.2.0", channel: "stable", channelSource: "version", defaultChannel: "stable", autoUpdate: false, checksEnabled: true, platform: "linux-x86_64", state: "available", available: offer("stable"), progress: null, error: null, lastCheckedMs: now - 42 * 60000, installedVersion: null, restartMode: "service" };
     const start = params.get("update") || "available";
     if (start === "idle") { st.state = "idle"; st.available = null; }

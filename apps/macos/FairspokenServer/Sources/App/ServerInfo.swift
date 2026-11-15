@@ -5,7 +5,7 @@ import Foundation
 /// Identity of this build, read from the bundle (`MV_DISPLAY_NAME` in Config/Server.xcconfig).
 nonisolated enum ServerInfo {
     static let displayName: String =
-        (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "Fairspoken Server"
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "Bark Server"
     static let bundleID: String = Bundle.main.bundleIdentifier ?? "ie.fairspoken.server"
     static let version: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0.0.0"
     static let build: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "0"
@@ -35,7 +35,7 @@ nonisolated enum ServerInfo {
     /// The web dashboard (src-tauri/src/host/dashboard.html, bundled at build time).
     static let dashboardHTML: [UInt8] = {
         guard let url = Bundle.main.url(forResource: "dashboard", withExtension: "html"), let data = try? Data(contentsOf: url) else {
-            return Array("<!doctype html><title>Fairspoken Server</title><p>The dashboard file is missing from this build.</p>".utf8)
+            return Array("<!doctype html><title>Bark Server</title><p>The dashboard file is missing from this build.</p>".utf8)
         }
         return [UInt8](data)
     }()

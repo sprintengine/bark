@@ -106,7 +106,7 @@ pub fn validate(
     )
     .map_err(|e| format!("adapter manifest is invalid: {e}"))?;
     if manifest.format != "fairspoken-polish-adapter" || manifest.version != 1 {
-        return Err("adapter manifest is not a Fairspoken polish adapter (version 1)".into());
+        return Err("adapter manifest is not a Bark polish adapter (version 1)".into());
     }
     if !manifest.base_model_sha256.eq_ignore_ascii_case(base.sha256) {
         return Err("adapter was trained for a different base model".into());

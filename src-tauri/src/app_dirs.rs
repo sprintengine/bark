@@ -1,4 +1,4 @@
-//! Where Fairspoken keeps its files, how its environment variables are read,
+//! Where Bark keeps its files, how its environment variables are read,
 //! and the one-time move of data written by builds that used the former name.
 
 use std::env;

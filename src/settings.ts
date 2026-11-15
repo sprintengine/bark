@@ -98,7 +98,7 @@ const POLISH_MODEL_NAMES: Record<string, string> = {
 };
 
 let currentSettings: Settings = { ...DEFAULTS };
-// Builds without a Fairspoken Cloud endpoint hide every cloud choice.
+// Builds without a Bark Cloud endpoint hide every cloud choice.
 let cloudAvailable = true;
 
 // A segmented control is a group of `aria-pressed` buttons carrying the active
@@ -216,9 +216,9 @@ function updatePolishUi(settings: Settings): void {
   polishEnabled.disabled = !hasToken;
   polishHelp.textContent = local
     ? "Removes fillers and self-corrections, on this device."
-    : !cloudAvailable ? "Fairspoken Cloud is not in this build. Choose This device."
-    : hasToken ? "Sends transcript text, never audio, to Fairspoken Cloud."
-    : "Add a Fairspoken Cloud token below to turn this on.";
+    : !cloudAvailable ? "Bark Cloud is not in this build. Choose This device."
+    : hasToken ? "Sends transcript text, never audio, to Bark Cloud."
+    : "Add a Bark Cloud token below to turn this on.";
   polishCloudAuthToken.closest<HTMLElement>("[data-polish-cloud]")?.toggleAttribute("hidden", local || !cloudAvailable);
   document.getElementById("polishLocalModelRow")?.toggleAttribute("hidden", !local);
   document.getElementById("polishDeveloperPanel")?.toggleAttribute("hidden", !local);
@@ -227,10 +227,10 @@ function updatePolishUi(settings: Settings): void {
   polishFormatPanel.hidden = polishTonesPanel.hidden || !isMacOS();
   formatAiDetectionHelp.textContent = local
     ? "Asks the polish model once per site or app, on this device."
-    : "Asks Fairspoken Cloud once per site or app, sending its name and title.";
+    : "Asks Bark Cloud once per site or app, sending its name and title.";
   contextAwarenessHelp.textContent = local
     ? "Reads text near your cursor to spell names right. Stays on this device."
-    : "Reads text near your cursor to spell names right. Sent to Fairspoken Cloud with polish.";
+    : "Reads text near your cursor to spell names right. Sent to Bark Cloud with polish.";
 }
 
 function readFromForm(): Settings {
@@ -316,7 +316,7 @@ function updateUseGpuUi(): void {
 }
 
 // Super mode pairs Parakeet with Whisper. Locally the user picks the Whisper
-// model; a remote host pairs whatever its operator serves; Fairspoken Cloud
+// model; a remote host pairs whatever its operator serves; Bark Cloud
 // has no super mode.
 function updateSuperModeUi(): void {
   const location = locationSeg.get();
@@ -332,7 +332,7 @@ function updateSuperModeUi(): void {
 function updateTranscriptionLocationUi(location: TranscriptionLocation): void {
   const local = location === "local";
   // The model choice and its download state are local-transcription concerns;
-  // a remote host (or Fairspoken Cloud) serves whatever its operator runs.
+  // a remote host (or Bark Cloud) serves whatever its operator runs.
   modelField.hidden = !local;
   modelDownload.hidden = !local;
   remoteHostPanel.hidden = location !== "remote-host";
@@ -340,7 +340,7 @@ function updateTranscriptionLocationUi(location: TranscriptionLocation): void {
   if (location === "remote-host") showRemoteHost(currentSettings);
   if (location === "cloud") {
     cloudStatus.textContent = !cloudAvailable
-      ? "Fairspoken Cloud is not in this build."
+      ? "Bark Cloud is not in this build."
       : currentSettings.cloudAuthToken
       ? "Allowance appears after your first dictation."
       : "Paste a token to start.";
@@ -389,7 +389,7 @@ locationSeg.onChange((value) => {
   void persistSettings()
     .then((saved) => {
       if (!saved) return;
-      const label = value === "local" ? "local" : value === "cloud" ? "Fairspoken Cloud" : "remote host";
+      const label = value === "local" ? "local" : value === "cloud" ? "Bark Cloud" : "remote host";
       addEvent("info", `Transcription location changed to ${label}`);
       return requestModelStatus();
     })
@@ -406,7 +406,7 @@ modelSelect.addEventListener("change", () => {
 });
 
 cloudTest.addEventListener("click", () => {
-  void testRemoteHost(cloudStatus, cloudTest, "Fairspoken Cloud");
+  void testRemoteHost(cloudStatus, cloudTest, "Bark Cloud");
 });
 
 // Every other control saves the whole form on change. `before` runs first

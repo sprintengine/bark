@@ -132,7 +132,7 @@ public final class HTTPServerRequest: @unchecked Sendable {
         if let contentType { headers.append(("Content-Type", contentType)) }
         headers += extraHeaders
         headers.append(("Content-Length", String(body.count)))
-        headers.append(("Server", "Fairspoken Server"))
+        headers.append(("Server", "Bark Server"))
         if closeAfterResponse { headers.append(("Connection", "close")) }
         try? await connection.transport.send(HTTPStatus.head(status, headers: headers) + body)
     }

@@ -31,7 +31,7 @@ public struct UpdatePresentation: Equatable, Sendable {
     public var isEnabled: Bool
     /// Short caption beside the icon ("Update available").
     public var title: String
-    /// Second line ("Fairspoken 0.3.0 (Nightly)").
+    /// Second line ("Bark 0.3.0 (Nightly)").
     public var detail: String
     /// Tooltip and VoiceOver label: the state and the versions.
     public var accessibilityLabel: String

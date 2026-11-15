@@ -95,7 +95,7 @@ Everything else. A Gmail tab therefore uses the Email tone.
 | --- | --- |
 | `PolishPrompt::Instructed` (Qwen3.5 0.8B/2B/4B) | the system prompt, all examples, and the tagged user turn |
 | `PolishPrompt::Trained` (SpeakoFlow Mini) | its own training prompt and the bare transcript, no tags |
-| Fairspoken Cloud (`/v1/polish`) | JSON, not this text layout: `vocabulary` for `<spelling>`, `appContext.tone` for `<tone>`, and an optional top-level `format` (omitted when `plain`) for `<format>`. A Worker that predates `format` ignores it. |
+| Bark Cloud (`/v1/polish`) | JSON, not this text layout: `vocabulary` for `<spelling>`, `appContext.tone` for `<tone>`, and an optional top-level `format` (omitted when `plain`) for `<format>`. A Worker that predates `format` ignores it. |
 
 A model retrained on these tags should get a new `PolishPrompt` variant that
 calls `polish_input::user_turn`, so the layout above stays the only one.
@@ -171,7 +171,7 @@ lasted 2 s, so a short dictation never pays for it. It gets 1.5 s.
   pass (`format_context::FIRST_PASS_WAIT`), so the two never queue behind
   each other mid-dictation, and every pass of the dictation uses one format.
   The classifier's prompt does evict the cached polish prefix once, which
-  happens only on the first dictation into a new site or app. On Fairspoken
+  happens only on the first dictation into a new site or app. On Bark
   Cloud it calls `POST /v1/format` with
   `{appName, windowTitle, host, field}` and expects `{format}`. That endpoint
   is not in this repository; until the Worker has it, the call returns 404, the

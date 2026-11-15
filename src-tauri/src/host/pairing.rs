@@ -17,7 +17,7 @@ pub(super) const MIN_PAIRING_PASSWORD_CHARS: usize = 6;
 pub(super) const MAX_PAIRING_PASSWORD_CHARS: usize = 128;
 const MAX_CLIENT_NAME_CHARS: usize = 64;
 const MAX_HOST_NAME_CHARS: usize = 64;
-const FALLBACK_HOST_NAME: &str = "Fairspoken host";
+const FALLBACK_HOST_NAME: &str = "Bark host";
 const HELLO_SERVICE: &str = "fairspoken-host";
 /// Bumps only on incompatible discovery or pairing changes.
 const HELLO_PROTOCOL: u32 = 1;

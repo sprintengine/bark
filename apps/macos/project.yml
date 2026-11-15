@@ -2,8 +2,8 @@
 #   xcodegen generate        (or scripts/build.sh, which does it for you)
 #
 # Two apps share the packages under Packages/:
-#   Fairspoken        → Fairspoken.app         (dictation client, ie.fairspoken.mac)
-#   FairspokenServer  → Fairspoken Server.app  (transcription server, ie.fairspoken.server)
+#   Fairspoken        → Bark.app               (dictation client, ie.fairspoken.mac)
+#   FairspokenServer  → Bark Server.app        (transcription server, ie.fairspoken.server)
 #
 # Both update with Sparkle 2 (Packages/FairspokenUpdates). CFBundleVersion is CURRENT_PROJECT_VERSION
 # (Config/Base.xcconfig); releases set it to the UTC build timestamp YYYYMMDDHHMM.

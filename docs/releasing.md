@@ -1,6 +1,6 @@
 # Releasing
 
-Fairspoken ships on two trains, stable and nightly, from
+Bark ships on two trains, stable and nightly, from
 `.github/workflows/release.yml`. Every installed app (the Tauri desktop app,
 the two native Mac apps and the standalone transcription host) updates itself
 from feeds on one rolling GitHub release of this repository. The release rules
@@ -13,8 +13,8 @@ release, built from one commit at one version, holding:
   not released for macOS: Macs use the native apps below;
 - the standalone **transcription host** (`transcription-host`, a bin of the same
   crate) for headless machines, on macOS (arm64 and x64), Windows and Linux;
-- the two **native macOS apps** (`apps/macos/`): **Fairspoken**, the dictation
-  client (`ie.fairspoken.mac`), and **Fairspoken Server**, a transcription
+- the two **native macOS apps** (`apps/macos/`): **Bark**, the dictation
+  client (`ie.fairspoken.mac`), and **Bark Server**, a transcription
   server with its own window (`ie.fairspoken.server`).
 
 They share the train because they share the code and the wire protocol
@@ -58,14 +58,14 @@ and never deleted by nightly retention (its tag is not a version, so nothing
 that lists releases by version ever picks it up). Base URL:
 
 ```
-https://github.com/sprintengine/speakeasy/releases/download/update-feeds/
+https://github.com/sprintengine/bark/releases/download/update-feeds/
 ```
 
 | Asset | Read by | Contents |
 | --- | --- | --- |
 | `desktop-stable.json`, `desktop-nightly.json` | the Tauri desktop app | Tauri's static updater JSON: `version`, `notes` (the release page), `pub_date`, `platforms` with `windows-x86_64` (NSIS installer), `linux-x86_64` (AppImage) and `linux-x86_64-deb` (.deb), each `{ url, signature }` |
-| `appcast-fairspoken.xml` | Fairspoken (Mac) | Sparkle 2 appcast, both channels |
-| `appcast-fairspoken-server.xml` | Fairspoken Server (Mac) | Sparkle 2 appcast, both channels |
+| `appcast-fairspoken.xml` | Bark (Mac) | Sparkle 2 appcast, both channels |
+| `appcast-fairspoken-server.xml` | Bark Server (Mac) | Sparkle 2 appcast, both channels |
 | `host-stable.json`, `host-nightly.json` | the transcription host | `version`, `channel`, `pub_date`, `notes`, `platforms` (`linux-x86_64`, `linux-aarch64`, `windows-x86_64`, `darwin-aarch64`; no Intel Mac build, since ort ships no prebuilt ONNX Runtime for it), each `{ url, sha256, signature, format }` |
 
 Every URL inside a feed points at the asset on its own release
@@ -183,8 +183,8 @@ build stamps its own version.
 ## Builds and publishing
 
 Every entry point builds the same files. `<slug>` is `productName` from
-`tauri.conf.json` in lower case (`fairspoken`); `<Name>` is `MV_DISPLAY_NAME`
-in `apps/macos/Config/Base.xcconfig` (`Fairspoken`); `<v>` the version.
+`tauri.conf.json` in lower case (`bark`; releases before the rename used `fairspoken`); `<Name>` is `MV_DISPLAY_NAME`
+in `apps/macos/Config/Base.xcconfig` (`Bark`); `<v>` the version.
 
 | Job (runner) | Files |
 | --- | --- |
@@ -254,8 +254,8 @@ package a nightly version.
 Application identity and the hardened runtime, notarizes and staples it, and
 writes a zip (the Sparkle enclosure: `ditto -c -k --sequesterRsrc --keepParent`
 of the stapled app) and a DMG for people (signed, notarized and stapled too).
-`--app client` (the default) packages `Fairspoken.app`; `--app server`
-packages `Fairspoken Server.app` as `<Name>-Server-...`.
+`--app client` (the default) packages `Bark.app`; `--app server`
+packages `Bark Server.app` as `<Name>-Server-...`.
 
 - **Version.** `CFBundleShortVersionString` is the release version written whole
   (`0.5.0-nightly.20261004.41`). `CFBundleVersion` is the build number,
@@ -283,8 +283,8 @@ To make the same files on a Mac:
 xcrun notarytool store-credentials fairspoken-notary --apple-id <apple id> --team-id <TEAM_ID>
 
 cd apps/macos
-scripts/release.sh --version 0.2.0              # → build/release/Fairspoken-0.2.0-macos-arm64.{zip,dmg}
-scripts/release.sh --app server --version 0.2.0 # → build/release/Fairspoken-Server-0.2.0-macos-arm64.{zip,dmg}
+scripts/release.sh --version 0.2.0              # → build/release/Bark-0.2.0-macos-arm64.{zip,dmg}
+scripts/release.sh --app server --version 0.2.0 # → build/release/Bark-Server-0.2.0-macos-arm64.{zip,dmg}
 SPARKLE_BIN=/path/to/Sparkle-2.10.0/bin scripts/release.sh --version 0.2.0 \
   --sparkle-key-file ~/.sparkle/fairspoken_ed25519.private-seed.b64   # also sparkle-fairspoken.json
 scripts/release.sh --no-notarize                # sign only, files end -unnotarized
@@ -334,7 +334,7 @@ sprintengine/studio's, so the same values carry over.
 | `SPARKLE_ED_PRIVATE_KEY` | Sparkle | The base64 32-byte Ed25519 seed whose public key is `SUPublicEDKey` in both apps' Info.plist (`SPGwzOHQk1H5lvqePdjg11xTC8LT3/AX3kILlbOIxp0=`): the single line in `~/.sparkle/fairspoken_ed25519.private-seed.b64`, which Sparkle's `sign_update --ed-key-file` reads as is. `pbcopy < ~/.sparkle/fairspoken_ed25519.private-seed.b64`. Used only when the Apple group is complete. |
 | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TRUSTED_SIGNING_ENDPOINT`, `AZURE_TRUSTED_SIGNING_ACCOUNT_NAME`, `AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME` | Azure | Windows Authenticode signing through Azure Trusted Signing: the service principal (tenant, client id, client secret) with the "Trusted Signing Certificate Profile Signer" role, and the account's endpoint, name and certificate profile. Without them the installer is unsigned and SmartScreen warns on first run. |
 
-Set them with `gh secret set <NAME> --repo sprintengine/speakeasy` (it reads
+Set them with `gh secret set <NAME> --repo sprintengine/bark` (it reads
 the value from stdin, so `gh secret set SPARKLE_ED_PRIVATE_KEY < ~/.sparkle/...`
 never echoes it). Secret values never reach a log: certificates go to a
 temporary keychain that is deleted, the Sparkle key goes to `sign_update` on
@@ -365,7 +365,7 @@ never update again; keep backups outside this machine.
    all of Apple plus `SPARKLE_ED_PRIVATE_KEY` for Mac updates).
 4. **Keys match the apps.** `tauri.conf.json` `plugins.updater.pubkey` is the
    public half of the Tauri key, its endpoint is
-   `https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-stable.json`,
+   `https://github.com/sprintengine/bark/releases/download/update-feeds/desktop-stable.json`,
    and both Mac apps' `SUPublicEDKey` is
    `SPGwzOHQk1H5lvqePdjg11xTC8LT3/AX3kILlbOIxp0=`. The release fails, before
    publishing, if a signature does not verify against these.
@@ -378,7 +378,7 @@ never update again; keep backups outside this machine.
    The `feeds` job creates the `update-feeds` release and uploads
    `desktop-nightly.json`, `host-nightly.json` and both appcasts (stable JSON
    feeds appear with the first stable). Check
-   `curl -sL https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-nightly.json`.
+   `curl -sL https://github.com/sprintengine/bark/releases/download/update-feeds/desktop-nightly.json`.
 8. **First stable.** `gh workflow run release.yml --ref main -f channel=stable`
    promotes that nightly; all six feeds now exist.
 9. From then on the schedule cuts nightlies by itself.

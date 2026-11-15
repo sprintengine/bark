@@ -189,7 +189,7 @@ fn maybe_polish_impl(
         return PolishDecision::Disabled;
     }
     if settings.cloud_auth_token.trim().is_empty() {
-        return PolishDecision::Skipped("no Fairspoken Cloud token");
+        return PolishDecision::Skipped("no Bark Cloud token");
     }
     let PolishGate { category, tone, .. } = match polish_gate(
         raw_transcript,
@@ -202,7 +202,7 @@ fn maybe_polish_impl(
         Err(decision) => return decision,
     };
     if cloud_url().is_none() {
-        return PolishDecision::Skipped("Fairspoken Cloud is not available in this build");
+        return PolishDecision::Skipped("Bark Cloud is not available in this build");
     }
 
     match polish_transcript(
@@ -444,7 +444,7 @@ mod tests {
 
     #[test]
     fn response_deserializes_from_the_worker_shape() {
-        // Copied from the Fairspoken Cloud Worker's /v1/polish contract.
+        // Copied from the Bark Cloud Worker's /v1/polish contract.
         let body = r#"{
             "text": "cleaned transcript",
             "changed": true,
@@ -474,7 +474,7 @@ mod tests {
         };
         assert!(matches!(
             maybe_polish(raw, &no_token, None, None),
-            PolishDecision::Skipped("no Fairspoken Cloud token")
+            PolishDecision::Skipped("no Bark Cloud token")
         ));
 
         assert!(matches!(

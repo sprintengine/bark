@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Runs the Fairspoken transcription host as a per-user launch agent.
+  Runs the Bark transcription host as a per-user launch agent.
   Install: see "Running the host on a Tailscale network" in README.md.
   Replace __BINARY__, __TOKEN__ and __LOG_DIR__ before loading.
 

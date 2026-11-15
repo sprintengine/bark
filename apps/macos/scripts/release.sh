@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Build a Release of one app, sign it with Developer ID, notarize and staple it, and package it:
-#   <out>/Fairspoken-<version>-macos-arm64.zip          the stapled app, zipped with ditto
-#   <out>/Fairspoken-<version>-macos-arm64.dmg          the stapled app plus an Applications link; the
+#   <out>/Bark-<version>-macos-arm64.zip                 the stapled app, zipped with ditto
+#   <out>/Bark-<version>-macos-arm64.dmg                 the stapled app plus an Applications link; the
 #                                                        DMG is itself signed, notarized and stapled
-#   <out>/Fairspoken-Server-<version>-macos-arm64.zip   the same for Fairspoken Server (--app server)
-#   <out>/Fairspoken-Server-<version>-macos-arm64.dmg
+#   <out>/Bark-Server-<version>-macos-arm64.zip          the same for Bark Server (--app server)
+#   <out>/Bark-Server-<version>-macos-arm64.dmg
 #   <out>/sparkle-fairspoken.json (sparkle-fairspoken-server.json)   with a Sparkle key: what the
 #                                                        appcast item for the zip is rendered from
 # .github/workflows/release.yml runs this same script, so a local run makes the same files.
 #
-#   scripts/release.sh                                  sign + notarize Fairspoken (the default)
-#   scripts/release.sh --app server                     the same for Fairspoken Server
+#   scripts/release.sh                                  sign + notarize Bark (the default)
+#   scripts/release.sh --app server                     the same for Bark Server
 #   scripts/release.sh --version 0.2.0 --build-number 202610051230
 #   scripts/release.sh --sparkle-key-file ~/.sparkle/<key>.private-seed.b64   also sign for Sparkle
 #   scripts/release.sh --no-notarize                    sign only; files end -unnotarized (checks the signing)
@@ -33,7 +33,7 @@
 # default is now), which only ever grows and is what Sparkle compares. The release workflow passes
 # the one build number its resolve step chose for every product of the release.
 #
-# Bundle id: ie.fairspoken.mac (Fairspoken Server: ie.fairspoken.server) on every channel. A nightly is told apart by its version, not by a
+# Bundle id: ie.fairspoken.mac (Bark Server: ie.fairspoken.server) on every channel. A nightly is told apart by its version, not by a
 # second bundle id: macOS keys Microphone and Accessibility grants on the bundle id and the signing
 # identity, so one id lets a user move between nightly and stable without re-granting (Studio's
 # nightlies keep their app id the same way).

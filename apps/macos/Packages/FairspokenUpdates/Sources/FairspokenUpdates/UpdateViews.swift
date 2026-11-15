@@ -158,7 +158,7 @@ public struct UpdateSidebarButton: View {
 
 // MARK: - Toast
 
-/// "Fairspoken 0.3.0 is available" with Update / Later, bottom-trailing over the content.
+/// "Bark 0.3.0 is available" with Update / Later, bottom-trailing over the content.
 /// Shown once per version; "Up to date" only after a check the person asked for.
 public struct UpdateToastView: View {
     var updates: UpdateController
@@ -325,7 +325,7 @@ public struct UpdateSettingsSection: View {
         } header: {
             Text("Updates")
         } footer: {
-            Text("Checks every 6 hours and asks before installing. Only updates signed by Fairspoken install.")
+            Text("Checks every 6 hours and asks before installing. Only updates signed by Bark install.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

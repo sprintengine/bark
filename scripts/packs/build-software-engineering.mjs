@@ -527,10 +527,10 @@ const pack = {
   version: "2026.10.1",
   locale: "en",
   licence: "MIT",
-  attribution: "Curated by the Fairspoken contributors. Product names are trademarks of their owners and are used only to spell them.",
+  attribution: "Curated by the Bark contributors. Product names are trademarks of their owners and are used only to spell them.",
   sources: [
     {
-      name: "Fairspoken curated list",
+      name: "Bark curated list",
       url: "",
       licence: "MIT",
       used_for: "Every term and spoken form (scripts/packs/build-software-engineering.mjs).",

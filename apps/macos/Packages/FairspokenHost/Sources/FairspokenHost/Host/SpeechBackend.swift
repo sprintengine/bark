@@ -21,7 +21,7 @@ public enum ModelDownloadStage: String, Sendable {
     case starting, downloading, validating, ready, error
 }
 
-/// The speech engine behind the host. Fairspoken Server plugs in FluidAudio (Parakeet on the
+/// The speech engine behind the host. Bark Server plugs in FluidAudio (Parakeet on the
 /// Neural Engine); tests use `StubSpeechBackend`. Every worker owns a decoder for its model,
 /// and workers serving the same model share one loaded copy of its weights.
 public protocol HostSpeechBackend: Sendable {

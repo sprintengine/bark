@@ -70,7 +70,7 @@ class Dictation(
         settleJob?.cancel()
         val host = store.active ?: return fail("Pair a host first")
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            return fail("Allow the microphone in Fairspoken")
+            return fail("Allow the microphone in Bark")
         }
         val settings = store.settings.value
         val newUpload = client.openStream(host, settings.superMode, VocabularyPacks.hintsFor(settings.packId))
@@ -155,7 +155,7 @@ class Dictation(
                     if (upload !== currentUpload) return@launch
                     currentUpload.cancel()
                     upload = null
-                    fail("The microphone gave silence. Open Fairspoken to re-arm it")
+                    fail("The microphone gave silence. Open Bark to re-arm it")
                 }
             }
         }

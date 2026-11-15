@@ -1,6 +1,6 @@
-# Crystal: the Fairspoken app theme
+# Crystal: the Bark app theme
 
-One look for every Fairspoken surface: the Mac apps (SwiftUI, Liquid Glass), the desktop app
+One look for every Bark surface: the Mac apps (SwiftUI, Liquid Glass), the desktop app
 (Tauri web UI), the host's web dashboard and the Android app.
 
 Crystal is **a frosted frame around opaque content**. The window's chrome (the sidebar) is the
@@ -10,8 +10,8 @@ The clients and the server differ only in the accent, so you can tell them apart
 
 | Surface | Accent hint |
 | --- | --- |
-| Clients (Fairspoken for Mac, desktop app, Android) | **Green** (sage / emerald) |
-| Server (Fairspoken Server, the host web dashboard) | **Red** (garnet) |
+| Clients (Bark for Mac, desktop app, Android) | **Green** (sage / emerald) |
+| Server (Bark Server, the host web dashboard) | **Red** (garnet) |
 
 No orange/blue gradients, no saturated colour blobs, no rainbow charts.
 
@@ -123,7 +123,7 @@ Status colours are functional, never decorative. On the server, errors keep an i
 - Android: the backdrop library's glass for chrome only, a 1px highlight edge; content on
   opaque cards.
 
-## Fairspoken for Mac: a frosted sidebar beside solid content
+## Bark for Mac: a frosted sidebar beside solid content
 
 The Mac client keeps glass to the window's chrome and to small floating pieces. Content is opaque,
 so it reads crisply and nothing translucent stacks on anything translucent.

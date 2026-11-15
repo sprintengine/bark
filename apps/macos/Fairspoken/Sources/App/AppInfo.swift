@@ -4,7 +4,7 @@ import Foundation
 /// once (`MV_DISPLAY_NAME` in Config/Base.xcconfig) and never hard-coded in Swift.
 nonisolated enum AppInfo {
     static let displayName: String =
-        (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "Fairspoken"
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "Bark"
     static let bundleID: String = Bundle.main.bundleIdentifier ?? "ie.fairspoken.mac"
     static let version: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0.0.0"
     static let build: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "0"

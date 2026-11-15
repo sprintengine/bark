@@ -5,7 +5,7 @@
 //! Off unless the user turns on "Detect format with AI for unknown apps". It
 //! uses whichever provider polish uses: the local runtime (never loading a
 //! model for it, and never waiting past its deadline for a polish pass) or
-//! Fairspoken Cloud's `/v1/format`. Its input is the app name, window title,
+//! Bark Cloud's `/v1/format`. Its input is the app name, window title,
 //! site host and field labels; its output is one label. Anything else —
 //! a timeout, an unloaded model, a Worker without the endpoint, an answer
 //! that is not a label — is unavailable, and the dictation stays `plain`.
@@ -122,7 +122,7 @@ fn classify_with_cloud(
     let status = response.status();
     if matches!(status.as_u16(), 404 | 405 | 501) {
         CLOUD_UNSUPPORTED.store(true, Ordering::SeqCst);
-        return Err("Fairspoken Cloud has no format endpoint".into());
+        return Err("Bark Cloud has no format endpoint".into());
     }
     if !status.is_success() {
         return Err(format!("format endpoint returned {status}"));

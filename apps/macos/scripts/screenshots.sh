@@ -10,7 +10,7 @@ shoot() { # <display name> <scheme app arg> <output dir>
   local app="build/Build/Products/Debug/$1.app"
   [[ -d "$app" ]] || scripts/build.sh --app "$2"
   mkdir -p "$3"
-  "$app/Contents/MacOS/$1" --screenshots "$PWD/$3"
+  "$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")" --screenshots "$PWD/$3"
   ls "$3"
 }
 if [[ "$WHICH" == "client" || "$WHICH" == "all" ]]; then

@@ -16,7 +16,7 @@ const status = (state, extra = {}) => ({ ...base, state, ...extra });
 {
   const idle = buttonView(status("idle"));
   assert.deepEqual([idle.kind, idle.icon, idle.badge, idle.action, idle.disabled], ["idle", "sync", null, "check", false]);
-  assert.match(idle.label, /Check for updates — Fairspoken 0\.3\.0 \(Stable\)/);
+  assert.match(idle.label, /Check for updates — Bark 0\.3\.0 \(Stable\)/);
 
   const upToDate = buttonView(status("upToDate"));
   assert.deepEqual([upToDate.kind, upToDate.icon, upToDate.action], ["idle", "sync", "check"]);
@@ -27,12 +27,12 @@ const status = (state, extra = {}) => ({ ...base, state, ...extra });
 
   const available = buttonView(status("available", { version: "0.3.1", switchToStable: false, channel: "nightly" }));
   assert.deepEqual([available.kind, available.icon, available.badge, available.action], ["available", "download", "count", "install"]);
-  assert.equal(available.label, "Update available: Fairspoken 0.3.1 (Nightly) — click to install");
+  assert.equal(available.label, "Update available: Bark 0.3.1 (Nightly) — click to install");
 
   const downloading = buttonView(status("downloading", { version: "0.3.1", switchToStable: false, downloaded: 42, total: 100 }));
   assert.deepEqual([downloading.kind, downloading.icon, downloading.badge, downloading.action, downloading.disabled], ["downloading", "download", null, null, true]);
   assert.equal(downloading.progress, 0.42);
-  assert.match(downloading.label, /Downloading Fairspoken 0\.3\.1 \(Stable\) — 42%/);
+  assert.match(downloading.label, /Downloading Bark 0\.3\.1 \(Stable\) — 42%/);
   const unsized = buttonView(status("downloading", { version: "0.3.1", switchToStable: false, downloaded: 42, total: null }));
   assert.equal(unsized.progress, null);
   assert.match(unsized.label, /Downloading .*…$/);
@@ -55,8 +55,8 @@ const status = (state, extra = {}) => ({ ...base, state, ...extra });
   const lines = (view) => [view.title, view.detail];
   assert.deepEqual(lines(buttonView(status("idle"))), ["Check for updates", "0.3.0 · Stable"]);
   assert.deepEqual(lines(buttonView(status("checking"))), ["Checking…", "0.3.0 · Stable"]);
-  assert.deepEqual(lines(buttonView(status("available", { version: "0.3.1", switchToStable: false }))), ["Update available", "Fairspoken 0.3.1"]);
-  assert.deepEqual(lines(buttonView(status("downloading", { version: "0.3.1", switchToStable: false, downloaded: 42, total: 100 }))), ["Downloading… 42%", "Fairspoken 0.3.1"]);
+  assert.deepEqual(lines(buttonView(status("available", { version: "0.3.1", switchToStable: false }))), ["Update available", "Bark 0.3.1"]);
+  assert.deepEqual(lines(buttonView(status("downloading", { version: "0.3.1", switchToStable: false, downloaded: 42, total: 100 }))), ["Downloading… 42%", "Bark 0.3.1"]);
   assert.equal(buttonView(status("downloading", { version: "0.3.1", switchToStable: false, downloaded: 100, total: 100 })).title, "Installing…");
   assert.deepEqual(lines(buttonView(status("ready", { version: "0.3.1", switchToStable: true }))), ["Restart to update", "Stable 0.3.1"]);
   assert.deepEqual(lines(buttonView(status("failed", { message: "offline" }))), ["Update check failed", "offline"]);
@@ -78,7 +78,7 @@ const status = (state, extra = {}) => ({ ...base, state, ...extra });
 {
   const offer = status("available", { version: "0.3.1", switchToStable: false });
   const first = toastFor(offer, new Set(), false);
-  assert.equal(first.title, "Fairspoken 0.3.1 is available");
+  assert.equal(first.title, "Bark 0.3.1 is available");
   assert.equal(toastFor(offer, new Set([first.key]), false), null);
   assert.notEqual(toastFor(offer, new Set([first.key]), true), null);
   assert.notEqual(toastFor({ ...offer, version: "0.3.2" }, new Set([first.key]), false), null);

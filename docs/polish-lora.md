@@ -1,6 +1,6 @@
 # Polish LoRA adapters and vocabulary
 
-How Fairspoken's local polish model learns behaviour (LoRA) and vocabulary
+How Bark's local polish model learns behaviour (LoRA) and vocabulary
 (retrieval), and what each can and cannot do. The training pipeline is in
 [`training/polish`](../training/polish/README.md).
 

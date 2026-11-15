@@ -248,7 +248,7 @@ struct TailnetDiscoveryTests {
         let t = FakeTransport([
             "http://127.0.0.1:48173/v1/hello": helloJSON("Conal’s Mac mini", auth: "password"),
             "http://100.91.70.66:48173/v1/hello": helloJSON("Conal’s Mac mini", auth: "password"),
-            "http://127.0.0.1:48174/v1/hello": helloJSON("Fairspoken Server", auth: "password"),
+            "http://127.0.0.1:48174/v1/hello": helloJSON("Bark Server", auth: "password"),
             "http://100.101.102.103:48173/v1/hello": helloJSON("Studio", auth: "password"),
         ])
         let hosts = try await discovery(t, localPorts: [48174, 48173]).discover()

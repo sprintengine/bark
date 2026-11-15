@@ -83,7 +83,7 @@ fun KeyboardPanel(
         ) {
             DictationStatus(
                 state,
-                idle = if (hosts.isEmpty()) "Open Fairspoken to connect a host" else "Tap to speak",
+                idle = if (hosts.isEmpty()) "Open Bark to connect a host" else "Tap to speak",
                 Modifier.fillMaxWidth().height(22.dp),
                 done = panel.notice,
             )

@@ -9,13 +9,13 @@ pub enum TranscriptionLocation {
     #[default]
     Local,
     RemoteHost,
-    /// The hosted Fairspoken Cloud service (Cloudflare Worker). Unlike
+    /// The hosted Bark Cloud service (Cloudflare Worker). Unlike
     /// `RemoteHost`, the URL is ours (not user-editable) and the token is a
     /// multiauth-issued JWT.
     Cloud,
 }
 
-/// Fairspoken Cloud endpoint. Not user-editable: users configure only their
+/// Bark Cloud endpoint. Not user-editable: users configure only their
 /// token. Builds bake it in by setting `FAIRSPOKEN_CLOUD_URL` at compile time
 /// (the former `MULTIVOICE_CLOUD_URL` is still read); the same variable at
 /// runtime overrides it again (dev builds). With neither, the build has no
@@ -26,7 +26,7 @@ const BUILD_CLOUD_URL: Option<&str> = match option_env!("FAIRSPOKEN_CLOUD_URL") 
 };
 
 pub const CLOUD_UNAVAILABLE: &str =
-    "Fairspoken Cloud is not available in this build. Choose Local or My host in Settings.";
+    "Bark Cloud is not available in this build. Choose Local or My host in Settings.";
 
 pub fn cloud_url() -> Option<String> {
     let normalize = |url: &str| Some(url.trim().trim_end_matches('/').to_string()).filter(|url| !url.is_empty());
@@ -150,7 +150,7 @@ pub struct Settings {
     pub remote_auth_token: String,
     #[serde(default = "default_remote_timeout_seconds")]
     pub remote_timeout_seconds: u16,
-    /// multiauth-issued JWT for Fairspoken Cloud. Phase 1 stores it in
+    /// multiauth-issued JWT for Bark Cloud. Phase 1 stores it in
     /// settings JSON exactly like `remote_auth_token` (same acknowledged
     /// keychain debt; phase-1 tokens are short-lived which bounds exposure).
     #[serde(default)]
@@ -203,7 +203,7 @@ pub struct Settings {
     #[serde(default)]
     pub fn_push_to_talk: bool,
     /// Opt-in AI polish: send the raw transcript (text, never audio) to
-    /// Fairspoken Cloud for filler/self-correction cleanup before the user's
+    /// Bark Cloud for filler/self-correction cleanup before the user's
     /// deterministic rules run. Requires a cloud token; failures always fall
     /// back to the raw transcript.
     #[serde(default)]

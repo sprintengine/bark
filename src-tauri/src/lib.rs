@@ -262,7 +262,7 @@ fn get_settings(services: State<'_, AppServices>) -> Result<Settings, String> {
     services.settings_snapshot()
 }
 
-/// Whether this build has a Fairspoken Cloud endpoint; without one the UI
+/// Whether this build has a Bark Cloud endpoint; without one the UI
 /// hides the Cloud location and cloud polish.
 #[tauri::command]
 fn get_cloud_available() -> bool {
@@ -909,7 +909,7 @@ async fn connect_transcription_host(
         let token = match password {
             Some(password) => {
                 let client_name =
-                    machine::computer_name().unwrap_or_else(|| "Fairspoken".to_string());
+                    machine::computer_name().unwrap_or_else(|| "Bark".to_string());
                 tailnet_discovery::pair_with_host(&url, &password, &client_name)?
                     .unwrap_or_default()
             }
@@ -1354,7 +1354,7 @@ fn start_recording_inner(app: AppHandle, services: State<'_, AppServices>) -> Re
                 &app,
                 "info",
                 if settings.transcription_location == TranscriptionLocation::Cloud {
-                    "Starting Fairspoken Cloud streaming transcription session"
+                    "Starting Bark Cloud streaming transcription session"
                 } else {
                     "Starting remote streaming transcription session"
                 },
@@ -2065,7 +2065,7 @@ fn perform_stop_and_transcribe(
 /// AppleScript; see `insertion.rs` for why tiers are chosen by
 /// pre-condition and never verified-and-retried). AX insert is only
 /// considered when the user opted into `accessibility_insert`. Skipped when one of our
-/// own windows is focused (the paste would land in Fairspoken itself);
+/// own windows is focused (the paste would land in Bark itself);
 /// every other failure is surfaced as a backend event because the user is
 /// otherwise left wondering why no text appeared.
 ///
@@ -2091,7 +2091,7 @@ fn deliver_transcript_at_cursor(
         emit_backend_event(
             app,
             "info",
-            "Insert at cursor skipped while a Fairspoken window is focused; transcript is on the clipboard",
+            "Insert at cursor skipped while a Bark window is focused; transcript is on the clipboard",
         );
         return false;
     }
