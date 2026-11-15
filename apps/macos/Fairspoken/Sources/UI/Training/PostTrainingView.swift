@@ -17,7 +17,7 @@ struct PostTrainingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: Layout.gap) {
-                    PageTitle("Post-training", subtitle: "Teach the speech model your voice and accent")
+                    PageTitle("Post-training", subtitle: "Collect recordings of your voice now; training them arrives in a later update")
                         .padding(.bottom, 4)
                     SavingCard(training: training)
                     HStack(alignment: .top, spacing: Layout.gap) {

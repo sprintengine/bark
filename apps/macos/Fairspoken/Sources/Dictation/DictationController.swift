@@ -59,8 +59,9 @@ final class DictationController {
     @ObservationIgnored private var session: (any TranscriptionSession)?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private var resetTask: Task<Void, Never>?
-    /// The recording is for this app's own window (Home, the setup guide), not another app.
-    var isForThisApp: Bool { targetApp == nil }
+    /// Which of this app's windows the recording is for (Home, the setup guide), or nil when it
+    /// is for another app.
+    @ObservationIgnored private(set) var startedInWindow: NSUserInterfaceItemIdentifier?
     /// What started the current recording (the pill says how to end it).
     private(set) var trigger: Trigger = .button
     @ObservationIgnored private var targetApp: NSRunningApplication?
@@ -148,6 +149,7 @@ final class DictationController {
 
         let front = NSWorkspace.shared.frontmostApplication
         targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
+        startedInWindow = targetApp == nil ? NSApp.keyWindow?.identifier : nil
         do {
             try capture.start(deviceName: s.audioDevice, maxSeconds: s.maxRecordingSeconds) { [newSession] chunk in
                 newSession.append(chunk)
@@ -159,7 +161,6 @@ final class DictationController {
         }
         session = newSession
         self.trigger = trigger
-        if phase.isActive { targetApp = nil }
         resetTask?.cancel()
         phase = .listening(since: Date())
         hotkeys?.setCancelEnabled(true)

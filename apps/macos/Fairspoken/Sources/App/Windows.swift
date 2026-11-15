@@ -65,6 +65,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
             window.setContentSize(Self.onboardingSize())
             window.center()
             window.delegate = self
+            window.identifier = Self.onboardingID
             onboarding = window
         }
         if hideObserver == nil {
@@ -80,8 +81,10 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     /// the guide itself ("Try it"). A dictation into another app carries on.
     private func stopOnboardingAudio() {
         model.micTest.stop()
-        if model.dictation.phase.isListening, model.dictation.isForThisApp { model.dictation.cancel() }
+        if model.dictation.phase.isListening, model.dictation.startedInWindow == Self.onboardingID { model.dictation.cancel() }
     }
+
+    static let onboardingID = NSUserInterfaceItemIdentifier("onboarding")
 
     /// The guide's size, no taller than the screen (its steps scroll and its buttons stay visible).
     static func onboardingSize() -> NSSize {

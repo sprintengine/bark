@@ -124,6 +124,11 @@ struct OnboardingView: View {
             } else {
                 Button("Retry") { retryModel() }
             }
+        case .tryIt where model.dictation.phase.isListening:
+            // Finish the sentence rather than throw it away.
+            Button("Stop") { model.dictation.toggleFromUI() }
+        case .tryIt where model.dictation.phase == .transcribing:
+            Button("Continue") {}.disabled(true)
         case .finish:
             Button(SetupGuide.isReady(model.setupChecklist(micHeard: micHeard)) ? "Start Dictating" : "Done") {
                 model.completeOnboarding()
@@ -140,7 +145,9 @@ struct OnboardingView: View {
 
     private func go(to next: Step) {
         if step == .microphone { model.micTest.stop() }
-        if step == .tryIt, model.dictation.phase.isActive { model.dictation.cancel() }
+        if step == .tryIt, model.dictation.phase.isListening, model.dictation.startedInWindow == WindowCoordinator.onboardingID {
+            model.dictation.cancel()
+        }
         withAnimation(Motion.unlessReduced(Motion.deliberate, reduceMotion)) { step = next }
     }
 
@@ -205,7 +212,7 @@ private struct WelcomeStep: View {
                 .font(.system(size: 34, weight: .semibold)).tracking(-0.6)
                 .foregroundStyle(Crystal.ink)
                 .accessibilityAddTraits(.isHeader)
-            Text("Speak in any app. Your words appear where you type,\ntranscribed privately on this Mac.")
+            Text("Speak in any app. Your words appear where you type,\ntranscribed privately on your own devices.")
                 .font(.system(size: 15)).foregroundStyle(Crystal.ink2)
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
@@ -234,7 +241,9 @@ private struct PermissionsStep: View {
         VStack(alignment: .leading, spacing: 8) {
             StepHeader(title: "Allow access", subtitle: "\(AppInfo.displayName) asks only for what dictation needs. You can change these in System Settings at any time.")
             PermissionCard(kind: .microphone, tile: Crystal.Tile.red, symbol: "mic.fill", title: "Microphone",
-                           detail: "Hears you only while you dictate. Audio never leaves this Mac.", required: true)
+                           detail: model.settings.settings.transcriptionLocation == .remoteHost
+                               ? "Hears you only while you dictate. Audio goes only to your network device."
+                               : "Hears you only while you dictate. Audio stays on this Mac.", required: true)
             PermissionCard(kind: .accessibility, tile: Crystal.Tile.blue, symbol: "character.cursor.ibeam", title: "Accessibility",
                            detail: "Types your words into the app you're using. Without it, dictations are copied for you to paste.",
                            required: false)
@@ -659,6 +668,8 @@ private struct TryItStep: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var messages: [Message]
     @State private var draft = ""
+    /// The last attempt's failure, kept until the next attempt (the pill's message fades).
+    @State private var lastError: String?
     @FocusState private var fieldFocused: Bool
 
     init(showcase: Bool = false) {
@@ -684,8 +695,8 @@ private struct TryItStep: View {
             }
             .cardSurface()
             .padding(.bottom, 4)
-            if case .failed(let message) = model.dictation.phase {
-                Label("\(message). Try again, or check the microphone in the previous steps.", systemImage: "exclamationmark.triangle.fill")
+            if let lastError {
+                Label("\(lastError). Try again, or go back to test the microphone.", systemImage: "exclamationmark.triangle.fill")
                     .font(TypeScale.meta).foregroundStyle(Crystal.warn)
                     .padding(.top, 6)
             }
@@ -694,6 +705,13 @@ private struct TryItStep: View {
                       ?? "The model is getting ready. Dictation starts working in a moment.", systemImage: "arrow.down.circle")
                     .font(TypeScale.meta).foregroundStyle(Crystal.ink2)
                     .padding(.top, 6)
+            }
+        }
+        .onChange(of: model.dictation.phase) { _, phase in
+            switch phase {
+            case .failed(let message): lastError = message
+            case .listening: lastError = nil
+            default: break
             }
         }
         .onChange(of: model.dictation.lastInAppResult) { _, result in
