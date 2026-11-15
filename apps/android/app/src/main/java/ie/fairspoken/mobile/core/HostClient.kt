@@ -47,7 +47,7 @@ class CleartextRefused : IOException(
 class HostException(message: String, val rejected: Boolean = false) : Exception(message)
 
 /**
- * Speaks the Fairspoken host protocol (src-tauri/src/host/PROTOCOL.md):
+ * Speaks the Bark host protocol (src-tauri/src/host/PROTOCOL.md):
  * discovery, pairing, health and streamed transcription.
  */
 class HostClient {

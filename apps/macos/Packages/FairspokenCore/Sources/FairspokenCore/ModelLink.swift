@@ -1,7 +1,7 @@
 import Foundation
 
 /// A download link for one model: `modelLinks[<model id>]` in the client's settings.json and in
-/// Fairspoken Server's host-config.json. The link points at an archive (zip, tar or tar.gz) of
+/// Bark Server's host-config.json. The link points at an archive (zip, tar or tar.gz) of
 /// the model's files, for networks that can't reach the standard download.
 ///
 /// - `http://` or `https://`: downloaded as is, query string included (Artifactory and

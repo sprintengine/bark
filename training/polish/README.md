@@ -1,6 +1,6 @@
 # Polish model training
 
-Retrains Fairspoken's local polish model so it understands the
+Retrains Bark's local polish model so it understands the
 `<spelling>`, `<format>` and `<tone>` tags, and builds small per-pack LoRA
 adapters (the first is `ie-general-practice`). Nothing here runs inside the
 app; the app only loads the files it produces.

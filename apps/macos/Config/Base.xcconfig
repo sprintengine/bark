@@ -3,7 +3,7 @@
 // PRODUCT NAME: the display name lives in exactly one place, MV_DISPLAY_NAME below.
 // It flows into PRODUCT_NAME (the .app name) and CFBundleDisplayName / CFBundleName,
 // and the Swift code reads it back from the bundle (AppInfo.displayName).
-MV_DISPLAY_NAME = Fairspoken
+MV_DISPLAY_NAME = Bark
 
 // BUNDLE ID: ie.fairspoken.mac (Release). Debug builds append ".dev" so they never
 // clobber the installed app's privacy grants.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build Release and install to ~/Applications (no admin needed), then launch it.
-#   scripts/install.sh                 # Fairspoken
-#   scripts/install.sh --app server    # Fairspoken Server
+#   scripts/install.sh                 # Bark
+#   scripts/install.sh --app server    # Bark Server
 #   scripts/install.sh --app all       # both
 set -euo pipefail
 cd "$(dirname "$0")/.."

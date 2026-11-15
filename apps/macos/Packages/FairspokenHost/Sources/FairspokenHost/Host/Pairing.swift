@@ -107,7 +107,7 @@ public final class PairingLimiter: Sendable {
 
 public enum MachineName {
     /// The Rust host's last resort when the machine has no usable name.
-    public static let fallback = "Fairspoken host"
+    public static let fallback = "Bark host"
 
     /// This Mac's name as Sharing settings show it ("Studio Mac"), else its Bonjour name, else
     /// the host name. Read once per start: `/v1/hello` must stay cheap.

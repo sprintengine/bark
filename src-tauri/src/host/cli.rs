@@ -17,7 +17,7 @@ use std::path::Path;
 pub(super) const USAGE: &str = "\
 Usage: transcription-host [OPTION]
 
-Runs the Fairspoken transcription host (configured with FAIRSPOKEN_HOST_*
+Runs the Bark transcription host (configured with FAIRSPOKEN_HOST_*
 environment variables; see README.md and PROTOCOL.md).
 
 Options:
@@ -374,7 +374,7 @@ fn update(one_off: Option<UpdateChannel>, yes: bool) -> Result<i32, String> {
         },
     )?;
     println!(
-        "Installed Fairspoken host {} at {} (the previous version is kept at {}).",
+        "Installed Bark host {} at {} (the previous version is kept at {}).",
         report.version,
         report.target.display(),
         report.previous.display()

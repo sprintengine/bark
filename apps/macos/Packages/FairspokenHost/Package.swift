@@ -1,5 +1,5 @@
 // swift-tools-version: 6.2
-// The transcription host behind Fairspoken Server: an HTTP/1.1 server on Network.framework
+// The transcription host behind Bark Server: an HTTP/1.1 server on Network.framework
 // that speaks the host protocol in src-tauri/src/host/PROTOCOL.md byte for byte (the Rust
 // `transcription-host` is the reference implementation), plus the worker pool, job queue,
 // metrics and the `/v1/events` fan-out. The speech engine is injected (`HostSpeechBackend`),

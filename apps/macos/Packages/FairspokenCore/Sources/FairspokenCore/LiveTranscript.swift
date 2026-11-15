@@ -60,7 +60,7 @@ public enum LiveTranscript {
 
 /// Where to cut the live tail into a finished segment. Parakeet sees 15 s windows, so once
 /// 12 s are waiting the audio is cut at the quietest 20 ms between 7 and 12 s (a pause between
-/// words), as Fairspoken Server's `StreamSegmenter` does; the segment is decoded once and only
+/// words), as Bark Server's `StreamSegmenter` does; the segment is decoded once and only
 /// the newer audio is decoded again as the user keeps speaking.
 public struct LiveSegmenter: Sendable, Equatable {
     public var triggerSeconds = 12.0

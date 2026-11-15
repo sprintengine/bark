@@ -1,6 +1,6 @@
 // swift-tools-version: 6.2
-// Speech recognition on the Apple Neural Engine, shared by Fairspoken (the dictation client)
-// and Fairspoken Server. Absorbs engine API churn in one place; both engines are pinned exactly.
+// Speech recognition on the Apple Neural Engine, shared by Bark (the dictation client)
+// and Bark Server. Absorbs engine API churn in one place; both engines are pinned exactly.
 //
 //   FairspokenSpeech   Parakeet through FluidAudio (Core ML): the client's engine and the
 //                      server's worker pool. The only code that touches FluidAudio.

@@ -6,7 +6,7 @@ import { normalizeSettings, type DiscoveredHost, type RemoteHealth, type Setting
 
 // Settings → Transcription → My host: finding a transcription host on the
 // tailnet (or by name), pairing with its password, and testing the saved
-// connection. Fairspoken Cloud shares the connection test.
+// connection. Bark Cloud shares the connection test.
 
 const remoteUrl = required<HTMLInputElement>("remoteUrl");
 const remoteAuthToken = required<HTMLInputElement>("remoteAuthToken");

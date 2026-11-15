@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Run Fairspoken Server headless under launchd, as a per-user LaunchAgent: it starts when you log
+# Run Bark Server headless under launchd, as a per-user LaunchAgent: it starts when you log
 # in (no window, menu bar item or Dock icon) and launchd restarts it if it exits abnormally.
 #
 #   scripts/server-agent.sh install [--app PATH] [--env KEY=VALUE ...]
 #   scripts/server-agent.sh status
 #   scripts/server-agent.sh uninstall
 #
-# --app       the app to run (default: /Applications/Fairspoken Server.app, else ~/Applications/…)
+# --app       the app to run (default: /Applications/Bark Server.app, else ~/Applications/…; a copy
+#             installed before the rename may still be named Fairspoken Server.app)
 # --env       extra environment for the server, e.g. --env FAIRSPOKEN_HOST_ADDR=0.0.0.0:48173
 #             (see apps/macos/README.md; normally the app's own host-config.json is enough)
 #
-# The agent's label is the app's bundle id; its log is ~/Library/Logs/Fairspoken Server.log.
+# The agent's label is the app's bundle id; its log is ~/Library/Logs/Fairspoken Server.log
+# (its name from before the rename, kept so the log stays in one file).
 # Don't run the app normally at the same time: both would try to bind the same port.
 set -euo pipefail
 ACTION="${1:-}"; shift || true
@@ -24,11 +26,12 @@ while (($#)); do
   esac
 done
 if [[ -z "$APP" ]]; then
-  for candidate in "/Applications/Fairspoken Server.app" "$HOME/Applications/Fairspoken Server.app"; do
+  for candidate in "/Applications/Bark Server.app" "$HOME/Applications/Bark Server.app" \
+                   "/Applications/Fairspoken Server.app" "$HOME/Applications/Fairspoken Server.app"; do
     [[ -d "$candidate" ]] && APP="$candidate" && break
   done
 fi
-[[ "$ACTION" == "uninstall" || "$ACTION" == "status" || -d "$APP" ]] || { echo "server-agent.sh: Fairspoken Server.app not found; pass --app PATH" >&2; exit 1; }
+[[ "$ACTION" == "uninstall" || "$ACTION" == "status" || -d "$APP" ]] || { echo "server-agent.sh: Bark Server.app not found; pass --app PATH" >&2; exit 1; }
 BUNDLE_ID="ie.fairspoken.server"
 if [[ -d "$APP" ]]; then BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")"; fi
 LABEL="$BUNDLE_ID"

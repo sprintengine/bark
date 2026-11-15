@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Fairspoken Server</title>
+<title>Bark Server</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#EDEFF2" media="(prefers-color-scheme: light)">
@@ -595,7 +595,7 @@
       <span class="logo" aria-hidden="true">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="5" width="2" height="6" rx="1"/><rect x="5" y="2.5" width="2" height="11" rx="1"/><rect x="8.5" y="4" width="2" height="8" rx="1"/><rect x="12" y="6" width="2" height="4" rx="1"/></svg>
       </span>
-      <span class="brand-name">Fairspoken</span>
+      <span class="brand-name">Bark</span>
       <span class="brand-sub">Server</span>
     </div>
     <div class="top-right">
@@ -2067,7 +2067,7 @@
 
   const renderChrome = (stats) => {
     const uptime = (Date.now() - stats.startedAt) / 1000;
-    $("footVersion").textContent = `Fairspoken Server ${stats.serverVersion || "?"} · ${stats.bindAddr || "—"}`;
+    $("footVersion").textContent = `Bark Server ${stats.serverVersion || "?"} · ${stats.bindAddr || "—"}`;
     $("footUptime").textContent = fmtUptime(uptime);
     $("editConfig").disabled = false;
   };
@@ -2703,7 +2703,7 @@
     const state = U.restarting ? "restarting" : s.state;
     const a = s.available;
     const pct = s.progress && s.progress.percentage != null ? s.progress.percentage : null;
-    const current = `Fairspoken Server ${s.currentVersion} (${channelLabel(s.channel)})`;
+    const current = `Bark Server ${s.currentVersion} (${channelLabel(s.channel)})`;
     const label = {
       idle: s.lastCheckedMs ? `${current} is up to date. Check for updates` : `${current}. Check for updates`,
       checking: "Checking for updates…",
@@ -2817,8 +2817,8 @@
     if (!DEMO) return null;
     const now = Date.now();
     const offer = (channel) => (channel === "nightly"
-      ? { version: "0.3.0-nightly.20261005.4", channel: "nightly", notes: "https://github.com/sprintengine/speakeasy/releases/tag/v0.3.0-nightly.20261005.4", pubDate: "2026-10-05T12:00:00Z", switchToStable: false }
-      : { version: "0.3.0", channel: "stable", notes: "https://github.com/sprintengine/speakeasy/releases/tag/v0.3.0", pubDate: "2026-10-01T12:00:00Z", switchToStable: false });
+      ? { version: "0.3.0-nightly.20261005.4", channel: "nightly", notes: "https://github.com/sprintengine/bark/releases/tag/v0.3.0-nightly.20261005.4", pubDate: "2026-10-05T12:00:00Z", switchToStable: false }
+      : { version: "0.3.0", channel: "stable", notes: "https://github.com/sprintengine/bark/releases/tag/v0.3.0", pubDate: "2026-10-01T12:00:00Z", switchToStable: false });
     const st = { currentVersion: "0.2.0", channel: "stable", channelSource: "version", defaultChannel: "stable", autoUpdate: false, checksEnabled: true, platform: "linux-x86_64", state: "available", available: offer("stable"), progress: null, error: null, lastCheckedMs: now - 42 * 60000, installedVersion: null, restartMode: "service" };
     const start = params.get("update") || "available";
     if (start === "idle") { st.state = "idle"; st.available = null; }

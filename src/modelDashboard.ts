@@ -118,13 +118,13 @@ function polishRows(): Row[] {
 function remoteRows(): Row[] {
   const rows: Row[] = [];
   const remote = (id: string, kind: ModelKind, name: string, summary: string, location: "host" | "cloud"): Row => ({
-    id, kind, name, summary, detail: summary, publisher: location === "cloud" ? "Fairspoken" : "Host", languages: "", language: "multi",
+    id, kind, name, summary, detail: summary, publisher: location === "cloud" ? "Bark" : "Host", languages: "", language: "multi",
     bytes: 0, speed: 0, accuracy: 0, rank: -1, installed: true, inUse: true, favorite: favorites.has(id), location, recommended: false, isNew: false, measured: false,
     searchText: `${name} ${summary}`,
   });
   if (settings.transcriptionLocation === "remote-host") rows.push(remote("remote-host", "speech", "Your host", "Dictation runs on your transcription host", "host"));
-  if (settings.transcriptionLocation === "cloud") rows.push(remote("cloud-speech", "speech", "Fairspoken Cloud", "Hosted dictation", "cloud"));
-  if (settings.polishEnabled && settings.polishProvider === "cloud") rows.push(remote("cloud-polish", "polish", "Fairspoken Cloud polish", "Hosted cleanup", "cloud"));
+  if (settings.transcriptionLocation === "cloud") rows.push(remote("cloud-speech", "speech", "Bark Cloud", "Hosted dictation", "cloud"));
+  if (settings.polishEnabled && settings.polishProvider === "cloud") rows.push(remote("cloud-polish", "polish", "Bark Cloud polish", "Hosted cleanup", "cloud"));
   return rows;
 }
 
@@ -280,10 +280,10 @@ function toggle(id: string): void {
 }
 
 function renderSummary(): void {
-  const speechName = settings.transcriptionLocation === "remote-host" ? "your host" : settings.transcriptionLocation === "cloud" ? "Fairspoken Cloud" : speechInfo(settings.model).name;
+  const speechName = settings.transcriptionLocation === "remote-host" ? "your host" : settings.transcriptionLocation === "cloud" ? "Bark Cloud" : speechInfo(settings.model).name;
   const dictation = root.querySelector("#dictationProvider")!;
   dictation.replaceChildren(el("span", "model-summary-k", "Dictation"), el("strong", "", speechName));
-  const polishName = !settings.polishEnabled ? "Off" : settings.polishProvider === "cloud" ? "Fairspoken Cloud" : catalog.polish.find(m => m.id === settings.polishModel)?.name ?? settings.polishModel;
+  const polishName = !settings.polishEnabled ? "Off" : settings.polishProvider === "cloud" ? "Bark Cloud" : catalog.polish.find(m => m.id === settings.polishModel)?.name ?? settings.polishModel;
   root.querySelector("#polishProvider")!.replaceChildren(el("span", "model-summary-k", "Polish"), el("strong", "", polishName));
   const providerActions = root.querySelector("#polishProviderActions")!;
   providerActions.replaceChildren();

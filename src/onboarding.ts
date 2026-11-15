@@ -112,7 +112,7 @@ function renderWelcome(): void {
   stepHost.replaceChildren(
     h("header", { class: "ob-head ob-head--hero" }, [
       h("span", { class: "ob-mark", "aria-hidden": "true" }, [svg(ICONS.wave)]),
-      h("h1", { tabindex: "-1" }, ["Welcome to Fairspoken"]),
+      h("h1", { tabindex: "-1" }, ["Welcome to Bark"]),
       h("p", {}, ["Speak anywhere you type. Fast, private, and on your computer."]),
     ]),
     points,
@@ -196,8 +196,8 @@ function renderPermissions(): void {
   ]);
   stepHost.replaceChildren(
     header("lock", "green", mac ? "Allow a few things" : "Allow the microphone", mac
-      ? "Fairspoken needs your microphone. Accessibility lets it type for you."
-      : "Fairspoken needs your microphone to hear you."),
+      ? "Bark needs your microphone. Accessibility lets it type for you."
+      : "Bark needs your microphone to hear you."),
     cards,
     h("p", { class: "ob-note" }, [mac ? "You can change these later in System Settings → Privacy & Security." : "You can change this later in your system's privacy settings."]),
   );
@@ -440,7 +440,7 @@ function enterTry(): void {
   const shortcut = settings?.recordingShortcut ?? "";
   const holdMode = settings?.recordingShortcutMode === "push-to-talk";
   const thread = h("div", { class: "ob-thread", role: "log", "aria-live": "polite" }, [
-    bubble("them", "Hi! What will you use Fairspoken for? Answer out loud."),
+    bubble("them", "Hi! What will you use Bark for? Answer out loud."),
   ]);
   const live = h("div", { class: "ob-compose-text", "data-placeholder": "Your words appear here as you speak" });
   const mic = h("button", { class: "ob-mic-btn", type: "button", "aria-label": "Hold to talk", title: "Hold to talk" }, [svg(ICONS.mic)]);
@@ -594,14 +594,14 @@ function renderDone(): void {
       state === "ready" || state === "downloading" ? undefined : { label: state === "failed" ? "Retry" : "Download", step: "model" }),
   ]);
   stepHost.replaceChildren(
-    header(ready ? "check" : "wave", "green", ready ? "You're all set" : "Almost there", ready ? "Fairspoken is ready in every app." : "Everything else is ready. You can finish later in Settings."),
+    header(ready ? "check" : "wave", "green", ready ? "You're all set" : "Almost there", ready ? "Bark is ready in every app." : "Everything else is ready. You can finish later in Settings."),
     h("div", { class: "ob-card ob-recap" }, [
       h("div", { class: "ob-recap-keys" }, [keycaps(shortcut)]),
       h("p", {}, [settings?.recordingShortcutMode === "push-to-talk" ? "Hold to dictate in any app, let go to insert." : "Press to dictate in any app, press again to insert."]),
     ]),
     list,
   );
-  setFooter({ next: "Open Fairspoken", back: true });
+  setFooter({ next: "Open Bark", back: true });
 }
 
 // ── Navigation ──────────────────────────────────────────────────────────

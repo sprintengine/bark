@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the .zip a Fairspoken app installs a model from: "Download from
+# Builds the .zip a Bark app installs a model from: "Download from
 # link…" on the Models screen, or --model-link / FAIRSPOKEN_MODEL_LINKS /
 # modelLinks for a transcription host. Run it on a machine that can reach
 # huggingface.co, then put the zip on your own server or share.
@@ -8,7 +8,7 @@
 #
 #   desktop  the Windows/Linux/macOS desktop app and its transcription-host
 #            (ONNX, whisper.cpp and GGUF files)
-#   mac      the native macOS apps, Fairspoken and Fairspoken Server
+#   mac      the native macOS apps, Bark and Bark Server
 #            (Core ML bundles)
 #
 # The zip holds exactly the files that app needs for that model, at its root;

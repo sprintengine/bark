@@ -497,7 +497,7 @@ private struct ManualHostSection: View {
                           prompt: Text("http://practice-mini.local:48173"))
                     .font(.fsData(.body))
                     .onSubmit { model.hostStatus.refresh(force: true) }
-                SecureField("Token", text: $token, prompt: Text("From Fairspoken Server › Connect"))
+                SecureField("Token", text: $token, prompt: Text("From Bark Server › Connect"))
                     .focused($tokenFocused)
                     .onSubmit { model.settings.remoteToken = token; model.hostStatus.refresh(force: true) }
                     .onChange(of: token) { _, v in model.settings.remoteToken = v }

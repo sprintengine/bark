@@ -1,7 +1,7 @@
 import FairspokenCore
 import Foundation
 
-/// Fairspoken Server's host configuration, persisted as `host-config.json`. The first four
+/// Bark Server's host configuration, persisted as `host-config.json`. The first four
 /// fields are the Rust host's `PersistedHostConfig` with the same names and meaning, so either
 /// host reads the other's file; the rest are restart-only settings the Rust host takes from
 /// `FAIRSPOKEN_HOST_*` environment variables.

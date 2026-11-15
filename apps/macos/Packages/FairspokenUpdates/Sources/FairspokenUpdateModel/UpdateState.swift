@@ -84,7 +84,7 @@ extension UpdateState {
     }
 }
 
-/// "Fairspoken 0.3.0 (Nightly)": the channel is the offered version's, not the picker's.
+/// "Bark 0.3.0 (Nightly)": the channel is the offered version's, not the picker's.
 public func updateDisplayName(appName: String, version: String) -> String {
     "\(appName) \(version)" + (UpdateChannel.isNightly(version: version) ? " (Nightly)" : "")
 }

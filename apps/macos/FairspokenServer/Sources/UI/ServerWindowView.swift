@@ -43,7 +43,7 @@ struct ServerWindowView: View {
             HStack(spacing: 10) {
                 FairspokenMark(size: 28, monochrome: Crystal.ink)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Fairspoken").font(.headline).foregroundStyle(Crystal.ink)
+                    Text("Bark").font(.headline).foregroundStyle(Crystal.ink)
                     Text("Server").font(.subheadline).foregroundStyle(Crystal.serverAccent)
                 }
                 Spacer()

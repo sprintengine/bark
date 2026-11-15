@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fairspoken</title>
+  <title>Bark</title>
   <link rel="stylesheet" href="/src/home.css" />
   <script type="module" src="/src/home.ts" defer></script>
   <script type="module" src="/src/settings.ts" defer></script>
@@ -17,7 +17,7 @@
         <div class="sidebar-chrome" data-tauri-drag-region></div>
         <div class="sidebar-brand" data-tauri-drag-region>
           <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4.5 10.5v3M8 7.5v9M11.5 4.5v15M15 8v8M18.5 10v4"/></svg></span>
-          <span class="brand-name">Fairspoken</span>
+          <span class="brand-name">Bark</span>
         </div>
         <nav class="nav" aria-label="Primary">
           <button class="nav-item" type="button" data-screen="home" aria-current="page"><span class="nav-tile nav-tile--home" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 10.5v3M8.5 7.5v9M12 4.5v15M15.5 8v8M19 10.5v3"/></svg></span><span class="nav-label">Home</span></button>
@@ -77,7 +77,7 @@
             <div class="e-title">Start with your voice</div>
             <div class="e-sub">Press your shortcut in any app and speak. Your pace, words and time saved appear here.</div>
             <div class="e-actions">
-              <button class="btn btn-primary" data-open="onboarding" type="button">Set up Fairspoken</button>
+              <button class="btn btn-primary" data-open="onboarding" type="button">Set up Bark</button>
               <button class="btn" data-open="speedtest" type="button">Run a speed test</button>
             </div>
           </div>
@@ -522,7 +522,7 @@
         <div class="row">
           <div class="row-text">
             <label class="row-label" for="cloudAuthToken">Token</label>
-            <div class="row-help">Audio is sent to Fairspoken Cloud.</div>
+            <div class="row-help">Audio is sent to Bark Cloud.</div>
           </div>
           <div class="row-control">
             <input id="cloudAuthToken" class="setting-input mono w-lg" type="password" autocomplete="off" />
@@ -620,7 +620,7 @@
       <div class="row">
         <div class="row-text"><label class="row-label" for="polishProviderSelect">Runs on</label></div>
         <div class="row-control">
-          <select id="polishProviderSelect" class="setting-select w-md"><option value="local">This device</option><option value="cloud">Fairspoken Cloud</option></select>
+          <select id="polishProviderSelect" class="setting-select w-md"><option value="local">This device</option><option value="cloud">Bark Cloud</option></select>
         </div>
       </div>
       <div class="row" id="polishLocalModelRow">
@@ -833,7 +833,7 @@
     <div class="settings-card">
       <div class="row">
         <div class="row-text">
-          <div class="row-label">Fairspoken <span id="appVersion" class="num"></span> <span class="update-channel-chip" id="appChannel"></span></div>
+          <div class="row-label">Bark <span id="appVersion" class="num"></span> <span class="update-channel-chip" id="appChannel"></span></div>
           <div class="row-help" id="updateStatus" role="status" aria-live="polite"></div>
           <div class="update-progress" id="updateProgress" hidden><span></span></div>
           <div class="row-help" id="updateLastChecked"></div>

@@ -1,5 +1,5 @@
 // swift-tools-version: 6.2
-// SwiftUI building blocks shared by Fairspoken and Fairspoken Server: the palette (brand
+// SwiftUI building blocks shared by Bark and Bark Server: the palette (brand
 // colours from design/brand/README.md plus the client's status colours), glass and
 // material cards, chips, tags, the brand mark and number formatting.
 import PackageDescription

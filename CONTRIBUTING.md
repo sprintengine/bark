@@ -1,6 +1,6 @@
-# Contributing to Fairspoken
+# Contributing to Bark
 
-Thanks for your interest in improving Fairspoken. Bug reports, fixes, and
+Thanks for your interest in improving Bark. Bug reports, fixes, and
 well-scoped features are all welcome.
 
 ## Before you start

@@ -2,8 +2,8 @@
 // the rolling `update-feeds` release,
 //
 //   desktop-stable.json, desktop-nightly.json   the Tauri desktop app
-//   appcast-fairspoken.xml                      the Fairspoken Mac client (Sparkle)
-//   appcast-fairspoken-server.xml               Fairspoken Server (Sparkle)
+//   appcast-fairspoken.xml                      the Bark Mac client (Sparkle)
+//   appcast-fairspoken-server.xml               Bark Server (Sparkle)
 //   host-stable.json, host-nightly.json         the standalone transcription host
 //
 // and every feed is RENDERED, on each publish, from the releases that exist at
@@ -35,7 +35,7 @@ import {
 export const FEEDS_TAG = 'update-feeds'
 export const FEEDS_RELEASE_TITLE = 'Update feeds'
 export const FEEDS_RELEASE_BODY =
-  'Update feeds read by installed Fairspoken apps (desktop, macOS and the transcription host). ' +
+  'Update feeds read by installed Bark apps (desktop, macOS and the transcription host). ' +
   'Rewritten by the release workflow on every publish; not a release to install. ' +
   'See docs/releasing.md.'
 

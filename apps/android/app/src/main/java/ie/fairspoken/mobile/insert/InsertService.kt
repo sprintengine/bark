@@ -92,7 +92,7 @@ class InsertService : AccessibilityService() {
             }
         }
         getSystemService(ClipboardManager::class.java)
-            .setPrimaryClip(ClipData.newPlainText("Fairspoken", insertion))
+            .setPrimaryClip(ClipData.newPlainText("Bark", insertion))
         val pasted = node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
         return if (pasted) Result.Pasted else Result.NoField
     }

@@ -81,7 +81,7 @@ ssl-rustls = [
     "zeroize",
 ]
 
-# Fairspoken: vendored as-is (see the patch note in util/equal_reader.rs);
+# Bark: vendored as-is (see the patch note in util/equal_reader.rs);
 # keep its upstream warnings out of the host build, as cargo does for
 # registry crates.
 [lints.rust]

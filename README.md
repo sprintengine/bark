@@ -1,14 +1,14 @@
-# Fairspoken
+# Bark
 
 Fast, private, local-first desktop dictation. Press a shortcut, speak, and the
 text lands in whatever app you're typing in.
 
-Fairspoken transcribes **on your machine** by default with NVIDIA's Parakeet
+Bark transcribes **on your machine** by default with NVIDIA's Parakeet
 TDT model: no account, no network, and no audio ever leaves your computer. On
 Apple Silicon a typical dictation is transcribed in a few hundred milliseconds.
 
 If you'd rather not spend local CPU/RAM, or want the extra features below,
-there is an optional hosted service, **Fairspoken Cloud**, that you can sign in
+there is an optional hosted service, **Bark Cloud**, that you can sign in
 to and pay for with credits. It is off by default and the app is fully usable
 without it.
 
@@ -27,7 +27,7 @@ without it.
 - **History and notes**: recent transcripts, copy-again, and a notes view.
 - **Remote host**: run the bundled `transcription-host` on another machine
   (e.g. a Mac mini) and stream audio to it over your own network.
-- **Fairspoken Cloud (optional, paid)**: hosted transcription, AI polish
+- **Bark Cloud (optional, paid)**: hosted transcription, AI polish
   (filler-word and self-correction cleanup with one-click "Undo AI edit"), and
   app-aware tone. Polish and context awareness are off unless you turn them on.
 
@@ -40,12 +40,14 @@ with ratings, sizes and one-click downloads.
 ## Install
 
 Pre-built releases are published on the
-[Releases page](https://github.com/sprintengine/speakeasy/releases).
-macOS is the primary platform. Each release carries:
+[Releases page](https://github.com/sprintengine/bark/releases).
+macOS is the primary platform. Bark was called Fairspoken until November
+2026; a copy installed under the old name updates to Bark on its own.
+Each release carries:
 
 - **macOS** (Apple Silicon, macOS 26): the native app,
-  `Fairspoken-<version>-macos-arm64.dmg` (or `.zip`), and Fairspoken Server,
-  `Fairspoken-Server-<version>-macos-arm64.dmg` (or `.zip`), for a Mac that
+  `Bark-<version>-macos-arm64.dmg` (or `.zip`), and Bark Server,
+  `Bark-Server-<version>-macos-arm64.dmg` (or `.zip`), for a Mac that
   transcribes for other devices. The desktop app built from this repository is
   not released for macOS.
 - **Windows and Linux**: the desktop app (`-windows-x64-setup.exe`,
@@ -59,7 +61,7 @@ download in the background and install when you choose **Restart to update** in
 Settings → General → Updates. The macOS apps do not update themselves yet;
 install each new release by hand. See [docs/releasing.md](docs/releasing.md).
 
-On macOS, Fairspoken needs **Microphone** access, and **Accessibility** access
+On macOS, Bark needs **Microphone** access, and **Accessibility** access
 to insert text into other apps.
 
 ## Build from source
@@ -90,7 +92,7 @@ Useful environment variables:
 | --- | --- |
 | `FAIRSPOKEN_MODEL_DIR` | Override the model cache directory |
 | `FAIRSPOKEN_SETTINGS_PATH` | Override the settings file location |
-| `FAIRSPOKEN_CLOUD_URL` | Fairspoken Cloud endpoint. Set at compile time to offer the Cloud location and cloud polish (a runtime value overrides it); builds without it offer only local and self-hosted transcription |
+| `FAIRSPOKEN_CLOUD_URL` | Bark Cloud endpoint. Set at compile time to offer the Cloud location and cloud polish (a runtime value overrides it); builds without it offer only local and self-hosted transcription |
 
 Variables from before the rename (`MULTIVOICE_*`, `MULTIVOICE_TAURI_*`) are
 still accepted when the `FAIRSPOKEN_*` name is unset.
@@ -230,8 +232,8 @@ takes effect the next time the host starts.
 
 - **Local mode** (the default): audio and text stay on your computer.
 - **Remote host**: audio goes only to the host you configure.
-- **Fairspoken Cloud**: audio (for cloud transcription) and transcript text
-  (for AI polish) are sent to the Fairspoken Cloud service for processing and
+- **Bark Cloud**: audio (for cloud transcription) and transcript text
+  (for AI polish) are sent to the Bark Cloud service for processing and
   are not stored.
 - **Context awareness** (off by default) reads text near your cursor through
   the macOS Accessibility API, locally, to improve casing and vocabulary.
@@ -244,6 +246,6 @@ privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-Fairspoken is released under the [MIT License](LICENSE). The speech models it
+Bark is released under the [MIT License](LICENSE). The speech models it
 downloads are licensed separately. Parakeet TDT is © NVIDIA and licensed
 CC BY 4.0. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

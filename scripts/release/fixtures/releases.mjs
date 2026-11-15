@@ -28,9 +28,9 @@ import {
   SPARKLE_APPS,
 } from '../release-lib.mjs'
 
-export const FIXTURE_REPO = 'sprintengine/speakeasy'
+export const FIXTURE_REPO = 'sprintengine/bark'
 export const FIXTURE_SLUG = 'fairspoken'
-export const FIXTURE_MAC_NAME = 'Fairspoken'
+export const FIXTURE_MAC_NAME = 'Bark'
 
 const digest = (text, length) => createHash('sha512').update(text).digest().subarray(0, length)
 // A string shaped like a tauri signer .sig: base64 of a minisign signature file.
@@ -94,12 +94,12 @@ export function fixtureRelease({ version, publishedAt, build, sparkle = true, re
   return {
     id: nextId++,
     tag_name: tag,
-    name: `Fairspoken ${version}`,
+    name: `Bark ${version}`,
     draft: false,
     prerelease: version.includes('-'),
     published_at: publishedAt,
     html_url: releasePageUrl({ repo, tag }),
-    body: `Fairspoken ${version}.\n\n<!-- source-sha: ${digest(tag, 20).toString('hex')} -->\n`,
+    body: `Bark ${version}.\n\n<!-- source-sha: ${digest(tag, 20).toString('hex')} -->\n`,
     assets,
   }
 }

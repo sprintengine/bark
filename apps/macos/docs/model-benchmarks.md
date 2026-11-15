@@ -1,6 +1,6 @@
 # Speech model benchmarks (Models library figures)
 
-The speed and accuracy bars in Fairspoken › Models come from one check, run the same way for
+The speed and accuracy bars in Bark › Models come from one check, run the same way for
 every model on an Apple M4 Mac (10 cores, 16 GB, macOS 26):
 
 - **Audio:** 20 utterances from LibriSpeech test-clean (CC BY 4.0), 147 s in all, 16 kHz mono.
@@ -51,5 +51,5 @@ the model for the Neural Engine once (20 s for Tiny to 2.5 min for Medium on the
 To check a model through the app's own path:
 
 ```sh
-build/Build/Products/Debug/Fairspoken.app/Contents/MacOS/Fairspoken --selftest <clip.wav> --model large-v3-turbo
+build/Build/Products/Debug/Bark.app/Contents/MacOS/Bark --selftest <clip.wav> --model large-v3-turbo
 ```

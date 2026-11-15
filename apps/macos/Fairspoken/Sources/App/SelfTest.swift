@@ -7,14 +7,14 @@ import FairspokenCore
 
 /// Headless end-to-end check of the real pipeline without the microphone or TCC:
 ///
-///   Fairspoken --selftest <file.wav> [--model parakeet-ultra | large-v3-turbo | …] [--host URL --token T]
+///   Bark --selftest <file.wav> [--model parakeet-ultra | large-v3-turbo | …] [--host URL --token T]
 ///
 /// 1. Loads the model on the Neural Engine (timing), transcribes the file through the same
 ///    `LocalBatchSession` + post-processor the hotkey path uses.
 /// 2. With `--host`: streams the file through `RemoteStreamSession` (framed PCM16, chunked,
 ///    paced at 4× real time) while subscribed to `/v1/events`, and reports both.
 ///
-///   Fairspoken --discover [name | name:port [--password P]]
+///   Bark --discover [name | name:port [--password P]]
 ///
 /// Scans the tailnet the way Settings › Find my host does (or probes one typed entry) and
 /// prints what answered; with `--password`, pairs with the typed host (nothing is saved).
@@ -71,7 +71,7 @@ enum SelfTest {
                 let candidates = TailnetDiscovery.candidates(from: status)
                 say("probing \(candidates.count) machines: " + candidates.map { "\($0.machine) \($0.urls.map(\.absoluteString))" }.joined(separator: ", "))
                 let hosts = await discovery.probe(candidates)
-                if hosts.isEmpty { say("no Fairspoken hosts answered") }
+                if hosts.isEmpty { say("no Bark hosts answered") }
                 for host in hosts { say(String(describing: host)) }
             }
         } catch {

@@ -1,6 +1,6 @@
 # Third-party notices
 
-Fairspoken's source code is MIT-licensed (see `LICENSE`). The speech models it
+Bark's source code is MIT-licensed (see `LICENSE`). The speech models it
 downloads at runtime, and some of the native libraries it links, are the work
 of others and are distributed under their own licenses. No model weights are
 stored in this repository; they are downloaded on first use into the local
@@ -13,7 +13,7 @@ model cache.
 - Original model: [nvidia/parakeet-tdt-0.6b-v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3),
   © NVIDIA Corporation.
 - License: [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
-- Fairspoken downloads the ONNX export published at
+- Bark downloads the ONNX export published at
   [istupakov/parakeet-tdt-0.6b-v3-onnx](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx)
   (a format conversion of the NVIDIA weights; no changes to the model itself).
 - The native macOS apps (`apps/macos`) download the Core ML conversion

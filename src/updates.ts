@@ -266,8 +266,8 @@ function render(status: UpdateStatus): void {
     });
   } else if (status.state === "ready" && previous?.state === "downloading") {
     showToast({
-      title: status.switchToStable ? `Stable ${status.version} is installed` : `Fairspoken ${status.version} is installed`,
-      description: "Restart Fairspoken to finish updating.",
+      title: status.switchToStable ? `Stable ${status.version} is installed` : `Bark ${status.version} is installed`,
+      description: "Restart Bark to finish updating.",
       actions: [
         { label: "Later", run: () => {} },
         { label: "Restart", primary: true, run: () => perform("restart") },
@@ -278,7 +278,7 @@ function render(status: UpdateStatus): void {
   } else if (manualCheck && status.state === "upToDate") {
     showToast({
       title: "You're up to date",
-      description: `Fairspoken ${status.currentVersion} is the latest ${status.channel} release.`,
+      description: `Bark ${status.currentVersion} is the latest ${status.channel} release.`,
       autoDismissMs: 4000,
     });
   } else if (manualCheck && status.state === "failed") {

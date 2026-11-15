@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Renders Fairspoken Server's app icon from the brand's dark icon composite
+# Renders Bark Server's app icon from the brand's dark icon composite
 # (design/brand/logo/app-icon/app-icon-dark-1024.png) into its asset catalog.
 # Rerun when the brand icon changes; the shipping icon should eventually come from
 # Icon Composer (see design/brand/README.md §2).

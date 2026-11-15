@@ -1,3 +1,5 @@
+> The product is now called **Bark**. These notes are a record of the earlier Fairspoken name and are kept as written.
+
 # Home window: three redesign directions
 
 October 2026. These are concepts for the main window (`home.html`, the Home screen) ahead of the open-source launch. The app is aimed at Irish GP practices as well as developers. Each direction is one standalone HTML file. Nothing in the app source was changed.

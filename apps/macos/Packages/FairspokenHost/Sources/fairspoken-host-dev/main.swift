@@ -1,7 +1,7 @@
 // Development host: the real HTTP server, queue and workers over the stub speech engine
 // (no models, no Neural Engine). For protocol work and the conformance suite:
 //   FAIRSPOKEN_HOST_ADDR=127.0.0.1:48980 FAIRSPOKEN_HOST_TOKEN=secret swift run fairspoken-host-dev
-// The real server is `Fairspoken Server.app/Contents/MacOS/Fairspoken Server --headless`.
+// The real server is `Bark Server.app/Contents/MacOS/Bark Server --headless`.
 import FairspokenHost
 import Foundation
 
@@ -15,7 +15,7 @@ do {
     let dashboard = env["DASHBOARD_HTML"].flatMap { try? Data(contentsOf: URL(fileURLWithPath: $0)) }.map { [UInt8]($0) } ?? Array("<html></html>".utf8)
     let host = try await TranscriptionHost.start(configuration: config, configURL: configURL, backend: backend, dashboardHTML: dashboard,
                                                  serverVersion: "0.0.0-dev")
-    print("Fairspoken development host (stub engine) listening on http://\(config.bindAddress):\(host.boundPort)")
+    print("Bark development host (stub engine) listening on http://\(config.bindAddress):\(host.boundPort)")
     signal(SIGINT, SIG_IGN)
     signal(SIGTERM, SIG_IGN)
     let stop = AsyncStream<Void> { continuation in

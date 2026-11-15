@@ -55,7 +55,7 @@ function render(): void {
   const [name, [state, tone]] = location === "remote-host"
     ? ["My host", remoteState(remoteStatus?.textContent ?? "")]
     : location === "cloud"
-    ? ["Fairspoken Cloud", remoteState(cloudStatus?.textContent ?? "")]
+    ? ["Bark Cloud", remoteState(cloudStatus?.textContent ?? "")]
     : [speechModelShortName(settings.model), localState()];
   nameLabel.textContent = name;
   stateLabel.textContent = state;

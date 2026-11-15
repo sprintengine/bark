@@ -68,7 +68,7 @@ Build the binary with `cd src-tauri && cargo build --release --bin transcription
 The Rust host reads models from `~/.local/share/fairspoken/models`
 (override with `FAIRSPOKEN_MODEL_DIR`).
 
-Swift: `Fairspoken Server.app/Contents/MacOS/Fairspoken Server --headless`
+Swift: `Bark Server.app/Contents/MacOS/Bark Server --headless`
 honours the same `FAIRSPOKEN_HOST_*` variables.
 
 Host variables: `FAIRSPOKEN_HOST_ADDR`, `FAIRSPOKEN_HOST_TOKEN`,

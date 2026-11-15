@@ -436,7 +436,7 @@ impl CaptureStore {
     }
 }
 
-const EXPORT_README: &str = "Fairspoken training data export (format version 1).\n\
+const EXPORT_README: &str = "Bark training data export (format version 1).\n\
 \n\
 manifest.jsonl  one dictation per line, NeMo-style: audio_filepath, duration, text\n\
                 (the user's edited text, else the inserted text), plus every\n\
@@ -446,7 +446,7 @@ polish.jsonl    prompt/completion pairs (speech model text -> final text) for\n\
 audio/          16 kHz mono 16-bit PCM WAV, one per dictation.\n\
 \n\
 These recordings may contain sensitive or patient information. Keep them on\n\
-machines you control. See docs/training-data.md in the Fairspoken repository.\n";
+machines you control. See docs/training-data.md in the Bark repository.\n";
 
 fn create_private_dir(path: &Path) -> std::io::Result<()> {
     fs::create_dir_all(path)?;

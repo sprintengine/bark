@@ -43,7 +43,7 @@ use std::time::{Duration, Instant};
 
 /// Where every update feed lives (contract §2).
 pub(super) const DEFAULT_FEED_BASE_URL: &str =
-    "https://github.com/sprintengine/speakeasy/releases/download/update-feeds/";
+    "https://github.com/sprintengine/bark/releases/download/update-feeds/";
 /// The minisign public key the release archives are signed with: the same
 /// value as `plugins.updater.pubkey` in `src-tauri/tauri.conf.json` (base64 of
 /// a minisign public key file). A unit test keeps the two in step.
@@ -258,7 +258,7 @@ impl HostManifest {
     pub(super) fn asset_for(&self, key: &str) -> Result<&PlatformAsset, String> {
         let asset = self.platforms.get(key).ok_or_else(|| {
             format!(
-                "Fairspoken host {} has no {key} build in the update feed",
+                "Bark host {} has no {key} build in the update feed",
                 self.version
             )
         })?;
@@ -363,7 +363,7 @@ pub(super) fn verify_archive_file(
     let public_key = decode_public_key(public_key_base64)?;
     let signature = decode_signature(signature_base64)?;
     let mut verifier = public_key.verify_stream(&signature).map_err(|err| {
-        format!("The update was not signed with the Fairspoken release key: {err}")
+        format!("The update was not signed with the Bark release key: {err}")
     })?;
     let mut file = File::open(archive)
         .map_err(|err| format!("Failed to open the downloaded update: {err}"))?;
@@ -387,7 +387,7 @@ pub(super) fn verify_archive_file(
         ));
     }
     verifier.finalize().map_err(|_| {
-        "The downloaded update's signature does not verify against the Fairspoken release key"
+        "The downloaded update's signature does not verify against the Bark release key"
             .to_string()
     })
 }
@@ -797,7 +797,7 @@ pub(super) fn check_feed(
 ) -> Result<Option<AvailableUpdate>, String> {
     let platform = current_platform_key().ok_or_else(|| {
         format!(
-            "No Fairspoken host builds are published for {}-{}",
+            "No Bark host builds are published for {}-{}",
             env::consts::OS,
             env::consts::ARCH
         )
@@ -908,13 +908,13 @@ pub(super) fn restart_process(mode: RestartMode, exe: &Path) -> ! {
     let _ = io::stdout().flush();
     if mode == RestartMode::Service {
         eprintln!(
-            "Fairspoken host update installed; exiting with status {RESTART_EXIT_CODE} so the service manager starts the new version."
+            "Bark host update installed; exiting with status {RESTART_EXIT_CODE} so the service manager starts the new version."
         );
         std::process::exit(RESTART_EXIT_CODE);
     }
     let args: Vec<_> = env::args_os().skip(1).collect();
     eprintln!(
-        "Fairspoken host update installed; restarting {}",
+        "Bark host update installed; restarting {}",
         exe.display()
     );
     let mut command = Command::new(exe);
@@ -1149,7 +1149,7 @@ impl Updater {
                         .is_none_or(|known| known.version != update.version);
                     if announce {
                         println!(
-                            "Fairspoken host update available: {} — install it from the dashboard or run `transcription-host --update`.",
+                            "Bark host update available: {} — install it from the dashboard or run `transcription-host --update`.",
                             describe_update(&update)
                         );
                     }
@@ -1219,7 +1219,7 @@ impl Updater {
     }
 
     fn run_install(self: &Arc<Self>, update: AvailableUpdate, unattended: bool) {
-        println!("Installing Fairspoken host {}…", describe_update(&update));
+        println!("Installing Bark host {}…", describe_update(&update));
         let progress_updater = Arc::clone(self);
         let result = download_and_install(
             &update,
@@ -1239,7 +1239,7 @@ impl Updater {
         match result {
             Ok(report) => {
                 println!(
-                    "Installed Fairspoken host {} at {} (previous version kept at {}).",
+                    "Installed Bark host {} at {} (previous version kept at {}).",
                     report.version,
                     report.target.display(),
                     report.previous.display()
@@ -1588,7 +1588,7 @@ mod tests {
               "version": "{version}",
               "channel": "{channel}",
               "pub_date": "2026-10-05T12:00:00Z",
-              "notes": "https://github.com/sprintengine/speakeasy/releases/tag/v{version}",
+              "notes": "https://github.com/sprintengine/bark/releases/tag/v{version}",
               "platforms": {{
                 "linux-x86_64": {{ "url": "https://example.test/h-linux-x64.tar.gz", "sha256": "{sha}", "signature": "c2ln", "format": "tar.gz" }},
                 "windows-x86_64": {{ "url": "https://example.test/h-windows-x64.zip", "sha256": "{sha}", "signature": "c2ln", "format": "zip" }},

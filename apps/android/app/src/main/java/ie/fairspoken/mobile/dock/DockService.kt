@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 /**
  * Keeps the floating dock on screen. A microphone foreground service, so it
  * may record while another app is in front; it has to be started from the
- * Fairspoken screen, which is why it does not restart itself.
+ * Bark screen, which is why it does not restart itself.
  */
 class DockService : Service() {
     private val scope = MainScope()

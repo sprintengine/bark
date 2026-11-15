@@ -7,7 +7,7 @@ import Foundation
 extension RemoteProtocol {
     public static let helloPath = "v1/hello"
     public static let pairPath = "v1/pair"
-    /// `service` in a Fairspoken host's hello; clients ignore any other value.
+    /// `service` in a Bark host's hello; clients ignore any other value.
     public static let helloService = "fairspoken-host"
     /// The host's default port, probed on each peer's Tailscale IPv4.
     public static let defaultPort = 48173
@@ -48,7 +48,7 @@ public struct HostHello: Codable, Sendable, Equatable {
         self.auth = auth
     }
 
-    /// True when this is a Fairspoken host (and not some other service on the port).
+    /// True when this is a Bark host (and not some other service on the port).
     public var isFairspokenHost: Bool { service == RemoteProtocol.helloService }
 }
 

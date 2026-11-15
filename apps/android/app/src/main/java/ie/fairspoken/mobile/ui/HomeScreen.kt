@@ -323,7 +323,7 @@ private fun TranscriptCard(result: LastResult, backdrop: Backdrop) {
             )
             PillButton(if (copied) "Copied" else "Copy") {
                 context.getSystemService(ClipboardManager::class.java)
-                    .setPrimaryClip(ClipData.newPlainText("Fairspoken", result.text))
+                    .setPrimaryClip(ClipData.newPlainText("Bark", result.text))
                 copied = true
             }
             Spacer(Modifier.width(8.dp))

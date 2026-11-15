@@ -2,11 +2,11 @@
 # Build the apps from the command line.
 #   scripts/build.sh                      # Debug, both apps
 #   scripts/build.sh release              # Release, both apps
-#   scripts/build.sh --app server         # Debug, Fairspoken Server only (client | server | all)
+#   scripts/build.sh --app server         # Debug, Bark Server only (client | server | all)
 #
 # Products (Debug shown; Release is the same under Release/):
-#   build/Build/Products/Debug/Fairspoken.app          ie.fairspoken.mac.dev     (scheme Fairspoken)
-#   build/Build/Products/Debug/Fairspoken Server.app   ie.fairspoken.server.dev  (scheme FairspokenServer)
+#   build/Build/Products/Debug/Bark.app                ie.fairspoken.mac.dev     (scheme Fairspoken)
+#   build/Build/Products/Debug/Bark Server.app         ie.fairspoken.server.dev  (scheme FairspokenServer)
 #
 # Anything else is passed to xcodebuild as build settings and overrides the xcconfigs
 # (Config/Local.xcconfig included):

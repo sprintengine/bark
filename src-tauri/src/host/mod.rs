@@ -136,7 +136,7 @@ pub fn run_transcription_host() -> Result<(), String> {
     }
     let update_options = UpdaterOptions::from_env(SERVER_VERSION)?;
     let server = bind_server(&addr)?;
-    println!("Fairspoken transcription host {SERVER_VERSION} listening on http://{addr}");
+    println!("Bark transcription host {SERVER_VERSION} listening on http://{addr}");
 
     for (model, resolved) in &model_links {
         println!("{model} installs from {} ({})", resolved.link, resolved.origin);
@@ -704,7 +704,7 @@ mod tests {
             "version": version,
             "channel": channel,
             "pub_date": "2026-10-05T12:00:00Z",
-            "notes": format!("https://github.com/sprintengine/speakeasy/releases/tag/v{version}"),
+            "notes": format!("https://github.com/sprintengine/bark/releases/tag/v{version}"),
             "platforms": { platform: asset },
         })
         .to_string()

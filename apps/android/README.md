@@ -1,6 +1,6 @@
-# Fairspoken for Android (prototype)
+# Bark for Android (prototype)
 
-Dictate into any app on the phone with your own Fairspoken transcription
+Dictate into any app on the phone with your own Bark transcription
 host, reached over Tailscale. Audio streams to the host while you speak
 (`POST /v1/transcriptions/stream`), so the text is back a moment after you
 stop.
@@ -61,7 +61,7 @@ answers there: use the tailnet address, or put the host behind HTTPS.
   WireGuard-encrypted. `HostClient` checks the address it actually connected
   to before sending anything, since `network_security_config.xml` can't name
   address ranges. Hosts behind `tailscale serve` HTTPS are tried first.
-- **The dock's microphone service** must be started from the Fairspoken
+- **The dock's microphone service** must be started from the Bark
   screen. Android refuses to start microphone services from the background,
   so the service does not restart itself.
 - **Sideloaded apps** need *App info › ⋮ › Allow restricted settings* before

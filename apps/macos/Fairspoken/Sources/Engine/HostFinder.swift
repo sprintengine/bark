@@ -3,7 +3,7 @@ import FairspokenCore
 import Observation
 import SystemConfiguration
 
-/// Settings › Transcription › Find my host: scans the tailnet for Fairspoken hosts (or probes
+/// Settings › Transcription › Find my host: scans the tailnet for Bark hosts (or probes
 /// a typed machine name), pairs with a password, and saves the result as the network device.
 @Observable
 final class HostFinder {

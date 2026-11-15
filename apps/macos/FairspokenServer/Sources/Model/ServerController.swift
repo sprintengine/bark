@@ -6,7 +6,7 @@ import FairspokenCore
 import Observation
 import OSLog
 
-/// Composition root of Fairspoken Server: owns the running `TranscriptionHost`, its
+/// Composition root of Bark Server: owns the running `TranscriptionHost`, its
 /// configuration file, and the render-ready `HostLiveState` the window shows. The window
 /// reads the host in-process (the same snapshot + event frames `/v1/events` sends, decoded
 /// by the same `HostEvent` / `HostLiveState` code the client uses), or the simulator in demo mode.
@@ -588,7 +588,7 @@ final class ServerController {
     /// Screenshot mode: a start that failed because another app holds the port (or back to serving).
     func presentSamplePortConflict(_ on: Bool) {
         guard presenting else { return }
-        let conflict = PortConflict(port: configuration.port, owner: "Fairspoken")
+        let conflict = PortConflict(port: configuration.port, owner: "Bark")
         portConflict = on ? conflict : nil
         runState = on ? .failed(conflict.message) : .running
     }

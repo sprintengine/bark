@@ -252,7 +252,7 @@ public struct StatusDot: View {
     }
 }
 
-/// Capsule chip. Glass where it floats over a backdrop (Fairspoken Server's window); `flat` on a
+/// Capsule chip. Glass where it floats over a backdrop (Bark Server's window); `flat` on a
 /// solid card, where glass would sit on an opaque surface.
 public struct Chip: View {
     var text: String
@@ -387,7 +387,7 @@ public enum Format {
     }
 }
 
-/// The Fairspoken mark ("the Settle"): a spoken wave settling into one straight line,
+/// The Bark mark ("the Settle"): a spoken wave settling into one straight line,
 /// stopped by the red caret. Paths from design/brand/logo/fairspoken-mark.svg (64-unit grid).
 public struct FairspokenMark: View {
     var size: CGFloat

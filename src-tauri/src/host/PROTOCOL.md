@@ -1,6 +1,6 @@
 # Transcription host protocol
 
-The contract between Fairspoken clients, the host dashboard and any host
+The contract between Bark clients, the host dashboard and any host
 implementation (this Rust host, the Swift host). JSON is UTF-8 and camelCase.
 Timestamps named `at` or `…Ms` with an epoch meaning are Unix epoch
 milliseconds; other `…Ms` fields are durations.
@@ -62,7 +62,7 @@ or `pairingPassword` in the host config file, the env var winning). Rules:
 
 ### GET /v1/hello (no auth)
 
-Identifies a Fairspoken host to a scanning client. Answers `200`:
+Identifies a Bark host to a scanning client. Answers `200`:
 
 ```jsonc
 {
@@ -126,7 +126,7 @@ peer with `Online: true` (skipping phones and TVs: `OS` `iOS`, `android`,
    `0.0.0.0` or its Tailscale address on the default port.
 
 Clients also probe `http://127.0.0.1:<port>/v1/hello` for hosts on the same
-computer, on the default port and (on macOS) on the port in Fairspoken
+computer, on the default port and (on macOS) on the port in Bark
 Server's `host-config.json`. These come first in the list and are probed even
 when Tailscale isn't installed or running. When the same host (same name and
 port) answers both on loopback and on this computer's Tailscale address, only

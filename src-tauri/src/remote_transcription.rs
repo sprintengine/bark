@@ -45,7 +45,7 @@ pub struct RemoteTranscriptionResponse {
 
 /// The remote endpoint a session talks to, resolved from the transcription
 /// location: `RemoteHost` uses the user's own URL and token; `Cloud` uses the
-/// Fairspoken Cloud URL (compile-time `FAIRSPOKEN_CLOUD_URL`, runtime override
+/// Bark Cloud URL (compile-time `FAIRSPOKEN_CLOUD_URL`, runtime override
 /// for dev builds; absent in builds without a cloud) and the multiauth token. The wire protocol is
 /// identical, so everything downstream of resolution is shared.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -58,7 +58,7 @@ pub struct RemoteTarget {
 impl RemoteTarget {
     fn display_name(&self) -> &'static str {
         if self.is_cloud {
-            "Fairspoken Cloud"
+            "Bark Cloud"
         } else {
             "Remote transcription host"
         }
@@ -598,7 +598,7 @@ fn transcription_headers(settings: &Settings, target: &RemoteTarget) -> Result<H
 }
 
 /// Super mode on a remote host costs this device nothing, so `auto` asks
-/// too and the host sheds it when busy. Fairspoken Cloud has no super mode.
+/// too and the host sheds it when busy. Bark Cloud has no super mode.
 fn wants_host_super_mode(settings: &Settings) -> bool {
     settings.transcription_location == crate::settings::TranscriptionLocation::RemoteHost
         && settings.super_mode != crate::settings::SuperModeSetting::Off
@@ -896,7 +896,7 @@ mod tests {
         assert!(target.is_cloud);
         assert_eq!(target.auth_token, "cloud-jwt");
         assert_ne!(target.base_url.host_str(), Some("host.example.com"));
-        assert_eq!(target.display_name(), "Fairspoken Cloud");
+        assert_eq!(target.display_name(), "Bark Cloud");
 
         // Builds without a cloud URL never offer Cloud; a stale setting fails
         // with guidance instead of panicking.
@@ -929,7 +929,7 @@ mod tests {
         assert!(exhausted.contains("switch to Local"));
 
         let backend_down = format_remote_error(&target, 502, "502 Bad Gateway", None);
-        assert!(backend_down.contains("Fairspoken Cloud"));
+        assert!(backend_down.contains("Bark Cloud"));
     }
 
     #[test]

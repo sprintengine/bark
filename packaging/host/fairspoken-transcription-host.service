@@ -1,4 +1,4 @@
-# Runs the Fairspoken transcription host as a systemd user service.
+# Runs the Bark transcription host as a systemd user service.
 # Install: see "Running the host on a Tailscale network" in README.md.
 #
 # Updates: the host updates itself in place (dashboard -> Updates, or
@@ -8,7 +8,7 @@
 # tells the host a service manager will restart it. The replaced binary is
 # kept as ~/.local/bin/transcription-host.previous for a manual rollback.
 [Unit]
-Description=Fairspoken transcription host
+Description=Bark transcription host
 Wants=network-online.target
 After=network-online.target
 

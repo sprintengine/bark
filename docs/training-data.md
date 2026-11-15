@@ -1,6 +1,6 @@
 # Training data capture and export
 
-Fairspoken can keep your dictations so you can later fine-tune a speech
+Bark can keep your dictations so you can later fine-tune a speech
 model or train a polish model on them. This is off by default. Turn it on in
 **Settings → General → Training data → Keep my dictations to improve models**.
 

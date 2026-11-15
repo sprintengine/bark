@@ -22,7 +22,7 @@ export type UpdateStatus = UpdateState & {
   lastCheckedAt: number | null;
 };
 
-export const APP_NAME = "Fairspoken";
+export const APP_NAME = "Bark";
 
 export type ButtonKind = "hidden" | "idle" | "checking" | "available" | "downloading" | "ready" | "error";
 export type ButtonAction = "check" | "install" | "restart" | null;
@@ -46,7 +46,7 @@ export function channelName(channel: Channel): string {
   return channel === "nightly" ? "Nightly" : "Stable";
 }
 
-/** "Fairspoken 0.3.0 (Nightly)", or "stable 0.3.0" when it moves a nightly back. */
+/** "Bark 0.3.0 (Nightly)", or "stable 0.3.0" when it moves a nightly back. */
 export function offerName(status: UpdateStatus & { version: string; switchToStable: boolean }): string {
   return status.switchToStable
     ? `stable ${status.version}`

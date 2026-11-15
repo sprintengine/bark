@@ -1,6 +1,6 @@
 # Installing models from your own server
 
-Fairspoken downloads its speech and text polish models from the internet the
+Bark downloads its speech and text polish models from the internet the
 first time they are used. If your network blocks that, put a zip of each model
 on a server your users can reach and give the app a link to it. The app
 downloads the zip, unpacks it and installs the model as if it had downloaded
@@ -20,7 +20,7 @@ It needs only `bash`, `curl` and `zip` (or `python3`), and works on macOS and
 Linux. The desktop app and the Mac apps run different model files, so they
 need different zips:
 
-| Model id | Model | `desktop` zip: Fairspoken for Windows, Linux and macOS, and `transcription-host` | `mac` zip: Fairspoken for Mac and Fairspoken Server |
+| Model id | Model | `desktop` zip: Bark for Windows, Linux and macOS, and `transcription-host` | `mac` zip: Bark for Mac and Bark Server |
 | --- | --- | --- | --- |
 | `parakeet-tdt-0.6b-v3` | Parakeet 0.6B v3 (the default) | Yes | Yes |
 | `parakeet-ultra` | Parakeet Ultra | Yes | Yes |
@@ -90,5 +90,5 @@ FAIRSPOKEN_MODEL_LINKS="parakeet-tdt-0.6b-v3=/srv/models/parakeet-v3.zip large-v
 ```
 
 The host prints each link it will use at startup, and refuses to start when a
-model id is unknown or a link is malformed, saying which. Fairspoken Server
+model id is unknown or a link is malformed, saying which. Bark Server
 reads `modelLinks` from its config file the same way, with the `mac` zips.

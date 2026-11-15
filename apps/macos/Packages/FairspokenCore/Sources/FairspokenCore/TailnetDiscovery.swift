@@ -1,6 +1,6 @@
 import Foundation
 
-// Finding Fairspoken hosts on the user's tailnet (PROTOCOL.md › Client discovery):
+// Finding Bark hosts on the user's tailnet (PROTOCOL.md › Client discovery):
 // `tailscale status --json` lists the machines, and each online one is probed for
 // `/v1/hello` on its MagicDNS name over HTTPS and plain HTTP (`tailscale serve`), and over plain HTTP
 // on its Tailscale IPv4.
@@ -140,7 +140,7 @@ public enum TailnetDiscoveryError: Error, Equatable, LocalizedError {
         case .invalidEntry(let entry):
             "“\(entry)” isn't a machine name, name:port or URL."
         case .noHostAnswered(let entry):
-            "No Fairspoken host answered at \(entry)."
+            "No Bark host answered at \(entry)."
         }
     }
 }
@@ -250,7 +250,7 @@ public struct TailnetDiscovery: Sendable {
         self.localPorts = localPorts
     }
 
-    /// Fairspoken Server's configured port (release and debug builds), then the default port.
+    /// Bark Server's configured port (release and debug builds), then the default port.
     public static func localHostPorts(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [Int] {
         let support = home.appendingPathComponent("Library/Application Support", isDirectory: true)
         let configured = ["ie.fairspoken.server", "ie.fairspoken.server.dev"].compactMap { bundleID -> Int? in
@@ -464,7 +464,7 @@ public struct TailnetDiscovery: Sendable {
         return host.split(separator: ".").first.map(String.init) ?? host
     }
 
-    /// `GET <base>/v1/hello` within `probeTimeout`; `nil` unless a Fairspoken host answered.
+    /// `GET <base>/v1/hello` within `probeTimeout`; `nil` unless a Bark host answered.
     public func hello(at base: URL) async -> HostHello? {
         let request = URLRequest(url: RemoteURLPolicy.endpoint(base, RemoteProtocol.helloPath),
                                  cachePolicy: .reloadIgnoringLocalCacheData,

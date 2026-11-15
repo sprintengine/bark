@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Fairspoken",
+  "productName": "Bark",
   "version": "../package.json",
   "identifier": "ie.fairspoken.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "Fairspoken",
+        "title": "Bark",
         "label": "main",
         "width": 76,
         "height": 24,
@@ -27,7 +27,7 @@
         "skipTaskbar": false
       },
       {
-        "title": "Fairspoken",
+        "title": "Bark",
         "label": "home",
         "url": "home.html",
         "width": 980,
@@ -53,7 +53,7 @@
         }
       },
       {
-        "title": "Fairspoken Transcript Shelf",
+        "title": "Bark Transcript Shelf",
         "label": "transcript-shelf",
         "url": "transcript-shelf.html",
         "width": 360,
@@ -71,7 +71,7 @@
         "visible": false
       },
       {
-        "title": "Welcome to Fairspoken",
+        "title": "Welcome to Bark",
         "label": "onboarding",
         "url": "onboarding.html",
         "width": 720,
@@ -131,7 +131,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUxNkI3NkVCNzUwRkEzRUUKUldUdW93OTE2M1pyVVpsUzFNSzFTOUQwZVdsWUZyS0IzTVVSNU12YWFxdWVHM2ZNTTVNYklVdlUK",
       "endpoints": [
-        "https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-stable.json"
+        "https://github.com/sprintengine/bark/releases/download/update-feeds/desktop-stable.json"
       ]
     }
   }

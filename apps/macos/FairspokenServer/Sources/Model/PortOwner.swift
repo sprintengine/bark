@@ -5,7 +5,7 @@ import Foundation
 /// The port the server wanted, and who holds it, when a start failed with "address in use".
 struct PortConflict: Equatable {
     var port: Int
-    /// The app or program listening there ("Fairspoken", "node"), if `lsof` could tell.
+    /// The app or program listening there ("Bark", "node"), if `lsof` could tell.
     var owner: String?
 
     var message: String {
@@ -22,7 +22,7 @@ enum PortOwner {
         let owners = parse(String(decoding: output.stdout, as: UTF8.self))
         let me = ProcessInfo.processInfo.processIdentifier
         guard let owner = owners.first(where: { $0.pid != me }) ?? owners.first else { return nil }
-        // An app's own name ("Fairspoken Server") reads better than its executable's.
+        // An app's own name ("Bark Server") reads better than its executable's.
         return NSRunningApplication(processIdentifier: owner.pid)?.localizedName ?? owner.command
     }
 
