@@ -158,11 +158,29 @@ struct SpeedTestTests {
                                       speakingSeconds: 4)
         #expect(rough.comparison.accuracy == 70)
         #expect(rough.gated)
+        #expect(rough.notKept == .roughTranscript)
         #expect(!SpeedTest.isKeepable(rough))
         // 8 of 10 is exactly on the gate, and passes.
         let ok = SpeedTest.outcome(passage: passage, typing: typing, transcript: "one two three four five six seven eight",
                                    speakingSeconds: 4)
         #expect(!ok.gated)
+    }
+
+    @Test func unfairTypingIsShownButNotKept() {
+        let passage = "one two three"
+        let sloppy = SpeedTest.outcome(passage: passage, typing: .init(seconds: 20, wpm: 30, accuracy: 79),
+                                       transcript: passage, speakingSeconds: 4)
+        #expect(!sloppy.gated)
+        #expect(sloppy.notKept == .inaccurateTyping)
+        #expect(!SpeedTest.isKeepable(sloppy))
+        // Walking away mid-passage isn't typing speed.
+        let paused = SpeedTest.outcome(passage: passage, typing: .init(seconds: 90, wpm: 10, accuracy: 100, longestPause: 60),
+                                       transcript: passage, speakingSeconds: 4)
+        #expect(paused.notKept == .typingPaused)
+        let fair = SpeedTest.outcome(passage: passage, typing: .init(seconds: 20, wpm: 30, accuracy: 80, longestPause: 15),
+                                     transcript: passage, speakingSeconds: 4)
+        #expect(fair.notKept == nil)
+        #expect(SpeedTest.typingResult(typed: "abc", passage: "abc", seconds: 3, longestPause: 2).longestPause == 2)
     }
 
     @Test func noSpeakingTimeIsNoMultiplier() {

@@ -47,6 +47,14 @@ final class HistoryStore {
         save()
     }
 
+    /// Back to the typical typing speed (`UsageStats.typingWPM`).
+    func clearMeasuredTypingWPM() {
+        usage.measuredTypingWpm = nil
+        // Not modelled when nil, so the merge would otherwise keep the old value.
+        usageRaw["measuredTypingWpm"] = nil
+        save()
+    }
+
     /// Screenshots: no measured typing speed (the assumed one), or a sample one. Never saved.
     func showcaseTypingWPM(_ wpm: Double?) {
         guard !persists else { return }

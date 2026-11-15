@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Bark,Bark Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (239), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
+scripts/test.sh                       # unit tests: FairspokenCore (240), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Bark → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Bark Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Bark-<version>-macos-arm64.{zip,dmg}
@@ -533,13 +533,14 @@ retake). Typing is timed from the first key; net words per minute count five cha
 skipped space is one mistake rather than a run of them (`SpeedTest` in FairspokenCore). Pasting and
 every automatic text change are off in the field. The reading is a *measured* recording: the
 dictation's own capture, gate and transcription session with the model in use (`DictationController`'s
-`measure`, armed only on the speaking step and only for a recording started with Bark in front), and
-nothing else. It is never inserted or copied, never written to `Pending Dictations/`, history, lifetime
+`measure`, armed only on the speaking step and only for a recording started in the test's own sheet),
+and nothing else. It is never inserted or copied, never written to `Pending Dictations/`, history, lifetime
 stats or the post-training folder, and the edit watcher never sees it. The transcript is aligned word by
 word against the passage (`TranscriptComparison`); below 80% the run is shown as too rough and not
-kept. A kept run goes to `speed-test.json` (the desktop app's file, imported once) and its typing speed
-to `measuredTypingWpm` in `usage-stats.json`, so Home's "Typing would take" and "Time saved" count your
-own speed rather than the assumed 40 wpm.
+kept, and so is one typed under 80% accurately or with a pause of over 15 s. A kept run goes to
+`speed-test.json` (the desktop app's file, imported once). Its typing speed is offered for time saved:
+chosen, it goes to `measuredTypingWpm` in `usage-stats.json`, so Home's "Typing would take" and "Time
+saved" count your own speed rather than the assumed 40 wpm (Home's card goes back to 40).
 
 ## Screenshots
 

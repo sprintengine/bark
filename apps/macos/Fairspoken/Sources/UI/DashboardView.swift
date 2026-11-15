@@ -30,6 +30,11 @@ struct DashboardView: View {
         .screenshotActive()
         .frame(minWidth: 960, minHeight: 640)
         .onAppear { if model.settings.settings.transcriptionLocation == .remoteHost { model.hostStatus.refresh() } }
+        // On the dashboard rather than Home, so moving to another section never drops the test
+        // without ending it.
+        .sheet(isPresented: Binding(get: { model.speedTest.isPresented }, set: { model.speedTest.isPresented = $0 })) {
+            SpeedTestSheet().environment(model)
+        }
     }
 
     @ViewBuilder private var detail: some View {

@@ -40,9 +40,6 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
-        .sheet(isPresented: Binding(get: { model.speedTest.isPresented }, set: { model.speedTest.isPresented = $0 })) {
-            SpeedTestSheet().environment(model)
-        }
     }
 }
 

@@ -1,3 +1,4 @@
+import AppKit
 import FairspokenCore
 import FairspokenUI
 import SwiftUI
@@ -27,6 +28,8 @@ struct SpeedTestSheet: View {
         }
         .frame(width: Self.size.width, height: Self.size.height)
         .background(Crystal.canvas)
+        // Names the sheet's window: only a recording started here is measured.
+        .background(WindowIdentifier(DictationController.measuredWindow))
         .screenshotActive()
     }
 
@@ -74,6 +77,28 @@ private struct StepDots: View {
 }
 
 // MARK: - Shared pieces
+
+/// Gives the window this view is in an identifier.
+private struct WindowIdentifier: NSViewRepresentable {
+    var identifier: NSUserInterfaceItemIdentifier
+    init(_ identifier: NSUserInterfaceItemIdentifier) { self.identifier = identifier }
+
+    func makeNSView(context: Context) -> NSView { Marker(identifier: identifier) }
+    func updateNSView(_ view: NSView, context: Context) {}
+
+    private final class Marker: NSView {
+        let mark: NSUserInterfaceItemIdentifier
+        init(identifier: NSUserInterfaceItemIdentifier) {
+            mark = identifier
+            super.init(frame: .zero)
+        }
+        required init?(coder: NSCoder) { fatalError("not used") }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.identifier = mark
+        }
+    }
+}
 
 enum SpeedTestFormat {
     /// "1:48".
@@ -359,11 +384,11 @@ private struct ResultsStep: View {
                     VStack(alignment: .leading, spacing: 16) {
                         if outcome.gated {
                             gatedHeadline(outcome)
-                            if test.showsGatedTimes { comparison(outcome, kept: false) }
+                            if test.showsGatedTimes { comparison(outcome) }
                             HeardComparison(comparison: outcome.comparison)
                         } else {
                             headline(outcome)
-                            comparison(outcome, kept: true)
+                            comparison(outcome)
                             notes(outcome)
                             DisclosureGroup(isExpanded: $showsHeard) {
                                 HeardComparison(comparison: outcome.comparison).padding(.top, 8)
@@ -405,7 +430,7 @@ private struct ResultsStep: View {
                 Text("You spoke \(Text(SpeedTestFormat.multiplier(o.multiplier)).foregroundStyle(Crystal.clientAccent)) \(o.multiplier >= 1 ? "faster than you typed" : "as fast as you typed")")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(Crystal.ink)
-                if test.isNewBest {
+                if test.isNewBest && SpeedTest.isKeepable(o) {
                     Text("New best").font(.system(size: 11, weight: .semibold)).foregroundStyle(Crystal.onAccent)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Crystal.clientAccent, in: .capsule)
@@ -432,7 +457,7 @@ private struct ResultsStep: View {
     }
 
     /// Typed beside spoken: the time each took, the pace, the accuracy, then the times as bars.
-    private func comparison(_ o: SpeedTest.Outcome, kept: Bool) -> some View {
+    private func comparison(_ o: SpeedTest.Outcome) -> some View {
         Card(padding: 0) {
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
@@ -446,8 +471,8 @@ private struct ResultsStep: View {
                 Rectangle().fill(Crystal.hairline).frame(height: 1)
                 TimeBars(typed: o.typing.seconds, spoken: o.speakingSeconds)
                     .padding(16)
-                if !kept {
-                    Text("Not kept: the transcript was too rough to count.")
+                if let reason = o.notKept {
+                    Text(Self.notKeptText(reason, o))
                         .font(TypeScale.micro).foregroundStyle(Crystal.ink3)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 16).padding(.bottom, 12)
@@ -456,11 +481,35 @@ private struct ResultsStep: View {
         }
     }
 
+    static func notKeptText(_ reason: SpeedTest.NotKept, _ o: SpeedTest.Outcome) -> String {
+        switch reason {
+        case .roughTranscript: "Not kept: the transcript was too rough to count."
+        case .inaccurateTyping: "Not kept: under \(SpeedTest.typingAccuracyGate)% of the typing was accurate."
+        case .typingPaused: "Not kept: the typing stopped for \(Int(o.typing.longestPause.rounded())) s, so its time isn't your typing speed."
+        case .unmeasured: "Not kept: a leg had no time."
+        }
+    }
+
+    /// Whether Home's time saved should use this typing speed (the user's choice), and how the
+    /// reading was transcribed.
     private func notes(_ o: SpeedTest.Outcome) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label("Time saved on Home now counts typing at \(o.typing.wpm) wpm, your speed.", systemImage: "house")
+        VStack(alignment: .leading, spacing: 6) {
+            if SpeedTest.isKeepable(o) {
+                if test.typingSpeedAdopted || test.typingSpeedInUse == o.typing.wpm {
+                    Label("Time saved on Home counts typing at \(o.typing.wpm) wpm, your speed.", systemImage: "checkmark.circle")
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "house")
+                        LinkButton("Use \(o.typing.wpm) wpm for time saved on Home") { test.adoptTypingSpeed() }
+                        Text("now \(test.typingSpeedInUse.map { "\($0) wpm, an earlier test" } ?? "\(Int(UsageStats.typingWPM)) wpm, a typical pace")")
+                            .foregroundStyle(Crystal.ink3)
+                    }
+                }
+            }
             if let m = test.measured {
-                Label("Transcribed in \(Format.ms(Double(m.transcribeMs))) by \(m.placement == .remoteHost ? "your host" : SpeedTestFormat.modelName(m.model)). Nothing was inserted or kept.",
+                Label(m.placement == .remoteHost
+                      ? "Transcribed in \(Format.ms(Double(m.transcribeMs))) by your transcription host. Nothing was inserted or kept on this Mac."
+                      : "Transcribed in \(Format.ms(Double(m.transcribeMs))) by \(SpeedTestFormat.modelName(m.model)) on this Mac. Nothing was inserted or kept.",
                       systemImage: "waveform")
             }
         }

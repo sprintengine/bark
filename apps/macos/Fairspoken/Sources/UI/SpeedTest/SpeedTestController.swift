@@ -20,6 +20,9 @@ final class SpeedTestController {
     private(set) var typed = ""
     /// When the first key was typed (system uptime: a clock that never jumps).
     private(set) var typingStartedAt: TimeInterval?
+    /// The last key, and the longest gap between two keys so far.
+    @ObservationIgnored private var lastKeyAt: TimeInterval?
+    @ObservationIgnored private var longestPause: Double = 0
     private(set) var typing: SpeedTest.TypingResult?
     /// Set when a paste was refused, to say why.
     private(set) var pasteRefused = false
@@ -31,6 +34,8 @@ final class SpeedTestController {
     /// A gated run whose times the user asked to see anyway (still not kept).
     private(set) var showsGatedTimes = false
     private(set) var isNewBest = false
+    /// The user chose this run's typing speed for time saved on Home.
+    private(set) var typingSpeedAdopted = false
     private(set) var summary: SpeedTest.Summary
 
     @ObservationIgnored private let dictation: DictationController
@@ -77,9 +82,13 @@ final class SpeedTestController {
         guard step == .typing, typing == nil else { return }
         let clipped = String(text.prefix(passage.count))
         typed = clipped
-        if typingStartedAt == nil, !clipped.isEmpty { typingStartedAt = Self.now }
+        let now = Self.now
+        if typingStartedAt == nil, !clipped.isEmpty { typingStartedAt = now }
+        if let last = lastKeyAt { longestPause = max(longestPause, now - last) }
+        lastKeyAt = now
         if SpeedTest.analyzeTyping(clipped, passage: passage).reachedEnd {
-            typing = SpeedTest.typingResult(typed: clipped, passage: passage, seconds: typingSeconds())
+            typing = SpeedTest.typingResult(typed: clipped, passage: passage, seconds: typingSeconds(at: now),
+                                            longestPause: longestPause)
             goToSpeaking()
         }
     }
@@ -157,6 +166,8 @@ final class SpeedTestController {
     private func resetTyping() {
         typed = ""
         typingStartedAt = nil
+        lastKeyAt = nil
+        longestPause = 0
         typing = nil
         pasteRefused = false
         speakingError = nil
@@ -164,15 +175,30 @@ final class SpeedTestController {
         measured = nil
         showsGatedTimes = false
         isNewBest = false
+        typingSpeedAdopted = false
     }
 
     // MARK: Keeping results
 
     private func keep(_ outcome: SpeedTest.Outcome) {
         isNewBest = summary.record(SpeedTest.Record(outcome, at: Date()))
-        // Time saved on Home is counted against this typing speed from now on.
-        history.setMeasuredTypingWPM(outcome.typing.wpm)
         save()
+    }
+
+    /// The typing speed time saved on Home counts against: the measured one, or nil for the
+    /// typical pace.
+    var typingSpeedInUse: Int? { history.usage.measuredTypingWpm.map { Int($0.rounded()) } }
+
+    /// The user's choice: count time saved on Home against this run's typing speed.
+    func adoptTypingSpeed() {
+        guard let outcome, SpeedTest.isKeepable(outcome) else { return }
+        history.setMeasuredTypingWPM(outcome.typing.wpm)
+        typingSpeedAdopted = true
+    }
+
+    /// Back to the typical typing speed for time saved.
+    func useTypicalTypingSpeed() {
+        history.clearMeasuredTypingWPM()
     }
 
     private func save() {

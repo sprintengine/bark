@@ -95,10 +95,12 @@ final class DictationController {
     /// Which of this app's windows the recording is for (Home, the setup guide), or nil when it
     /// is for another app.
     @ObservationIgnored private(set) var startedInWindow: NSUserInterfaceItemIdentifier?
-    /// While set, a recording started with this app frontmost (the shortcut, Fn or a button) is
-    /// measured rather than delivered, and its outcome comes here (the speed test's speaking step).
-    /// A recording started from another app is an ordinary dictation.
+    /// While set, a recording started in the speed test's own window (`measuredWindow`: the
+    /// shortcut, Fn or its button) is measured rather than delivered, and its outcome comes here.
+    /// A recording started anywhere else (another app, the setup guide) is an ordinary dictation.
     @ObservationIgnored var measure: ((MeasuredOutcome) -> Void)?
+    static let measuredWindow = NSUserInterfaceItemIdentifier("speed-test")
+    @ObservationIgnored private var measuredTask: Task<Void, Never>?
     /// The current recording is a measured one.
     private(set) var isMeasuring = false
     @ObservationIgnored private var measuredHandler: ((MeasuredOutcome) -> Void)?
@@ -199,7 +201,7 @@ final class DictationController {
         let front = NSWorkspace.shared.frontmostApplication
         targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
         startedInWindow = targetApp == nil ? NSApp.keyWindow?.identifier : nil
-        if targetApp == nil, let measure {
+        if targetApp == nil, startedInWindow == Self.measuredWindow, let measure {
             startMeasured(session: newSession, settings: s, trigger: trigger, handler: measure)
             return
         }
@@ -239,6 +241,8 @@ final class DictationController {
         if let handler = measuredHandler {
             measuredHandler = nil
             measuredRun += 1
+            measuredTask?.cancel()
+            measuredTask = nil
             isMeasuring = false
             handler(.cancelled)
         }
@@ -346,8 +350,8 @@ final class DictationController {
                 newSession.append(chunk)
             }
         } catch {
+            // The test says what went wrong; no pill as well.
             newSession.cancel()
-            fail("Couldn't start the microphone: \(error.localizedDescription)")
             handler(.failed("Couldn't start the microphone: \(error.localizedDescription)"))
             return
         }
@@ -393,10 +397,12 @@ final class DictationController {
         transcribingNote = nil
         let placement = self.placement
         let run = measuredRun
-        Task { [weak self] in
+        measuredTask = Task { [weak self] in
             let result: Swift.Result<TranscriptionOutput, Error>
             do {
                 if placement == .neuralEngine { try await self?.waitForEngine() }
+                // Cancelled while the model loaded: never start decoding.
+                guard !Task.isCancelled, self?.measuredRun == run else { return }
                 result = .success(try await session.finish(allSamples: samples))
             } catch {
                 session.cancel()
@@ -404,6 +410,7 @@ final class DictationController {
             }
             // Cancelled while it was transcribing: the test has moved on.
             guard let self, self.measuredRun == run, self.measuredHandler != nil else { return }
+            self.measuredTask = nil
             self.session = nil
             self.measuredHandler = nil
             self.isMeasuring = false

@@ -10,6 +10,10 @@ public enum SpeedTest {
     public static let charactersPerWord = 5.0
     /// Below this transcript accuracy (percent), the spoken leg is too rough to count as a win.
     public static let accuracyGate = 80
+    /// Below this typing accuracy (percent), the typing leg isn't a fair measure of typing speed.
+    public static let typingAccuracyGate = 80
+    /// A longer pause between keys means the typing was interrupted, so its time isn't typing speed.
+    public static let typingPauseLimit = 15.0
 
     // MARK: Typing
 
@@ -82,18 +86,22 @@ public enum SpeedTest {
         public var seconds: Double
         public var wpm: Int
         public var accuracy: Int
-        public init(seconds: Double, wpm: Int, accuracy: Int) {
+        /// The longest gap between two keys.
+        public var longestPause: Double
+        public init(seconds: Double, wpm: Int, accuracy: Int, longestPause: Double = 0) {
             self.seconds = seconds
             self.wpm = wpm
             self.accuracy = accuracy
+            self.longestPause = longestPause
         }
     }
 
-    /// The result of typing `typed` against `passage` in `seconds`.
-    public static func typingResult(typed: String, passage: String, seconds: Double) -> TypingResult {
+    /// The result of typing `typed` against `passage` in `seconds`, with `longestPause` the longest
+    /// gap between keys.
+    public static func typingResult(typed: String, passage: String, seconds: Double, longestPause: Double = 0) -> TypingResult {
         let analysis = analyzeTyping(typed, passage: passage)
         return TypingResult(seconds: seconds, wpm: netWPM(correctCharacters: analysis.correctCharacters, seconds: seconds),
-                            accuracy: accuracyPercent(typed: typed.count, errors: analysis.errors))
+                            accuracy: accuracyPercent(typed: typed.count, errors: analysis.errors), longestPause: longestPause)
     }
 
     // MARK: Speaking
@@ -118,6 +126,15 @@ public enum SpeedTest {
 
         /// The transcript was too rough to call the run a win.
         public var gated: Bool { comparison.accuracy < SpeedTest.accuracyGate }
+
+        /// Why the run can't be kept (as the last or best result, or as the typing speed), or nil.
+        public var notKept: NotKept? {
+            if gated { return .roughTranscript }
+            if typing.accuracy < SpeedTest.typingAccuracyGate { return .inaccurateTyping }
+            if typing.longestPause > SpeedTest.typingPauseLimit { return .typingPaused }
+            if multiplier <= 0 || typing.seconds <= 0 { return .unmeasured }
+            return nil
+        }
         /// How much less time speaking took (never negative).
         public var secondsSaved: Double { max(0, typing.seconds - speakingSeconds) }
     }
@@ -210,10 +227,20 @@ public enum SpeedTest {
         }
     }
 
-    /// Only a run whose transcript passed the gate, and that has both times, is kept.
-    public static func isKeepable(_ outcome: Outcome) -> Bool {
-        !outcome.gated && outcome.multiplier > 0 && outcome.typing.seconds > 0
+    public enum NotKept: Equatable, Sendable {
+        /// The transcript is under `accuracyGate`.
+        case roughTranscript
+        /// The typing is under `typingAccuracyGate`.
+        case inaccurateTyping
+        /// The typing stopped for longer than `typingPauseLimit`.
+        case typingPaused
+        /// A leg has no time.
+        case unmeasured
     }
+
+    /// Only a fair run is kept: a transcript that passed the gate, typing accurate and without a
+    /// long pause, and both times measured.
+    public static func isKeepable(_ outcome: Outcome) -> Bool { outcome.notKept == nil }
 
     // MARK: Passages
 

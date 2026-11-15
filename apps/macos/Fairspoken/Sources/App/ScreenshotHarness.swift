@@ -240,7 +240,8 @@ final class ScreenshotHarness {
         await shootSheet("2-speak-transcribing")
         model.dictation.showcase(.idle)
 
-        // 3 Results: a clean run (one word heard differently), a new best.
+        // 3 Results: a clean run (one word heard differently), a new best, its typing speed not yet chosen for Home.
+        model.history.showcaseTypingWPM(nil)
         let clean = passage.replacingOccurrences(of: "notebook he had", with: "notebook he'd")
         test.showcaseResults(passage: passage, typing: typing, transcript: clean, speakingSeconds: 32.6, newBest: true)
         await shootSheet("3-results")
