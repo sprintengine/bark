@@ -47,12 +47,12 @@ if let cropArg {
     image = cut
 }
 
-// The backdrop: the app's sage accent, soft in the light theme and deep in the dark one.
+// The backdrop: the app's own, teal into lavender, soft in the light theme and deep in the dark one.
 let colors: [CGColor] = dark
-    ? [CGColor(srgbRed: 0x25 / 255, green: 0x55 / 255, blue: 0x40 / 255, alpha: 1),
-       CGColor(srgbRed: 0x0E / 255, green: 0x26 / 255, blue: 0x1B / 255, alpha: 1)]
-    : [CGColor(srgbRed: 0xDC / 255, green: 0xEE / 255, blue: 0xE3 / 255, alpha: 1),
-       CGColor(srgbRed: 0xA6 / 255, green: 0xD2 / 255, blue: 0xBA / 255, alpha: 1)]
+    ? [CGColor(srgbRed: 0x1D / 255, green: 0x4A / 255, blue: 0x4B / 255, alpha: 1),
+       CGColor(srgbRed: 0x1C / 255, green: 0x1A / 255, blue: 0x33 / 255, alpha: 1)]
+    : [CGColor(srgbRed: 0xCF / 255, green: 0xE9 / 255, blue: 0xE8 / 255, alpha: 1),
+       CGColor(srgbRed: 0xDA / 255, green: 0xD8 / 255, blue: 0xF2 / 255, alpha: 1)]
 
 let w = CGFloat(image.width), h = CGFloat(image.height)
 let pad = padArg.flatMap { Double($0) }.map { CGFloat($0) } ?? (max(w, h) * 0.07).rounded()
