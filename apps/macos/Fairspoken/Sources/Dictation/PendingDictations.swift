@@ -99,14 +99,17 @@ final class PendingDictations {
     /// A dictation was delivered: with post-training capture on, its recording moves from here to
     /// the post-training folder (or, if it never reached the disk, `samples` are written there).
     /// Call before the pending entry is removed.
-    func keepForTraining(_ id: String, samples: [Float]?, rawText: String, finalText: String, model: String, appBundleID: String?) {
-        guard let training, training.isCapturing else { return }
+    /// Returns the kept recording's id, for the edit watcher to attach the user's edit to.
+    @discardableResult
+    func keepForTraining(_ id: String, samples: [Float]?, rawText: String, finalText: String, model: String, appBundleID: String?) -> String? {
+        guard let training, training.isCapturing else { return nil }
         let duration = WAVFile.durationSeconds(store.audioURL(id))
         if let duration, let file = store.handOff(id) {
-            training.keep(.file(file, durationSeconds: duration), rawText: rawText, finalText: finalText, model: model, appBundleID: appBundleID)
+            return training.keep(.file(file, durationSeconds: duration), rawText: rawText, finalText: finalText, model: model, appBundleID: appBundleID)
         } else if let samples {
-            training.keep(.samples(samples), rawText: rawText, finalText: finalText, model: model, appBundleID: appBundleID)
+            return training.keep(.samples(samples), rawText: rawText, finalText: finalText, model: model, appBundleID: appBundleID)
         }
+        return nil
     }
 
     // MARK: Retrying
@@ -172,7 +175,9 @@ final class PendingDictations {
     /// False when post-processing left no words, so nothing was delivered.
     private func deliver(_ output: TranscriptionOutput, for item: PendingDictation, copy: Bool) async -> Bool {
         let s = settings.settings
-        let text = await BasicPostProcessor().process(output.text, context: PostProcessContext(appBundleID: item.appBundleId, vocabulary: s.vocabularyHints))
+        let text = await BasicPostProcessor().process(output.text, context: PostProcessContext(
+            appBundleID: item.appBundleId, vocabulary: s.vocabularyHints,
+            corrections: s.postProcess ? s.transcriptCorrections : [], speechModel: s.speechModelID))
         guard !text.isEmpty else { return false }
         if copy { TextInserter.copy(text) }
         keepForTraining(item.id, samples: nil, rawText: output.text, finalText: text, model: output.model, appBundleID: item.appBundleId)

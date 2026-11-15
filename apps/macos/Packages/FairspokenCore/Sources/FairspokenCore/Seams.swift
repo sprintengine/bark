@@ -52,18 +52,25 @@ public protocol TranscriptPostProcessor: Sendable {
 public struct PostProcessContext: Sendable {
     public var appBundleID: String?
     public var vocabulary: [String]
-    public init(appBundleID: String?, vocabulary: [String]) {
+    /// The user's corrections, manual and learned.
+    public var corrections: [TranscriptCorrection]
+    /// `AppSettings.speechModelID` of the model that heard it, for scoped corrections.
+    public var speechModel: String
+    public init(appBundleID: String?, vocabulary: [String], corrections: [TranscriptCorrection] = [], speechModel: String = "") {
         self.appBundleID = appBundleID
         self.vocabulary = vocabulary
+        self.corrections = corrections
+        self.speechModel = speechModel
     }
 }
 
-/// Phase 0 behaviour: trim, then restore the user's casing for vocabulary terms.
-/// Phase 1 chains tidy, corrections/snippets and polish in front of this.
+/// Trim, restore the user's casing for vocabulary terms, then apply the user's corrections
+/// (`TranscriptCorrections`). Tidy, snippets and polish are still to come.
 public struct BasicPostProcessor: TranscriptPostProcessor {
     public init() {}
     public func process(_ text: String, context: PostProcessContext) async -> String {
-        VocabularyCasing.apply(text.trimmingCharacters(in: .whitespacesAndNewlines), vocabulary: context.vocabulary)
+        let cased = VocabularyCasing.apply(text.trimmingCharacters(in: .whitespacesAndNewlines), vocabulary: context.vocabulary)
+        return TranscriptCorrections.apply(cased, corrections: context.corrections, speechModel: context.speechModel)
     }
 }
 

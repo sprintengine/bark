@@ -91,6 +91,8 @@ final class DictationController {
     private let permissions: Permissions
     private let pending: PendingDictations
     @ObservationIgnored var hotkeys: HotkeyController?
+    /// Learns from the user fixing a dictation in place (`learnFromEdits`).
+    @ObservationIgnored var editWatcher: EditWatcher?
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "dictation")
 
     var meter: LevelMeter { capture.meter }
@@ -129,6 +131,8 @@ final class DictationController {
 
     func start(_ trigger: Trigger) {
         guard !phase.isActive else { return }
+        // The next dictation may land in the field the last one is being watched in.
+        editWatcher?.flush()
         onWillStart?()
         permissions.refresh()
         switch permissions.microphone {
@@ -167,6 +171,7 @@ final class DictationController {
         let front = NSWorkspace.shared.frontmostApplication
         targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
         startedInWindow = targetApp == nil ? NSApp.keyWindow?.identifier : nil
+        editWatcher?.prime(targetApp)
         let now = Date()
         let item = PendingDictation(id: "dictation-\(Int64(now.timeIntervalSince1970 * 1000))", createdAt: now,
                                     appName: targetApp?.localizedName, appBundleId: targetApp?.bundleIdentifier)
@@ -242,6 +247,8 @@ final class DictationController {
         let item = kept.item
         let target = targetApp
         let placement = self.placement
+        // The field the dictation goes into, read while the speech is transcribed.
+        let fieldRead = editWatcher?.prepare(for: target)
         // After the live attempt: the whole recording to the host again, then this Mac.
         let routes = placement == .remoteHost ? pending.routes(for: s) : TranscriptionRoutes()
         let recovery = pending.recovery
@@ -252,9 +259,10 @@ final class DictationController {
             Task { @MainActor [weak self] in self?.show(progress) }
         }
         let deliver: @Sendable (TranscriptionOutput) async -> Bool = { [weak self] output in
+            // A retry lands many seconds later, when the field read at release may be out of date.
             await self?.complete(output, item: item, target: target, samples: samples, settings: s,
                                  durationSeconds: stats.durationSeconds, released: released,
-                                 retried: retried.isSet) ?? false
+                                 retried: retried.isSet, fieldRead: retried.isSet ? nil : fieldRead) ?? false
         }
         let live: @Sendable () async throws -> TranscriptionOutput = { [weak self] in
             do {
@@ -288,12 +296,16 @@ final class DictationController {
     /// The transcript is in: post-process, deliver, record in history (and for post-training),
     /// show the result. False when post-processing left no words, so nothing was delivered.
     private func complete(_ output: TranscriptionOutput, item: PendingDictation, target: NSRunningApplication?, samples: [Float],
-                          settings s: AppSettings, durationSeconds: Double, released: ContinuousClock.Instant, retried: Bool) async -> Bool {
+                          settings s: AppSettings, durationSeconds: Double, released: ContinuousClock.Instant, retried: Bool,
+                          fieldRead: Task<EditWatcher.FieldRead?, Never>?) async -> Bool {
         let transcribed = ContinuousClock.now
         transcribingNote = nil
         let text = await postProcessor.process(
-            output.text, context: PostProcessContext(appBundleID: item.appBundleId, vocabulary: s.vocabularyHints))
+            output.text, context: PostProcessContext(appBundleID: item.appBundleId, vocabulary: s.vocabularyHints,
+                                                     corrections: s.postProcess ? s.transcriptCorrections : [],
+                                                     speechModel: s.speechModelID))
         guard !text.isEmpty else { return false }
+        let pasteStarted = ContinuousClock.now
         let delivery = await deliver(text, settings: s, target: target, retried: retried)
         let total = Int((ContinuousClock.now - released) / .milliseconds(1))
         let transcribeMs = Int((transcribed - released) / .milliseconds(1))
@@ -306,8 +318,13 @@ final class DictationController {
             model: output.model, appName: item.appName, appBundleId: item.appBundleId)
         history.add(entry)
         // The recording already on disk moves to the post-training folder; nothing is written twice.
-        pending.keepForTraining(item.id, samples: samples, rawText: output.text, finalText: text, model: output.model,
-                                appBundleID: item.appBundleId)
+        let captureID = pending.keepForTraining(item.id, samples: samples, rawText: output.text, finalText: text, model: output.model,
+                                                appBundleID: item.appBundleId)
+        if case .pasted = delivery, let fieldRead, let editWatcher {
+            let dictation = EditWatcher.Dictation(inserted: text, raw: output.text, speechModel: s.speechModelID, captureID: captureID)
+            // Apart, so a read still running never holds up the result.
+            Task { editWatcher.arm(await fieldRead.value, insertedAfter: pasteStarted, dictation: dictation) }
+        }
         let result = Result(text: text, words: WordCounter.count(text), delivery: delivery, latencyMs: total, placement: output.placement)
         if delivery == .shownInApp { lastInAppResult = result }
         phase = .done(result)

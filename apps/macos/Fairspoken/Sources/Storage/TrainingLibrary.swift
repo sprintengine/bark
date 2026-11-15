@@ -75,12 +75,13 @@ final class TrainingLibrary {
         case file(URL, durationSeconds: Double)
     }
 
-    /// Keeps one dictation when capture is on. Never delays delivery: the WAV is written (or
-    /// moved) later. A file that can't be kept is deleted: it was only on its way here.
-    func keep(_ audio: Audio, rawText: String, finalText: String, model: String, appBundleID: String?) {
+    /// Keeps one dictation when capture is on, and returns its id. Never delays delivery: the WAV
+    /// is written (or moved) later. A file that can't be kept is deleted: it was only on its way here.
+    @discardableResult
+    func keep(_ audio: Audio, rawText: String, finalText: String, model: String, appBundleID: String?) -> String? {
         guard isCapturing else {
             if case .file(let url, _) = audio { try? FileManager.default.removeItem(at: url) }
-            return
+            return nil
         }
         let duration: Double = switch audio {
         case .samples(let samples): Double(samples.count) / TrainingDataStore.sampleRate
@@ -113,6 +114,20 @@ final class TrainingLibrary {
                     self.isAvailable = store.isAvailable
                     self.lastError = error.localizedDescription
                 }
+            }
+        }
+        return entry.id
+    }
+
+    /// Records the user's edit of a kept dictation (the edit watcher saw it), if it is still kept.
+    func attachEdit(_ id: String, edited: String) {
+        guard persists else { return }
+        let store = store()
+        queue.async { [weak self] in
+            guard (try? store.attachEdit(id, edited: edited)) == true else { return }
+            DispatchQueue.main.async {
+                guard let self, store.root == self.folder, let index = self.entries.firstIndex(where: { $0.id == id }) else { return }
+                self.entries[index].editedText = edited.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
     }

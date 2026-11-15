@@ -1,6 +1,7 @@
 import FairspokenSpeech
 import FairspokenWhisper
 import AVFoundation
+import AppKit
 import Foundation
 import FairspokenCore
 
@@ -26,6 +27,14 @@ enum SelfTest {
             let password = args.firstIndex(of: "--password").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
             Task {
                 await discover(entry: entry, password: password)
+                exit(0)
+            }
+            return true
+        }
+        if let i = args.firstIndex(of: "--ax-probe") {
+            let delay = i + 1 < args.count ? Int(args[i + 1]) ?? 5 : 5
+            Task {
+                await axProbe(after: delay)
                 exit(0)
             }
             return true
@@ -69,6 +78,37 @@ enum SelfTest {
             say("FAIL: \(error.localizedDescription)")
         }
         say("took \((ContinuousClock.now - t) / .milliseconds(1)) ms, client name “\(HostFinder.computerName)”")
+    }
+
+    /// `--ax-probe [seconds]`: waits, then says whether the edit watcher could read the focused
+    /// field of the app in front, before and after asking a Chromium-based app for its
+    /// accessibility tree. Prints lengths and offsets only, never the text.
+    private static func axProbe(after seconds: Int) async {
+        say("Accessibility trusted: \(AXIsProcessTrusted())")
+        say("Focus a text field in the app to check; reading in \(seconds) s…")
+        try? await Task.sleep(for: .seconds(seconds))
+        guard let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier else {
+            say("FAIL: no frontmost app")
+            return
+        }
+        let pid = app.processIdentifier
+        let chromium = FieldReader.isChromiumBased(bundleURL: app.bundleURL, bundleID: bundleID)
+        say("app: \(bundleID) (Chromium-based: \(chromium))")
+        func describe(_ label: String) async {
+            let read = await FieldReader.withTimeout(.seconds(2)) { FieldReader.snapshot(pid: pid, bundleID: bundleID) }
+            switch read {
+            case .success(let field)?:
+                say("\(label): readable, \(field.value.utf16.count) UTF-16 units, selection \(field.selectionStart)+\(field.selectionLength)")
+            case .failure(let skip)?: say("\(label): not watched (\(skip.rawValue))")
+            case nil: say("\(label): timed out")
+            }
+        }
+        await describe("before")
+        guard chromium else { return }
+        let enabled = await FieldReader.withTimeout { FieldReader.enableManualAccessibility(pid: pid) }
+        say("AXManualAccessibility: \(enabled == true ? "set" : "not supported")")
+        try? await Task.sleep(for: .seconds(1))
+        await describe("after")
     }
 
     private static func run(file: URL, model: String, host: String?, token: String) async {
