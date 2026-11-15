@@ -123,6 +123,7 @@ enum SpeedTestFormat {
 private struct Footer<Leading: View, Trailing: View>: View {
     @ViewBuilder var leading: Leading
     @ViewBuilder var trailing: Trailing
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(spacing: 0) {
@@ -135,7 +136,7 @@ private struct Footer<Leading: View, Trailing: View>: View {
             .padding(.horizontal, 28)
             .padding(.vertical, 14)
         }
-        .background(Frost.card)
+        .background(reduceTransparency ? Frost.cardSolid : Frost.card)
     }
 }
 

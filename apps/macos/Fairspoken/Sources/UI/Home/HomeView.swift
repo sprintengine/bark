@@ -143,7 +143,8 @@ private struct HomeBanner: View {
         return HStack(spacing: 6) {
             Text(push ? "Hold" : "Press")
             ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
-            Text("in any app and talk. \(AppInfo.displayName) types it where your cursor is.")
+            Text(push ? "in any app and talk. Let go, and \(AppInfo.displayName) types it where your cursor is."
+                      : "in any app and talk. Press it again, and \(AppInfo.displayName) types it where your cursor is.")
                 .fixedSize(horizontal: false, vertical: true)
         }
         .font(.system(size: 14))
@@ -423,7 +424,8 @@ private struct MicButton: View {
                 .foregroundStyle(.white)
                 .frame(width: size, height: size)
                 .background {
-                    let accent = scheme == .dark ? Crystal.clientAccent.mix(with: .black, by: 0.18) : Crystal.clientAccent
+                    // Dark mode's accent is a light teal; darkened so the white glyph keeps 3:1 or more.
+                    let accent = scheme == .dark ? Crystal.clientAccent.mix(with: .black, by: 0.4) : Crystal.clientAccent
                     let colors = listening ? [Crystal.live.mix(with: .white, by: 0.06), Crystal.live.mix(with: .black, by: 0.14)]
                                            : [accent.mix(with: .white, by: 0.12), accent.mix(with: Crystal.clientSecondary, by: 0.3)]
                     Circle().fill(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -479,6 +481,7 @@ private struct TimeSavedCard: View {
         let usage = model.history.usage
         let wpm = Int(usage.typingWPMInUse.rounded())
         let saved = usage.timeSavedSeconds
+        let faster = usage.totalRecordingSeconds > 0 ? usage.typingSeconds / usage.totalRecordingSeconds : 0
         Card(cornerRadius: 28, padding: 24, fillHeight: true) {
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(text: "Time saved", symbol: "hourglass")
@@ -490,6 +493,10 @@ private struct TimeSavedCard: View {
                     .font(.system(size: 13)).foregroundStyle(Crystal.ink2)
                     .help(usage.measuredTypingWpm == nil ? "A typical typing pace; take the speed test to use your own"
                                                          : "Your typing speed from the speed test")
+                if faster >= 1.05 {
+                    Text("Speaking is \(SpeedTestFormat.multiplier(faster)) faster than typing")
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.clientAccent)
+                }
                 if usage.typingSeconds > 0 {
                     SpeakingVersusTyping(speaking: usage.totalRecordingSeconds, typing: usage.typingSeconds)
                         .padding(.top, 2)
@@ -497,6 +504,8 @@ private struct TimeSavedCard: View {
                 Divider().overlay(Crystal.hairline).padding(.vertical, 4)
                 row("Words dictated", Format.number(usage.totalWords))
                 row("Dictations", Format.number(usage.totalDictations))
+                row("Apps used", "\(model.history.items.appsUsed)")
+                    .help("Apps counted from recent dictations")
                 if let pace = usage.speakingWPM {
                     row("Speaking pace", "\(Int(pace.rounded())) wpm")
                 }
