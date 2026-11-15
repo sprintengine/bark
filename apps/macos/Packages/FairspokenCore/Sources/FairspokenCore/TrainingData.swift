@@ -316,11 +316,12 @@ public struct TrainingDataStore: Sendable {
         }
     }
 
-    /// Waits for the other app to finish rewriting the index, but appends even if it doesn't
-    /// let go: a recording is never dropped.
+    /// Waits for as long as the other app holds the index: appending without the lock could be
+    /// undone by its rewrite. Callers are off the main thread, the audio and meta.json are already
+    /// on disk, and the lock goes when the other app's process does.
     private func appendToIndex(_ entry: TrainingEntry) throws {
-        let lock = lockIndex()
-        defer { if let lock { close(lock) } }
+        let lock = try lockIndexWaiting()
+        defer { close(lock) }
         var line = try JSONEncoder().encode(entry)
         line.append(UInt8(ascii: "\n"))
         if !FileManager.default.fileExists(atPath: indexURL.path) {
@@ -337,6 +338,19 @@ public struct TrainingDataStore: Sendable {
             try handle.seekToEnd()
         }
         try handle.write(contentsOf: line)
+    }
+
+    /// Takes the `flock` shared with the desktop app, however long that takes.
+    func lockIndexWaiting() throws -> Int32 {
+        let fd = open(root.appendingPathComponent(Self.lockFile).path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
+        while flock(fd, LOCK_EX) != 0 {
+            guard errno == EINTR else {
+                close(fd)
+                throw CocoaError(.fileWriteUnknown)
+            }
+        }
+        return fd
     }
 
     /// Takes the `flock` shared with the desktop app, waiting up to `lockWait`. Returns the open

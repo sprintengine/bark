@@ -132,14 +132,18 @@ impl CaptureStore {
         self.root.join(INDEX_FILE)
     }
 
+    fn open_lock_file(&self) -> std::io::Result<fs::File> {
+        let mut options = fs::OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        private_mode(&mut options);
+        options.open(self.root.join(LOCK_FILE))
+    }
+
     /// Takes the lock shared with the macOS app, waiting up to `LOCK_WAIT`.
     /// `None` when it is still held, or the root is missing. Released when the
     /// returned file is dropped.
     fn lock_index(&self) -> Option<fs::File> {
-        let mut options = fs::OpenOptions::new();
-        options.read(true).write(true).create(true).truncate(false);
-        private_mode(&mut options);
-        let file = options.open(self.root.join(LOCK_FILE)).ok()?;
+        let file = self.open_lock_file().ok()?;
         let deadline = Instant::now() + LOCK_WAIT;
         loop {
             match file.try_lock() {
@@ -167,9 +171,14 @@ impl CaptureStore {
         write_json(&folder.join(META_FILE), entry)?;
         let mut line = serde_json::to_vec(entry).map_err(|err| err.to_string())?;
         line.push(b'\n');
-        // Wait for the other app to finish rewriting the index, but append
-        // even if it doesn't let go: a recording is never dropped.
-        let _lock = self.lock_index();
+        // Wait for as long as the other app holds the index: appending without
+        // the lock could be undone by its rewrite. This runs on the writer
+        // thread, the audio and meta.json are already on disk, and the lock
+        // goes when the other app's process does.
+        let _lock = self
+            .open_lock_file()
+            .and_then(|file| file.lock().map(|()| file))
+            .map_err(|err| format!("Could not lock the training-data index: {err}"))?;
         let mut options = fs::OpenOptions::new();
         options.create(true).read(true).append(true);
         private_mode(&mut options);
@@ -269,16 +278,27 @@ impl CaptureStore {
 
     /// Deletes this app's own dictations (`RECORDED_BY`) older than
     /// `retention_days`; 0 keeps everything. Entries without the marker are
-    /// never pruned. Callers pass `retention_for(settings)`, which is 0 while
-    /// capture is off.
+    /// never pruned. The app goes through `prune_with`, which reads the
+    /// retention only once the shared lock is held.
+    #[cfg(test)]
     pub fn prune(&self, retention_days: u16, now: u64) -> Result<usize, String> {
         if retention_days == 0 {
             return Ok(0);
         }
-        // Pruning can wait for the next sweep.
+        self.prune_with(now, || retention_days)
+    }
+
+    /// Takes the shared lock (or skips: pruning can wait for the next sweep),
+    /// then asks `retention_days` for the retention to apply, so a setting
+    /// changed while waiting for the lock is the one used.
+    fn prune_with(&self, now: u64, retention_days: impl FnOnce() -> u16) -> Result<usize, String> {
         let Some(_lock) = self.lock_index() else {
             return Ok(0);
         };
+        let retention_days = retention_days();
+        if retention_days == 0 {
+            return Ok(0);
+        }
         let cutoff = now.saturating_sub(u64::from(retention_days) * SECONDS_PER_DAY);
         let mut lines = self.read_index()?;
         let mut removed = 0;
@@ -309,6 +329,7 @@ impl CaptureStore {
     }
 
     /// Applies the user's retention choice, which is none while capture is off.
+    #[cfg(test)]
     pub fn apply_retention(&self, settings: &Settings, now: u64) -> Result<usize, String> {
         self.prune(retention_for(settings), now)
     }
@@ -621,10 +642,19 @@ pub fn attach_edit(id: &str, edited: &str) {
 /// delete them" a moment earlier always wins. Keeps everything when the
 /// settings cannot be read.
 fn apply_current_retention(app: &AppHandle, store: &CaptureStore) -> Result<usize, String> {
-    let Ok(settings) = app.state::<crate::AppServices>().settings.lock().map(|service| service.current()) else {
-        return Ok(0);
+    let current = || {
+        app.state::<crate::AppServices>()
+            .settings
+            .lock()
+            .map(|service| retention_for(&service.current()))
+            .unwrap_or(0)
     };
-    store.apply_retention(&settings, now_seconds())
+    // Nothing to do (and no lock to take) when no retention is chosen; read
+    // again once the shared lock is held, right before pruning.
+    if current() == 0 {
+        return Ok(0);
+    }
+    store.prune_with(now_seconds(), current)
 }
 
 /// Applies a retention the user chose while capture is on, so this app's old
@@ -831,12 +861,39 @@ mod tests {
         assert_eq!(store.prune(30, 100 * SECONDS_PER_DAY).unwrap(), 0);
         assert_eq!(store.delete_all().unwrap_err(), BUSY);
         assert_eq!(store.attach_edit("old", "Ask Claude Code.").unwrap_err(), BUSY);
-        store.record(&entry("new", 2), &[0; 10]).unwrap();
-        assert_eq!(ids(&store), ["old", "new"]);
         assert!(root.join("old/audio.wav").exists());
 
+        // An append waits for the lock, however long, rather than going ahead.
+        let writer = {
+            let root = root.clone();
+            std::thread::spawn(move || CaptureStore::new(root).record(&entry("new", 2), &[0; 10]))
+        };
+        std::thread::sleep(LOCK_WAIT + Duration::from_millis(500));
+        assert!(!writer.is_finished());
+        assert!(root.join("new/audio.wav").exists());
+        assert_eq!(ids(&store), ["old"]);
+
         held.unlock().unwrap();
+        writer.join().unwrap().unwrap();
+        assert_eq!(ids(&store), ["old", "new"]);
         assert_eq!(store.prune(30, 100 * SECONDS_PER_DAY).unwrap(), 2);
+    }
+
+    #[test]
+    fn retention_is_read_once_the_lock_is_held() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CaptureStore::new(directory.path().to_path_buf());
+        store.record(&entry("old", 1), &[0; 10]).unwrap();
+        let held = fs::OpenOptions::new().read(true).write(true).open(directory.path().join(LOCK_FILE)).unwrap();
+        held.lock().unwrap();
+        // Waiting on the lock: the retention is not read yet.
+        let read = std::cell::Cell::new(false);
+        assert_eq!(store.prune_with(100 * SECONDS_PER_DAY, || { read.set(true); 30 }).unwrap(), 0);
+        assert!(!read.get());
+        held.unlock().unwrap();
+        // Capture turned off (retention 0) while waiting: nothing is pruned.
+        assert_eq!(store.prune_with(100 * SECONDS_PER_DAY, || 0).unwrap(), 0);
+        assert_eq!(ids(&store), ["old"]);
     }
 
     #[test]

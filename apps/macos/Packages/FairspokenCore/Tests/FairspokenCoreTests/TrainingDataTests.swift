@@ -216,11 +216,21 @@ struct TrainingDataTests {
         #expect(throws: TrainingDataStore.StoreError.busy(root.path)) { try store.delete("one", removal: .permanent) }
         #expect(throws: TrainingDataStore.StoreError.busy(root.path)) { try store.deleteAll(removal: .permanent) }
         #expect(throws: TrainingDataStore.StoreError.busy(root.path)) { try store.rebuildIndex() }
-        try store.record(entry("two"), samples: [0.1])
-        #expect(store.entries().map(\.id) == ["one", "two"])
         #expect(exists(store.audioURL(for: "one")))
 
+        // An append waits for the lock, however long, rather than going ahead.
+        let finished = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            try? store.record(entry("two"), samples: [0.1])
+            finished.signal()
+        }
+        #expect(finished.wait(timeout: .now() + TrainingDataStore.lockWait + 0.5) == .timedOut)
+        #expect(exists(store.audioURL(for: "two")))
+        #expect(store.entries().map(\.id) == ["one"])
+
         close(held)
+        #expect(finished.wait(timeout: .now() + 10) == .success)
+        #expect(store.entries().map(\.id) == ["one", "two"])
         try store.delete("one", removal: .permanent)
         #expect(store.entries().map(\.id) == ["two"])
     }

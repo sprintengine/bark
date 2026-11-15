@@ -66,7 +66,9 @@ Both apps protect the folder the same way:
   appends, edits, deletes, retention and rebuilds. The index itself is never
   locked, since a rewrite replaces it. If the other app holds the lock for
   more than two seconds, retention waits for its next run and deletes ask you
-  to try again; an append goes ahead anyway, so a recording is never lost.
+  to try again. An append waits for the lock however long it takes (its audio
+  and `meta.json` are already written), because appending without it could be
+  undone by the other app's rewrite; the lock is released if that app quits.
 
 The macOS app can also rebuild `index.jsonl` from each `<id>/meta.json`
 (`TrainingDataStore.rebuildIndex()`), for example after recordings are put
