@@ -27,9 +27,9 @@ struct SpeedTestSheet: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(width: Self.size.width, height: Self.size.height)
-        // The main window's October backdrop and frosted cards.
-        .background(AuroraBackground())
-        .environment(\.surfaceStyle, .frosted)
+        // The main window's plain ground and cards.
+        .background(PlainBackground())
+        .environment(\.surfaceStyle, .plain)
         // Names the sheet's window: only a recording started here is measured.
         .background(WindowIdentifier(DictationController.measuredWindow))
         .screenshotActive()
@@ -123,7 +123,6 @@ enum SpeedTestFormat {
 private struct Footer<Leading: View, Trailing: View>: View {
     @ViewBuilder var leading: Leading
     @ViewBuilder var trailing: Trailing
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(spacing: 0) {
@@ -136,7 +135,7 @@ private struct Footer<Leading: View, Trailing: View>: View {
             .padding(.horizontal, 28)
             .padding(.vertical, 14)
         }
-        .background(reduceTransparency ? Frost.cardSolid : Frost.card)
+        .background(Plain.card)
     }
 }
 

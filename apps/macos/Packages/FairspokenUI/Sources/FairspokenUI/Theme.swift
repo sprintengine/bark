@@ -1,88 +1,82 @@
 import AppKit
 import SwiftUI
 
-/// Brand tokens for the dictation client: the Crystal theme's green hint, and the live
-/// microphone colour. Bark Server uses `Crystal.serverAccent` (design/crystal/README.md).
+/// Brand tokens for the dictation client: its pink, neutral greys, and the listening colour
+/// (the same pink). Bark Server uses `Crystal.serverAccent` (design/crystal/README.md).
 public enum Brand {
     public static var accent: Color { Crystal.clientAccent }
     public static var secondary: Color { Crystal.ink2 }
     public static var live: Color { Crystal.live }
 }
 
-/// Crystal: a frosted sidebar beside opaque content, with one subtle accent: green for the
-/// clients, red for the server. Tokens match design/crystal/README.md.
+/// Crystal: the shared tokens. Text and lines are neutral greys (no blue or green cast); colour
+/// is one accent: pink for Bark (the client), garnet for Bark Server. Tokens match
+/// design/crystal/README.md.
 ///
-/// The material rule: only the window's chrome (the sidebar) is frosted, and the frost is tinted
-/// once (`frostTint`). Content stands on an opaque ground (`canvas`) in solid cards (`card`) with a
-/// hairline edge, so nothing translucent stacks on anything translucent. Glass is kept for small
-/// floating pieces: the recording pill, toasts and popovers.
+/// Bark's window (`SurfaceStyle.plain`, `Plain`) is black and white: a native translucent sidebar
+/// beside a plain ground (near-black or white) with cards one grey step off it. Bark Server keeps
+/// opaque cards (`card`) on an opaque `canvas`. Glass is kept for small floating pieces: the
+/// recording pill, toasts and popovers.
 public enum Crystal {
     public static let page = Color(hex: 0xEDEFF2, dark: 0x0D0F12)
     public static let pageSheen = Color(hex: 0xFFFFFF, dark: 0x1B1F24)
     /// Primary text.
-    public static let ink = Color(hex: 0x16191D, dark: 0xECEEF0, highContrast: (0x000000, 0xFFFFFF))
-    /// Secondary text: at least 4.5:1 on `card` and `canvas` in both themes.
-    public static let ink2 = Color(hex: 0x575F68, dark: 0xA3ABB3, highContrast: (0x2E343A, 0xD4D9DE))
-    /// Tertiary text: timestamps and captions. Still 4.5:1 on `card` and `canvas`.
-    public static let ink3 = Color(hex: 0x656D76, dark: 0x8C959E, highContrast: (0x464E56, 0xB0B8C0))
+    public static let ink = Color(hex: 0x141416, dark: 0xF2F2F3, highContrast: (0x000000, 0xFFFFFF))
+    /// Secondary text, a neutral grey: at least 4.5:1 on every card and ground in both themes.
+    public static let ink2 = Color(hex: 0x5C5C62, dark: 0xA3A3A9, highContrast: (0x2E2E33, 0xD6D6DA))
+    /// Tertiary text: timestamps and captions. Still 4.5:1 on cards and grounds.
+    public static let ink3 = Color(hex: 0x68686E, dark: 0x8E8E94, highContrast: (0x46464B, 0xB4B4B9))
     /// Dividers and outlines (8–10%, stronger with Increase Contrast).
     public static let hairline = Color(
-        light: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.10),
-        dark: NSColor(white: 1, alpha: 0.09),
-        highContrastLight: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.32),
+        light: NSColor(white: 0, alpha: 0.09),
+        dark: NSColor(white: 1, alpha: 0.085),
+        highContrastLight: NSColor(white: 0, alpha: 0.32),
         highContrastDark: NSColor(white: 1, alpha: 0.30))
     /// Flat fill for wells inside a card (fields, code, keycaps).
-    public static let well = Color(light: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.045),
-                                   dark: NSColor(white: 1, alpha: 0.055))
+    public static let well = Color(light: NSColor(white: 0, alpha: 0.045),
+                                   dark: NSColor(white: 1, alpha: 0.06))
 
-    // MARK: Surfaces
+    // MARK: Surfaces (Bark Server)
 
-    /// The opaque ground of the content column (the big card beside the sidebar) and of
-    /// the onboarding window.
+    /// The opaque ground of Bark Server's content column.
     public static let canvas = Color(hex: 0xF5F6F8, dark: 0x111316)
     /// A solid content card on `canvas`.
     public static let card = Color(hex: 0xFFFFFF, dark: 0x1A1D21)
-    /// The 1 pt highlight along a card's top edge.
+    /// The 1 pt highlight along a solid card's top edge.
     public static let cardHighlight = Color(light: NSColor(white: 1, alpha: 0.9), dark: NSColor(white: 1, alpha: 0.06))
-    /// Laid once over the sidebar's frost, at 52% of the app's base tone.
-    public static let frostTint = Color(light: NSColor(srgbRed: 0.918, green: 0.933, blue: 0.949, alpha: 0.52),
-                                        dark: NSColor(srgbRed: 0.035, green: 0.039, blue: 0.047, alpha: 0.52))
-    /// The frost's stand-in with Reduce Transparency: the same tone, opaque.
-    public static let frostSolid = Color(hex: 0xE6E9ED, dark: 0x0B0C0F)
 
     // MARK: Rows
 
     /// A row under the pointer, on a card.
-    public static let rowHover = Color(light: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.04),
+    public static let rowHover = Color(light: NSColor(white: 0, alpha: 0.04),
                                        dark: NSColor(white: 1, alpha: 0.05))
-    /// A row under the pointer, on the frost (one alpha step over the tint).
-    public static let chromeHover = Color(light: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.05),
+    /// A row under the pointer, in the sidebar.
+    public static let chromeHover = Color(light: NSColor(white: 0, alpha: 0.05),
                                           dark: NSColor(white: 1, alpha: 0.06))
-    /// The selected row on the frost.
+    /// The selected row in the sidebar.
     public static let chromeSelected = Color(
-        light: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.085),
+        light: NSColor(white: 0, alpha: 0.075),
         dark: NSColor(white: 1, alpha: 0.10),
-        highContrastLight: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.16),
+        highContrastLight: NSColor(white: 0, alpha: 0.16),
         highContrastDark: NSColor(white: 1, alpha: 0.20))
 
     // MARK: Accents and status
 
-    /// The client's accent (Bark for Mac): the October teal. Light: 5.0:1 on white; dark:
-    /// 9.9:1 on the dark cards.
-    public static let clientAccent = Color(hex: 0x0A7A7D, dark: 0x45D1C9, highContrast: (0x055C5F, 0x7FE6DF))
-    /// The client's second hue, for the backdrop and the time saved: the October indigo.
-    public static let clientSecondary = Color(hex: 0x5452D6, dark: 0x9491FF)
-    /// Text and glyphs on an accent fill: white on the light theme's deep teal, near-black on the
-    /// dark theme's light teal (4.5:1 or better on both).
-    public static let onAccent = Color(hex: 0xFFFFFF, dark: 0x041C1B)
+    /// Bark's one colour: pink. Deep magenta in light mode (6.6:1 on white, 6.0:1 on the light
+    /// cards), bright pink in dark mode (7.3:1 on black, 6.3:1 on the dark cards). Used for the
+    /// dictation state, primary actions, links, toggles and progress.
+    public static let clientAccent = Color(hex: 0xB0186A, dark: 0xFF5AAE, highContrast: (0x8A0E52, 0xFF8CC8))
+    /// Text and glyphs on an accent fill: white on the deep magenta (6.6:1), near-black on the
+    /// bright pink (6.8:1).
+    public static let onAccent = Color(hex: 0xFFFFFF, dark: 0x16070F)
     /// The server's hint (Bark Server): garnet.
     public static let serverAccent = Color(hex: 0xB2453E, dark: 0xF07F76)
 
     public static let ok = Color(hex: 0x2B7F57, dark: 0x5CCB94)
     public static let warn = Color(hex: 0x8F620C, dark: 0xE7B95A)
     public static let error = Color(hex: 0xB4283C, dark: 0xFF7D8E)
-    /// The microphone is on.
-    public static let live = Color(hex: 0xD9483B, dark: 0xFF6E62)
+    /// The microphone is on: Bark's pink, so listening reads as the app's one colour.
+    public static let live = clientAccent
 
     /// Fills for the rounded-square icon tiles (sidebar sections, permissions, settings).
     public enum Tile {
@@ -97,32 +91,36 @@ public enum Crystal {
     }
 }
 
-/// How content surfaces are drawn. Bark Server keeps `.solid`: opaque cards on an opaque canvas.
-/// Bark (the client) sets `.frosted`: translucent cards with large corners on the aurora
-/// backdrop (`AuroraBackground`), the October look.
+/// How content surfaces are drawn. Bark Server keeps `.solid`: opaque cards with 12 pt corners
+/// on an opaque canvas. Bark (the client) sets `.plain`: cards one grey step off a plain
+/// near-black or white ground, with large corners and a hairline edge (`Plain`).
 public enum SurfaceStyle: Sendable {
-    case solid, frosted
+    case solid, plain
 }
 
 extension EnvironmentValues {
     @Entry public var surfaceStyle: SurfaceStyle = .solid
 }
 
-/// The frosted surfaces (`SurfaceStyle.frosted`): translucent over the aurora, opaque with
-/// Reduce Transparency.
-public enum Frost {
+/// Bark's black-and-white surfaces (`SurfaceStyle.plain`). Dark: a near-black ground, cards a
+/// subtle grey step up. Light: a white ground, cards and wells a light grey. All opaque and
+/// neutral; the sidebar beside them is the system's translucent sidebar material.
+public enum Plain {
+    /// The window's ground behind the content.
+    public static let ground = Color(hex: 0xFFFFFF, dark: 0x0A0A0B)
     /// A content card's fill.
-    public static let card = Color(light: NSColor(white: 1, alpha: 0.62), dark: NSColor(srgbRed: 0.075, green: 0.086, blue: 0.106, alpha: 0.58))
-    /// The card fill with Reduce Transparency.
-    public static let cardSolid = Color(hex: 0xFBFCFD, dark: 0x171B21)
-    /// A card's edge: a bright rim in light mode, a faint one in dark.
-    public static let edge = Color(light: NSColor(white: 1, alpha: 0.85), dark: NSColor(white: 1, alpha: 0.10),
+    public static let card = Color(hex: 0xF4F5F7, dark: 0x151517, highContrast: (0xEEEFF2, 0x1A1A1D))
+    /// A raised control on a card (a chip): one more step.
+    public static let raised = Color(hex: 0xFFFFFF, dark: 0x1F1F22)
+    /// A card's edge: a faint hairline.
+    public static let edge = Color(light: NSColor(white: 0, alpha: 0.06), dark: NSColor(white: 1, alpha: 0.07),
                                    highContrastLight: NSColor(white: 0, alpha: 0.35), highContrastDark: NSColor(white: 1, alpha: 0.35))
-    /// The sidebar panel's fill.
-    public static let panel = Color(light: NSColor(white: 1, alpha: 0.46), dark: NSColor(srgbRed: 0.05, green: 0.06, blue: 0.075, alpha: 0.50))
-    /// The sidebar panel with Reduce Transparency.
-    public static let panelSolid = Color(hex: 0xEEF3F4, dark: 0x101317)
-    /// Corner radius of a frosted content card.
+    /// Laid over the sidebar's material, so it reads as the theme's grey rather than the desktop's colour.
+    public static let sidebarTint = Color(light: NSColor(srgbRed: 0.957, green: 0.961, blue: 0.969, alpha: 0.45),
+                                          dark: NSColor(srgbRed: 0.05, green: 0.05, blue: 0.055, alpha: 0.55))
+    /// The sidebar with Reduce Transparency: opaque.
+    public static let sidebarSolid = Color(hex: 0xF4F5F7, dark: 0x111113)
+    /// Corner radius of a content card.
     public static let radius: CGFloat = 22
 }
 
@@ -170,7 +168,7 @@ public struct CrystalBackground: View {
     @Environment(\.colorScheme) private var scheme
     public var accent: Color
 
-    public init(accent: Color = Crystal.clientAccent) { self.accent = accent }
+    public init(accent: Color = Crystal.serverAccent) { self.accent = accent }
 
     public var body: some View {
         GeometryReader { geo in
@@ -192,61 +190,30 @@ public struct CrystalBackground: View {
     }
 }
 
-/// The October backdrop behind Bark's windows: a soft teal wash top-left, indigo on the right and
-/// teal again along the bottom, over a pale (or near-black) ground. Drawn once, still, so idle
-/// CPU stays at zero. Dark mode uses lower washes than October's so the cards keep their contrast.
-public struct AuroraBackground: View {
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.colorSchemeContrast) private var contrast
-    public var accent: Color
-    public var secondary: Color
-
-    public init(accent: Color = Crystal.clientAccent, secondary: Color = Crystal.clientSecondary) {
-        self.accent = accent
-        self.secondary = secondary
-    }
+/// Bark's window ground: plain near-black in dark mode, plain white in light. No gradient.
+public struct PlainBackground: View {
+    public init() {}
 
     public var body: some View {
-        let dark = scheme == .dark
-        // Increase Contrast keeps the ground and only a trace of the colour.
-        let k = contrast == .increased ? 0.4 : 1.0
-        GeometryReader { geo in
-            let w = geo.size.width, h = geo.size.height
-            ZStack {
-                dark ? Color(red: 0.055, green: 0.063, blue: 0.075) : Color(red: 0.955, green: 0.962, blue: 0.968)
-                Circle().fill(accent.opacity((dark ? 0.24 : 0.24) * k))
-                    .frame(width: w * 0.8, height: w * 0.8)
-                    .position(x: w * 0.16, y: h * 0.02)
-                    .blur(radius: 100)
-                Circle().fill(secondary.opacity((dark ? 0.20 : 0.15) * k))
-                    .frame(width: w * 0.62, height: w * 0.62)
-                    .position(x: w * 0.96, y: h * 0.36)
-                    .blur(radius: 110)
-                Circle().fill(accent.opacity((dark ? 0.11 : 0.10) * k))
-                    .frame(width: w * 0.7, height: w * 0.5)
-                    .position(x: w * 0.55, y: h * 1.05)
-                    .blur(radius: 120)
-            }
-            .drawingGroup()
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
+        Plain.ground
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
     }
 }
 
-/// The window's frost: the desktop blurred behind the window (`NSVisualEffectView`, so the blur
-/// costs the app nothing), with `Crystal.frostTint` laid over it once. With Reduce Transparency
-/// it is the same tone, opaque.
-public struct WindowFrost: View {
+/// Bark's sidebar: the system's sidebar material (the desktop blurred behind the window, so the
+/// blur costs the app nothing) with `Plain.sidebarTint` laid over it once, running the full
+/// height of the window. With Reduce Transparency it is `Plain.sidebarSolid`, opaque.
+public struct SidebarBackground: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     public init() {}
 
     public var body: some View {
         Group {
             if reduceTransparency {
-                Crystal.frostSolid
+                Plain.sidebarSolid
             } else {
-                VisualEffectBackground(material: .sidebar).overlay(Crystal.frostTint)
+                VisualEffectBackground(material: .sidebar).overlay(Plain.sidebarTint)
             }
         }
         .ignoresSafeArea()

@@ -52,7 +52,7 @@ struct SettingsView: View {
             // The grouped form centres its rows in its own width, so it gets exactly the rows'
             // width plus its 20 pt inset.
             .frame(maxWidth: 744, maxHeight: .infinity, alignment: .topLeading)
-            // Settings is one frosted card: its grouped rows are wells on it, as fields are on
+            // Settings is one plain card: its grouped rows are wells on it, as fields are on
             // any card. The card's edge lines up with the title.
             .padding(.vertical, 2)
             .cardSurface()

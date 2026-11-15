@@ -68,6 +68,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windows.showDashboard(.settings)
     }
 
+    /// View › Home, Models, Post-training, Settings (⌘1…⌘4).
+    @objc func showSection(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let section = AppModel.Section(rawValue: raw) else { return }
+        windows.showDashboard(section)
+    }
+
     /// App menu › Check for Updates…: opens the window so the answer (a toast) is visible.
     @objc func checkForUpdates() {
         windows.showDashboard()
@@ -103,6 +109,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         edit.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
         edit.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         main.addItem(submenu(edit))
+
+        // View: the sidebar (the main window answers toggleSidebar:) and the sections, so ⌘1…⌘4
+        // work with the sidebar hidden too.
+        let view = NSMenu(title: "View")
+        let sidebar = NSMenuItem(title: "Hide Sidebar", action: #selector(DashboardWindow.toggleSidebar(_:)), keyEquivalent: "s")
+        sidebar.keyEquivalentModifierMask = [.control, .command]
+        view.addItem(sidebar)
+        view.addItem(.separator())
+        for section in AppModel.Section.allCases {
+            let item = NSMenuItem(title: section.title, action: #selector(showSection(_:)), keyEquivalent: "\(section.shortcutNumber)")
+            item.target = target
+            item.representedObject = section.rawValue
+            view.addItem(item)
+        }
+        main.addItem(submenu(view))
 
         let window = NSMenu(title: "Window")
         window.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))

@@ -31,7 +31,7 @@ for theme in light dark; do
   compose models-library "$theme" models
   compose onboarding-4-model "$theme" setup --width 1200
   # The second pill in the showcase: listening, with the words so far.
-  compose pill "$theme" pill --crop 239,345,1042,174 --radius 50 --pad 110 --width 1200
+  compose pill "$theme" pill --crop 239,340,1042,184 --radius 41 --pad 110 --width 1200
 done
 
 images=("$out"/{home,models,setup,pill}-{light,dark}.png)

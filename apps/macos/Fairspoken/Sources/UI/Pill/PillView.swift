@@ -31,16 +31,24 @@ struct PillView: View {
     static let defaultMaxLines = 4
     static let height: CGFloat = 44
 
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: showsLiveText ? 20 : Self.height / 2, style: .continuous)
+    }
+
     var body: some View {
         content
             .padding(.horizontal, showsLiveText ? 16 : 14)
             .padding(.vertical, showsLiveText ? 12 : 0)
             .frame(minHeight: Self.height)
-            // A light wash under the glass keeps the text legible over any desktop.
-            .background(Crystal.card.opacity(scheme == .dark ? 0.35 : 0.55),
-                        in: RoundedRectangle(cornerRadius: showsLiveText ? 20 : Self.height / 2, style: .continuous))
-            .glassEffect(dictation.phase.isListening ? .regular.tint(Crystal.live.opacity(0.06)) : .regular,
-                         in: RoundedRectangle(cornerRadius: showsLiveText ? 20 : Self.height / 2, style: .continuous))
+            // A neutral wash under the glass keeps the text legible over any desktop.
+            .background(Plain.card.opacity(scheme == .dark ? 0.45 : 0.6), in: shape)
+            .glassEffect(dictation.phase.isListening ? .regular.tint(Crystal.live.opacity(0.08)) : .regular, in: shape)
+            // While listening, a fine pink edge: the app's one colour says the microphone is on.
+            .overlay {
+                if dictation.phase.isListening {
+                    shape.strokeBorder(Crystal.live.opacity(scheme == .dark ? 0.55 : 0.45), lineWidth: 1).allowsHitTesting(false)
+                }
+            }
             .animation(Motion.unlessReduced(Motion.deliberate, reduceMotion), value: stateKey)
             .animation(Motion.unlessReduced(Motion.normal, reduceMotion), value: showsLiveText)
             .onGeometryChange(for: CGRect.self) { proxy in
