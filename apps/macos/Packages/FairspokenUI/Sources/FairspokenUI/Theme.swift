@@ -67,11 +67,14 @@ public enum Crystal {
 
     // MARK: Accents and status
 
-    /// The clients' hint (Bark for Mac): sage green.
-    public static let clientAccent = Color(hex: 0x2A7F56, dark: 0x5CCB94, highContrast: (0x1D6B45, 0x7FE0AE))
-    /// Text and glyphs on an accent fill: white on the light theme's deep green, near-black on the
-    /// dark theme's light green (4.5:1 or better on both).
-    public static let onAccent = Color(hex: 0xFFFFFF, dark: 0x08140E)
+    /// The client's accent (Bark for Mac): the October teal. Light: 5.0:1 on white; dark:
+    /// 9.9:1 on the dark cards.
+    public static let clientAccent = Color(hex: 0x0A7A7D, dark: 0x45D1C9, highContrast: (0x055C5F, 0x7FE6DF))
+    /// The client's second hue, for the backdrop and the time saved: the October indigo.
+    public static let clientSecondary = Color(hex: 0x5452D6, dark: 0x9491FF)
+    /// Text and glyphs on an accent fill: white on the light theme's deep teal, near-black on the
+    /// dark theme's light teal (4.5:1 or better on both).
+    public static let onAccent = Color(hex: 0xFFFFFF, dark: 0x041C1B)
     /// The server's hint (Bark Server): garnet.
     public static let serverAccent = Color(hex: 0xB2453E, dark: 0xF07F76)
 
@@ -92,6 +95,35 @@ public enum Crystal {
         public static let red = Color(hex: 0xE0483C, dark: 0xEC5A4E)
         public static let teal = Color(hex: 0x1F9AA6, dark: 0x2FAFBB)
     }
+}
+
+/// How content surfaces are drawn. Bark Server keeps `.solid`: opaque cards on an opaque canvas.
+/// Bark (the client) sets `.frosted`: translucent cards with large corners on the aurora
+/// backdrop (`AuroraBackground`), the October look.
+public enum SurfaceStyle: Sendable {
+    case solid, frosted
+}
+
+extension EnvironmentValues {
+    @Entry public var surfaceStyle: SurfaceStyle = .solid
+}
+
+/// The frosted surfaces (`SurfaceStyle.frosted`): translucent over the aurora, opaque with
+/// Reduce Transparency.
+public enum Frost {
+    /// A content card's fill.
+    public static let card = Color(light: NSColor(white: 1, alpha: 0.62), dark: NSColor(srgbRed: 0.075, green: 0.086, blue: 0.106, alpha: 0.58))
+    /// The card fill with Reduce Transparency.
+    public static let cardSolid = Color(hex: 0xFBFCFD, dark: 0x171B21)
+    /// A card's edge: a bright rim in light mode, a faint one in dark.
+    public static let edge = Color(light: NSColor(white: 1, alpha: 0.85), dark: NSColor(white: 1, alpha: 0.10),
+                                   highContrastLight: NSColor(white: 0, alpha: 0.35), highContrastDark: NSColor(white: 1, alpha: 0.35))
+    /// The sidebar panel's fill.
+    public static let panel = Color(light: NSColor(white: 1, alpha: 0.46), dark: NSColor(srgbRed: 0.05, green: 0.06, blue: 0.075, alpha: 0.50))
+    /// The sidebar panel with Reduce Transparency.
+    public static let panelSolid = Color(hex: 0xEEF3F4, dark: 0x101317)
+    /// Corner radius of a frosted content card.
+    public static let radius: CGFloat = 22
 }
 
 /// The type scale: system font, 13 pt body, six steps.
@@ -151,6 +183,48 @@ public struct CrystalBackground: View {
                 Circle().fill(accent.opacity(scheme == .dark ? 0.12 : 0.08))
                     .frame(width: w * 0.8, height: w * 0.8)
                     .position(x: w * 0.1, y: h * 0.0)
+                    .blur(radius: 120)
+            }
+            .drawingGroup()
+        }
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
+    }
+}
+
+/// The October backdrop behind Bark's windows: a soft teal wash top-left, indigo on the right and
+/// teal again along the bottom, over a pale (or near-black) ground. Drawn once, still, so idle
+/// CPU stays at zero. Dark mode uses lower washes than October's so the cards keep their contrast.
+public struct AuroraBackground: View {
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+    public var accent: Color
+    public var secondary: Color
+
+    public init(accent: Color = Crystal.clientAccent, secondary: Color = Crystal.clientSecondary) {
+        self.accent = accent
+        self.secondary = secondary
+    }
+
+    public var body: some View {
+        let dark = scheme == .dark
+        // Increase Contrast keeps the ground and only a trace of the colour.
+        let k = contrast == .increased ? 0.4 : 1.0
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            ZStack {
+                dark ? Color(red: 0.055, green: 0.063, blue: 0.075) : Color(red: 0.955, green: 0.962, blue: 0.968)
+                Circle().fill(accent.opacity((dark ? 0.24 : 0.24) * k))
+                    .frame(width: w * 0.8, height: w * 0.8)
+                    .position(x: w * 0.16, y: h * 0.02)
+                    .blur(radius: 100)
+                Circle().fill(secondary.opacity((dark ? 0.20 : 0.15) * k))
+                    .frame(width: w * 0.62, height: w * 0.62)
+                    .position(x: w * 0.96, y: h * 0.36)
+                    .blur(radius: 110)
+                Circle().fill(accent.opacity((dark ? 0.11 : 0.10) * k))
+                    .frame(width: w * 0.7, height: w * 0.5)
+                    .position(x: w * 0.55, y: h * 1.05)
                     .blur(radius: 120)
             }
             .drawingGroup()

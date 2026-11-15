@@ -28,6 +28,10 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
 	<true/>
+	<!-- The Bark wordmark's typeface, Fraunces SemiBold (SIL OFL 1.1; Resources/Fonts holds the
+	     font and its licence). Registered for this app only. -->
+	<key>ATSApplicationFontsPath</key>
+	<string>Fonts</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSHumanReadableCopyright</key>

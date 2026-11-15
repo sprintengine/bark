@@ -1,19 +1,27 @@
 import FairspokenUI
 import SwiftUI
 
-/// Crystal layout constants for the client (design/crystal/README.md): 12 for cards, 8 for rows
-/// and fields, one compact rhythm of spacing.
+/// Layout constants for the client's October look: large frosted cards (`Frost.radius`), 8 for
+/// rows and fields, generous spacing.
 enum Layout {
-    static let card: CGFloat = CardMetrics.radius
+    static let card: CGFloat = Frost.radius
     static let row: CGFloat = 8
-    static let gap: CGFloat = 12
-    static let pageH: CGFloat = 28
-    static let pageTop: CGFloat = 22
+    static let gap: CGFloat = 16
+    static let pageH: CGFloat = 32
+    static let pageTop: CGFloat = 40
     /// The content column's width cap, so lines never run the width of a big window.
-    static let readable: CGFloat = 980
+    static let readable: CGFloat = 1120
 }
 
-/// A screen title: semibold, slightly tight, with at most one quiet line under it.
+extension Font {
+    /// The Bark wordmark's face: Fraunces SemiBold, bundled (Resources/Fonts, SIL OFL 1.1).
+    /// Use it for the name and the greeting only; everything else is SF Pro.
+    static func barkWordmark(_ size: CGFloat) -> Font {
+        .custom("Fraunces-SemiBold", fixedSize: size)
+    }
+}
+
+/// A screen title, October style: large and bold, with at most one quiet line under it.
 struct PageTitle<Trailing: View>: View {
     var title: String
     var subtitle: String?
@@ -27,13 +35,13 @@ struct PageTitle<Trailing: View>: View {
 
     var body: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(TypeScale.title)
-                    .tracking(-0.2)
+                    .font(.system(size: 30, weight: .bold))
+                    .tracking(-0.4)
                     .foregroundStyle(Crystal.ink)
                 if let subtitle {
-                    Text(subtitle).font(TypeScale.meta).foregroundStyle(Crystal.ink2)
+                    Text(subtitle).font(.system(size: 15)).foregroundStyle(Crystal.ink2)
                 }
             }
             .accessibilityElement(children: .combine)

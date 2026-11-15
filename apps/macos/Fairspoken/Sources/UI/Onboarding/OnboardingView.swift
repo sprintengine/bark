@@ -28,12 +28,8 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Crystal.canvas
-            // A subtle wash of the accent across the top.
-            LinearGradient(colors: [Crystal.clientAccent.opacity(0.16), Crystal.clientAccent.opacity(0.05), .clear],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: 320)
-                .allowsHitTesting(false)
+            // The main window's October backdrop, with its frosted cards.
+            AuroraBackground()
             VStack(spacing: 0) {
                 StepProgress(step: step)
                     .padding(.top, 44)
@@ -72,6 +68,7 @@ struct OnboardingView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .environment(\.surfaceStyle, .frosted)
         .ignoresSafeArea()
         .screenshotActive()
         .onAppear { model.permissions.beginPolling() }
@@ -190,7 +187,7 @@ private struct StepHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(TypeScale.display).tracking(-0.4).foregroundStyle(Crystal.ink)
+            Text(title).font(.system(size: 30, weight: .bold)).tracking(-0.5).foregroundStyle(Crystal.ink)
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle).font(.system(size: 15)).foregroundStyle(Crystal.ink2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -206,10 +203,11 @@ private struct StepHeader: View {
 private struct WelcomeStep: View {
     var body: some View {
         VStack(spacing: 18) {
-            BrandMark(size: 96)
-                .padding(.bottom, 10)
-            Text(AppInfo.displayName)
-                .font(.system(size: 34, weight: .semibold)).tracking(-0.6)
+            BrandMark(size: 104)
+                .shadow(color: Crystal.clientAccent.opacity(0.25), radius: 24, y: 10)
+                .padding(.bottom, 6)
+            Text("Welcome to \(Text(AppInfo.displayName).font(.barkWordmark(46)).tracking(-1.15))")
+                .font(.system(size: 38, weight: .bold)).tracking(-0.6)
                 .foregroundStyle(Crystal.ink)
                 .accessibilityAddTraits(.isHeader)
             Text("Speak in any app. Your words appear where you type,\ntranscribed privately on your own devices.")
