@@ -97,28 +97,52 @@ final class ScreenshotHarness {
         windows.dashboard?.orderOut(nil)
     }
 
-    /// Models with "Download from Link…" open on a model that isn't downloaded, then with the
-    /// link saved. Screenshot settings are never saved, and nothing downloads.
+    /// The Models library with a download in progress and a favourite, a model's detail sheet,
+    /// and "Download from Link…" open in a sheet, then with the link saved. Screenshot settings
+    /// are never saved, and nothing downloads.
     private func modelLinkShots(suffix: String) async {
         let id = "parakeet-tdt-0.6b-v2"
         let sample = "https://artifactory.example.org/artifactory/models/parakeet-tdt-0.6b-v2-mac.zip"
         model.models.presentedAsAvailable = [id]
         model.models.refresh()
-        model.linkDraft = sample
-        model.linkEditorModel = id
+        model.models.showcase("large-v3-turbo", .downloading(0.42))
+        model.settings.update { $0.favoriteModels = ["small.en"] }
         windows.showDashboard(.models)
         try? await Task.sleep(for: .milliseconds(1200))
         await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "models-link-open-\(suffix)") }
+        if let window = windows.dashboard { await capture(window, as: "models-library-\(suffix)") }
+
+        model.modelDetailID = "large-v3"
+        try? await Task.sleep(for: .milliseconds(1200))
+        await captureSheet(as: "models-detail-\(suffix)")
+        model.modelDetailID = nil
+        try? await Task.sleep(for: .milliseconds(600))
+
+        model.linkDraft = sample
+        model.linkEditorModel = id
+        model.modelDetailID = id
+        try? await Task.sleep(for: .milliseconds(1200))
+        await captureSheet(as: "models-link-open-\(suffix)")
         model.linkEditorModel = nil
         // The query (a token) is never shown.
         model.settings.update { $0.modelLinks[id] = sample + "?X-JFrog-Art-Api=sample-token" }
         try? await Task.sleep(for: .milliseconds(600))
-        await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "models-link-saved-\(suffix)") }
-        model.settings.update { $0.modelLinks = [:] }
+        await captureSheet(as: "models-link-saved-\(suffix)")
+        model.modelDetailID = nil
+        try? await Task.sleep(for: .milliseconds(600))
+        model.settings.update {
+            $0.modelLinks = [:]
+            $0.favoriteModels = []
+        }
         model.models.presentedAsAvailable = []
         model.models.refresh()
+    }
+
+    /// The sheet attached to the dashboard, captured on its own.
+    private func captureSheet(as name: String) async {
+        guard let sheet = windows.dashboard?.attachedSheet else { return }
+        sheet.displayIfNeeded()
+        await capture(sheet, as: name)
     }
 
     /// The sidebar update button in each state (the window, Home), the available toast, and
