@@ -3,10 +3,11 @@
 // Tauri, so scripts/test-model-catalog.mjs can check it.
 //
 // Speed and accuracy are 1–5 ratings. For the speech models they come from
-// the measurements in apps/macos/docs/model-benchmarks.md (word error rate
-// and real-time factor on 20 LibriSpeech clips, through the Mac app's own
-// engines on an M4), on the same scale the Mac app's library uses, so both
-// apps agree. Where a model has no measurement (Parakeet v2, the polish
+// the reference measurements in apps/macos/docs/model-benchmarks.md (word
+// error rate and real-time factor on 20 English LibriSpeech clips, through
+// the Mac app's engines on an M4), on the same scale the Mac app's library
+// uses, so both apps agree. This app runs Whisper on a different engine, so
+// they are a guide to how the models compare, not a promise of speed here. Where a model has no measurement (Parakeet v2, the polish
 // models) the rating is an estimate and `measured` is false; the library
 // marks those. The model in use also shows its speed measured on this
 // computer, from the dictation history (measuredSpeed below).
@@ -59,13 +60,13 @@ export const isMeasured = (model: Pick<ModelInfo, "wer" | "rtfx">): boolean => m
 
 export const SPEECH_MODELS: ModelInfo[] = [
   speech({ id: "parakeet-tdt-0.6b-v3", name: "Parakeet v3", summary: "Fast and accurate, the default", publisher: "NVIDIA", bytes: 2.5 * GB, language: "multi", languages: "25 European languages", wer: 2.07, rtfx: 129, recommended: true, rank: 0 }),
-  speech({ id: "parakeet-ultra", name: "Parakeet Ultra", summary: "Post-trained v3 with lower error rates", publisher: "Moondream", bytes: 2.6 * GB, language: "multi", languages: "25 European languages", wer: 2.33, rtfx: 120, isNew: true, rank: 1 }),
+  speech({ id: "parakeet-ultra", name: "Parakeet Ultra", summary: "A post-trained v3", publisher: "Moondream", bytes: 2.6 * GB, language: "multi", languages: "25 European languages", wer: 2.33, rtfx: 120, isNew: true, rank: 1 }),
   speech({ id: "parakeet-tdt-0.6b-v2", name: "Parakeet v2", summary: "The earlier release, tuned for English", publisher: "NVIDIA", bytes: 2.51 * GB, language: "en", languages: "English", speed: 5, accuracy: 4, rank: 2 }),
-  speech({ id: "large-v3-turbo", name: "Whisper Large v3 Turbo", summary: "Whisper's best trade of speed for accuracy", publisher: "OpenAI", bytes: 1.62 * GB, language: "multi", languages: "99 languages", wer: 3.11, rtfx: 8, rank: 3 }),
-  speech({ id: "large-v3", name: "Whisper Large v3", summary: "Most accurate Whisper, and the slowest", publisher: "OpenAI", bytes: 3.1 * GB, language: "multi", languages: "99 languages", wer: 2.59, rtfx: 3.5, rank: 4 }),
+  speech({ id: "large-v3-turbo", name: "Whisper Large v3 Turbo", summary: "The quickest of the large Whispers", publisher: "OpenAI", bytes: 1.62 * GB, language: "multi", languages: "99 languages", wer: 3.11, rtfx: 8, rank: 3 }),
+  speech({ id: "large-v3", name: "Whisper Large v3", summary: "The newest large Whisper", publisher: "OpenAI", bytes: 3.1 * GB, language: "multi", languages: "99 languages", wer: 2.59, rtfx: 3.5, rank: 4 }),
   speech({ id: "large-v2", name: "Whisper Large v2", summary: "The previous large Whisper", publisher: "OpenAI", bytes: 3.09 * GB, language: "multi", languages: "99 languages", wer: 2.33, rtfx: 3.3, rank: 5 }),
-  speech({ id: "medium", name: "Whisper Medium", summary: "Balanced Whisper", publisher: "OpenAI", bytes: 1.53 * GB, language: "multi", languages: "99 languages", wer: 2.33, rtfx: 5.1, rank: 6 }),
-  speech({ id: "small", name: "Whisper Small", summary: "Light and quick", publisher: "OpenAI", bytes: 488 * MB, language: "multi", languages: "99 languages", wer: 4.4, rtfx: 16, rank: 7 }),
+  speech({ id: "medium", name: "Whisper Medium", summary: "Accurate, but slow", publisher: "OpenAI", bytes: 1.53 * GB, language: "multi", languages: "99 languages", wer: 2.33, rtfx: 5.1, rank: 6 }),
+  speech({ id: "small", name: "Whisper Small", summary: "A lighter download", publisher: "OpenAI", bytes: 488 * MB, language: "multi", languages: "99 languages", wer: 4.4, rtfx: 16, rank: 7 }),
   speech({ id: "base", name: "Whisper Base", summary: "Small download, rougher text", publisher: "OpenAI", bytes: 148 * MB, language: "multi", languages: "99 languages", wer: 6.22, rtfx: 57, rank: 8 }),
   speech({ id: "tiny", name: "Whisper Tiny", summary: "Smallest download, for slow machines", publisher: "OpenAI", bytes: 78 * MB, language: "multi", languages: "99 languages", wer: 7.77, rtfx: 105, rank: 9 }),
 ];

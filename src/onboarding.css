@@ -141,6 +141,8 @@ body {
 }
 .ob-wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: 88px; border-radius: 10px; background: var(--crystal-well); }
 .ob-wave span { width: 5px; height: 72px; border-radius: 3px; background: var(--crystal-accent); transform: scaleY(0.08); transition: transform 60ms linear; }
+.ob-mic.is-failed .ob-wave span { background: var(--crystal-track); transform: scaleY(0.08) !important; }
+.ob-mic > .ob-btn { align-self: center; }
 .ob-mic-status { margin: 0; text-align: center; color: var(--crystal-ink-2); font-weight: 500; }
 .ob-mic-status[data-tone="ok"] { color: var(--crystal-ok); }
 .ob-mic-status[data-tone="warn"] { color: var(--crystal-warn); }

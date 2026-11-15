@@ -241,8 +241,10 @@ function enterMic(): void {
     bars,
     status,
   ]);
+  const retry = h("button", { class: "ob-btn ob-btn--sm", type: "button", hidden: true }, ["Try again"]);
+  card.append(retry);
   stepHost.replaceChildren(header("mic", "red", "Check your microphone", "Say a few words. The bars should move as you speak."), card);
-  setFooter({ next: "Continue", back: true, skip: "Skip" });
+  setFooter({ next: "Continue", back: true });
 
   let stream: MediaStream | null = null;
   let context: AudioContext | null = null;
@@ -255,6 +257,13 @@ function enterMic(): void {
     status.textContent = text;
     if (tone) status.dataset.tone = tone; else delete status.dataset.tone;
   };
+  // A failed start greys the meter and offers to try again.
+  const failed = (text: string) => {
+    say(text, "warn");
+    card.classList.add("is-failed");
+    retry.hidden = false;
+  };
+  retry.addEventListener("click", () => { void start(); });
   const stop = () => {
     session += 1;
     cancelAnimationFrame(frame);
@@ -266,6 +275,8 @@ function enterMic(): void {
     stop();
     const mine = session;
     heard = 0;
+    card.classList.remove("is-failed");
+    retry.hidden = true;
     say("Listening…");
     try {
       const constraints: MediaTrackConstraints = { channelCount: 1 };
@@ -300,7 +311,7 @@ function enterMic(): void {
       frame = requestAnimationFrame(tick);
       await loadDevices(select);
     } catch (error) {
-      if (mine === session) say(micProblem(error), "warn");
+      if (mine === session) failed(micProblem(error));
     }
   };
   select.addEventListener("change", () => { void start(); });
@@ -381,7 +392,7 @@ function renderModel(): void {
     list,
     h("p", { class: `ob-note${failed ? " ob-note--warn" : ""}`, role: failed ? "alert" : false }, [failed
       ? `The download didn't finish: ${download.error}`
-      : "Downloads carry on in the background while you finish setting up."]),
+      : "Downloads carry on in the background while you finish setting up. Ratings compare the models on a short English test; est. marks an estimate."]),
   );
   const state = modelState(chosenModel);
   setFooter({
@@ -566,7 +577,7 @@ function renderDone(): void {
   const ready = micOk && (!mac || typeOk) && state === "ready";
   const list = h("ul", { class: "ob-card ob-checklist" }, [
     checkItem(micOk, "Microphone", micOk ? "Allowed" : "Not allowed yet", micOk ? undefined : { label: "Fix", step: "permissions" }),
-    mac ? checkItem(typeOk, "Typing into apps", typeOk ? "Accessibility is allowed" : "Accessibility is needed to type where your cursor is", typeOk ? undefined : { label: "Fix", step: "permissions" }) : null,
+    mac ? checkItem(typeOk, "Typing into apps", typeOk ? "Accessibility is allowed" : "Until it's allowed, your words are copied for you to paste", typeOk ? undefined : { label: "Fix", step: "permissions" }) : null,
     checkItem(state === "ready" ? true : state === "downloading" ? "busy" : false, name,
       state === "ready" ? "Downloaded and ready" : state === "downloading" ? `Downloading · ${Math.round(download.percentage)}%` : state === "failed" ? "The download failed" : "Not downloaded yet",
       state === "ready" || state === "downloading" ? undefined : { label: state === "failed" ? "Retry" : "Download", step: "model" }),

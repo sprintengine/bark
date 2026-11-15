@@ -164,13 +164,16 @@ function progressCell(id: string, percentage: number, message: string, cancel?: 
   return wrap;
 }
 
+// Use is an instant switch, so it reads quieter than Download.
+function quiet(node: HTMLButtonElement): HTMLButtonElement { node.classList.add("is-quiet"); return node; }
+
 function action(row: Row): HTMLElement {
   if (row.location !== "local") return el("span", "model-inuse", "In use");
   if (row.kind === "speech") {
     const progress = speechProgress.get(row.id);
     if (speechDownload === row.id || (progress && !progress.done)) return progressCell(row.id, progress?.percentage ?? 0, progress?.message ?? "Starting download…");
     if (row.installed && row.inUse) return el("span", "model-inuse", "In use");
-    if (row.installed) return button("Use", () => choose({ model: row.id, transcriptionLocation: "local" }));
+    if (row.installed) return quiet(button("Use", () => choose({ model: row.id, transcriptionLocation: "local" })));
     return button("Download", () => startSpeechDownload(row.id), speechDownload !== null);
   }
   const m = row.polish!;
@@ -180,7 +183,7 @@ function action(row: Row): HTMLElement {
   }
   if (!m.supported) return el("span", "model-muted", "Unavailable");
   if (row.inUse) return el("span", "model-inuse", "In use");
-  if (m.installed) return button("Use", () => choose({ polishProvider: "local", polishModel: m.id, polishEnabled: true }));
+  if (m.installed) return quiet(button("Use", () => choose({ polishProvider: "local", polishModel: m.id, polishEnabled: true })));
   return button("Download", () => startPolishDownload(m), busyDownload());
 }
 
@@ -193,8 +196,8 @@ function details(row: Row): HTMLElement {
   fact("Publisher", row.publisher);
   if (row.languages) fact("Languages", row.languages);
   if (row.bytes) fact(row.kind === "speech" ? "Download, about" : "Download", formatBytes(row.bytes));
-  if (row.wer !== undefined) fact("Word error rate", `${row.wer}%`);
-  if (row.rtfx !== undefined) fact("Speed on an M4 Mac", `${row.rtfx}× real time`);
+  if (row.wer !== undefined) fact("Word error rate (reference)", `${row.wer.toFixed(1)}%`);
+  if (row.rtfx !== undefined) fact("Speed (reference, M4 Mac)", `${row.rtfx >= 10 ? Math.round(row.rtfx) : row.rtfx.toFixed(1)}× real time`);
   if (row.kind === "speech" && row.inUse && measured) fact("Speed on this computer", `${measured.toFixed(0)}× real time`);
   if (row.polish?.downloads != null) fact("Hugging Face downloads", row.polish.downloads.toLocaleString());
   body.append(facts);
@@ -206,7 +209,13 @@ function details(row: Row): HTMLElement {
     const buttons = el("div", "models-actions");
     if (!row.installed && supported && !linkDrafts.has(row.id) && (row.kind === "speech" ? speechDownload === null : !busyDownload())) buttons.append(linkButton(row.id));
     if (row.source?.startsWith("https://huggingface.co/")) buttons.append(button("Model page ↗", () => openUrl(row.source!)));
-    if (row.polish?.installed) buttons.append(button("Remove", async () => { await invoke("remove_local_model", { model: row.id }); await load(); }, busyDownload()));
+    // Removing the model in use would turn polish off underneath the person;
+    // they switch first.
+    if (row.polish?.installed && !row.inUse) {
+      const remove = button("Remove", async () => { await invoke("remove_local_model", { model: row.id }); await load(); }, busyDownload());
+      remove.classList.add("is-destructive");
+      buttons.append(remove);
+    }
     if (buttons.childElementCount) body.append(buttons);
   }
   panel.append(body);
@@ -243,7 +252,7 @@ function rowElement(row: Row): HTMLElement[] {
   kind.append(glyph, row.kind === "speech" ? "Speech" : "Polish");
   kind.title = row.kind === "speech" ? "Speech to text" : "Cleans up the text";
 
-  const bench = "on 20 LibriSpeech clips, measured on an M4 Mac";
+  const bench = "(reference: 20 English clips, M4 Mac)";
   const speedTitle = [
     row.rtfx !== undefined ? `${row.rtfx}× real time ${bench}` : "Estimated",
     row.kind === "speech" && row.inUse && measured ? `${measured.toFixed(0)}× real time on this computer` : "",

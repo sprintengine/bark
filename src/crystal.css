@@ -172,6 +172,9 @@ body {
 .topbar-actions { margin-left: auto; display: flex; gap: var(--sem-space-sm); }
 .topbar-actions[hidden], .is-first-run .topbar-actions { display: none; }
 #clearActivityButton:disabled { visibility: hidden; }
+/* With nothing logged, the empty state says so once; the summary row goes. */
+#screen-activity .row:has(#activitySummary:empty) { display: none; }
+#screen-activity .row:has(#activitySummary:empty) + .activity-list > .empty { border-top: 0; }
 .content { padding: 2px var(--page-gutter) 32px; }
 #screenTitle:focus { outline: none; }
 #screen-home, #screen-dictionary, #screen-activity { margin: 0; }

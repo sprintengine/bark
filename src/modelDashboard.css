@@ -167,6 +167,9 @@
 .model-where { white-space: nowrap; }
 .model-where--host, .model-where--cloud { color: var(--crystal-ink); }
 .model-action-cell { display: flex; justify-content: flex-end; }
+.model-action.is-quiet { background: transparent; border-color: transparent; box-shadow: none; color: var(--crystal-accent); }
+.model-action.is-quiet:hover:not(:disabled) { background: var(--crystal-tint); color: var(--crystal-accent); }
+.model-action.is-destructive { color: var(--crystal-error); }
 .model-action { min-width: 64px; min-height: 24px; padding: 0 10px; font-size: var(--sem-font-size-meta); }
 .model-row.is-in-use { background: color-mix(in srgb, var(--crystal-accent) 5%, transparent); }
 .model-row.is-in-use:hover, .model-row.is-in-use.is-open { background: color-mix(in srgb, var(--crystal-accent) 8%, transparent); }
@@ -203,16 +206,13 @@
 @media (max-width: 960px) {
   /* The search takes the first line; filters share the second. */
   .model-toolbar #modelSearchBox { flex-basis: 100%; }
-  .model-table-head, .model-row, .model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 24px minmax(170px, 1fr) 26px 56px 56px 56px 96px; }
+  .model-table-head, .model-row, .model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 22px minmax(150px, 1fr) 64px 66px 66px 52px 84px; }
   .model-table-head > :nth-child(7), .model-row > :nth-child(7) { display: none; }
-  /* The kind keeps its glyph and title; the word goes first. */
-  .model-kind { font-size: 0; gap: 0; }
-  .model-steps i { width: 8px; }
-  .model-est { display: none; }
-  .model-steps:has(+ .model-est) i.on { opacity: 0.6; }
+  .model-steps i { width: 7px; }
+  .model-rating { gap: 3px; }
 }
 @media (max-width: 800px) {
-  .model-table-head, .model-row, .model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 24px minmax(150px, 1fr) 26px 52px 52px 92px; }
+  .model-table-head, .model-row, .model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 22px minmax(140px, 1fr) 64px 66px 66px 84px; }
   .model-table-head .col-size, .model-row .col-size { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {

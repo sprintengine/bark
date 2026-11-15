@@ -114,7 +114,7 @@
                   <div><dt>Streak</dt><dd class="num"><span id="statStreak">0</span> days <span class="totals-aside" id="statBestStreak"></span></dd></div>
                   <div><dt>Spoken time</dt><dd class="num" id="statSpokenTime">0 m</dd></div>
                   <div><dt>Money saved</dt><dd class="num" id="statMoneySaved">$0</dd></div>
-                  <div id="statZeroEditTile" hidden><dt>Zero-edit</dt><dd class="num"><span id="statZeroEdit">–</span> <span class="totals-aside" id="statZeroEditMeta"></span></dd></div>
+                  <div id="statZeroEditTile" hidden><dt>Sent without edits</dt><dd class="num"><span id="statZeroEdit">–</span> <span class="totals-aside" id="statZeroEditMeta"></span></dd></div>
                 </dl>
                 <p class="totals-note" id="statMoneySavedMeta">vs cloud transcription</p>
               </section>
@@ -207,7 +207,7 @@
           <div class="settings-card">
             <div class="row">
               <div class="row-text">
-                <div class="row-label" id="activitySummary">All clear</div>
+                <div class="row-label" id="activitySummary"></div>
               </div>
               <div class="row-control">
                 <button class="btn btn-ghost" id="clearActivityButton" type="button">Clear</button>
@@ -261,7 +261,7 @@
             </div>
             <div id="modelRows" role="rowgroup"></div>
           </div>
-          <p class="model-footnote" id="modelFootnote">Speech models are rated from word error rate and speed on 20 LibriSpeech clips, measured on an M4 Mac. Ratings marked est. are estimates. A model's details also show its speed on this computer once it has transcribed here.</p>
+          <p class="model-footnote" id="modelFootnote">Speech ratings come from reference measurements: word error rate and speed on 20 English clips, through the Mac app's engines on an M4 Mac. This app runs some models differently, so read them as a comparison. est. marks an estimate. A model's details show its speed on this computer once it has transcribed here.</p>
           <section class="home-section" aria-labelledby="hubTitle" id="hubSection" hidden>
             <div class="section-head"><h2 id="hubTitle">From Hugging Face</h2></div>
             <div class="card" id="modelSearchResults" aria-busy="false"></div>

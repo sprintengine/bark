@@ -91,6 +91,8 @@ function renderHeadlineDuration(node: HTMLElement, text: string): void {
 }
 
 const usdFormat = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+// The cloud rate is fractions of a cent; the same currency style, more digits.
+const rateFormat = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 3 });
 
 function formatMoney(usd: number): string {
   if (usd > 0 && usd < 0.005) return `<${usdFormat.format(0.01)}`;
@@ -157,7 +159,7 @@ function renderStats(summary: UsageStatsSummary): void {
   statWpm.textContent = String(summary.speakingWpm);
   statMoneySaved.textContent = formatMoney(summary.moneySavedUsd);
   statMoneySavedMeta.textContent =
-    `vs cloud at $${summary.cloudRateUsdPerMinute.toFixed(3)}/min`;
+    `vs cloud at ${rateFormat.format(summary.cloudRateUsdPerMinute)} a minute`;
 
   renderZeroEdit(summary);
   renderChart(summary.week);
@@ -270,7 +272,7 @@ function renderRecent(history: HistoryEntry[]): void {
 function renderApps(history: HistoryEntry[]): void {
   const { count, named } = appsUsed(history);
   statApps.textContent = named === 0 ? "–" : String(count);
-  statAppsMeta.textContent = named === 0 ? "recorded from now on" : `in the last ${named.toLocaleString()} dictation${named === 1 ? "" : "s"}`;
+  statAppsMeta.textContent = named === 0 ? "recorded from now on" : "across recent dictations";
 }
 
 async function refresh(): Promise<void> {

@@ -933,7 +933,8 @@ async fn connect_transcription_host(
 fn pill_window_bounds(state: &str) -> Option<(f64, f64)> {
     match state {
         "idle" => Some((68.0, 24.0)),
-        "hover" => Some((186.0, 46.0)),
+        // The name, the shortcut and the settings gear side by side.
+        "hover" => Some((208.0, 46.0)),
         "starting" | "transcribing" => Some((186.0, 46.0)),
         // Room for the level meter, the timer and the "Stop" shortcut hint.
         "recording" => Some((244.0, 46.0)),

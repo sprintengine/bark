@@ -380,4 +380,4 @@ body[data-pill="error"] .pill { padding-right: 36px; }
 }
 
 /* Hover: the gear sits at the trailing end, so the content keeps clear of it. */
-body[data-pill="hover"] .pill { gap: 7px; padding: 0 34px 0 12px; justify-content: flex-start; }
+body[data-pill="hover"] .pill { gap: 7px; padding: 0 40px 0 12px; justify-content: flex-start; }
