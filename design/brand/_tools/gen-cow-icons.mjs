@@ -23,13 +23,19 @@
 //     makes the iOS set full-bleed and the Android adaptive foreground the mark alone)
 //   apps/android/app/src/main/res/drawable/ic_launcher_{background,foreground}.xml
 //   apps/macos/Packages/FairspokenUI/Sources/FairspokenUI/CowMarkPaths.swift
+//
+// Not written, so copy them by hand when a master changes: the inline SVGs in
+// home.html (sidebar: small; empty state: medium), src/onboarding.ts (ICONS.cow:
+// medium) and src-tauri/src/host/dashboard.html (header: small), each the master's
+// shapes in currentColor on a square viewBox of "76 57.5 871 871".
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const REPO = new URL('../../../', import.meta.url).pathname;
+const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 const COW = REPO + 'design/brand/logo/cow/';
 
 // ── Masters ──────────────────────────────────────────────────────────────
