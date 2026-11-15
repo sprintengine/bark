@@ -20,6 +20,8 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 PageTitle("Home") { MicDeviceChip() }
+                // First: a dictation that hasn't been transcribed is the one thing that can be lost.
+                if !model.pending.items.isEmpty { PendingDictationsCard() }
                 if model.history.items.isEmpty {
                     FirstUseCard()
                     EmptyRecent()
@@ -248,7 +250,7 @@ private struct DictateBarContent: View {
         case .transcribing:
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Transcribing…").font(TypeScale.body).foregroundStyle(Crystal.ink2)
+                Text(dictation.transcribingNote.map { "\($0)…" } ?? "Transcribing…").font(TypeScale.body).foregroundStyle(Crystal.ink2)
             }
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -331,6 +333,108 @@ struct DictateButton: View {
         .buttonStyle(.plain)
         .disabled(busy)
         .accessibilityLabel(listening ? "Stop dictation" : "Start dictation")
+    }
+}
+
+// MARK: - Not transcribed yet
+
+/// Dictations every attempt failed on. Their audio stays on this Mac until one is transcribed;
+/// the app retries on its own, and here they can be retried now, exported or moved to the Trash.
+struct PendingDictationsCard: View {
+    @Environment(AppModel.self) private var model
+    @State private var confirmDelete: PendingDictation?
+
+    var body: some View {
+        let pending = model.pending
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeading("Not transcribed yet") {
+                if pending.items.count > 1 {
+                    Button("Retry All") { Task { await pending.retryAll(manual: true) } }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Crystal.clientAccent)
+                        .disabled(!pending.retrying.isEmpty)
+                        .help("Transcribe them all now; the text goes to Recent")
+                }
+            }
+            Card(padding: 4) {
+                VStack(spacing: 0) {
+                    ForEach(Array(pending.items.enumerated()), id: \.element.id) { index, item in
+                        if index > 0 { Rectangle().fill(Crystal.hairline).frame(height: 1).padding(.leading, 48) }
+                        PendingDictationRow(item: item, retrying: pending.retrying.contains(item.id)) { confirmDelete = item }
+                    }
+                }
+            }
+            Text("Kept on this Mac until transcribed. \(AppInfo.displayName) keeps retrying.")
+                .font(TypeScale.meta).foregroundStyle(Crystal.ink3)
+        }
+        .confirmationDialog("Delete this recording?",
+                            isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
+                            presenting: confirmDelete) { item in
+            Button("Move to Trash", role: .destructive) { model.pending.delete(item.id) }
+        } message: { _ in
+            Text("It hasn't been transcribed. The audio moves to the Trash.")
+        }
+        // Only reached when the Trash couldn't be used: nothing is gone yet.
+        .confirmationDialog("Delete permanently?",
+                            isPresented: Binding(get: { pending.needsPermanentDeletion != nil },
+                                                 set: { if !$0 { pending.keepAfterTrashFailed() } }),
+                            presenting: pending.needsPermanentDeletion) { id in
+            Button("Delete Permanently", role: .destructive) { pending.deletePermanently(id) }
+        } message: { _ in
+            Text("The recording couldn't be moved to the Trash, so nothing was deleted. Deleting it permanently can't be undone; export the audio first to keep it.")
+        }
+    }
+}
+
+private struct PendingDictationRow: View {
+    var item: PendingDictation
+    var retrying: Bool
+    var onDelete: () -> Void
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            IconTile("waveform.badge.exclamationmark", color: Crystal.Tile.orange, size: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(item.appName ?? "Dictation") · \(PillView.clock(item.durationSeconds))")
+                    .font(TypeScale.body).foregroundStyle(Crystal.ink).lineLimit(1)
+                Text(retrying ? "Transcribing…" : item.lastError ?? "Not transcribed yet")
+                    .font(.system(size: 11)).foregroundStyle(Crystal.ink3).lineLimit(2).truncationMode(.tail)
+                    .help(item.lastError ?? "")
+            }
+            Spacer(minLength: 8)
+            Text(Format.relative(item.date)).font(TypeScale.meta).foregroundStyle(Crystal.ink3).monospacedDigit()
+            if retrying {
+                ProgressView().controlSize(.small).frame(width: 52)
+            } else {
+                Button("Retry") { Task { await model.pending.retry(item.id, manual: true) } }
+                    .cardButton()
+                    .controlSize(.small)
+                    .help("Transcribe it now; the text goes to the clipboard and Recent")
+            }
+            Menu {
+                actions
+            } label: {
+                Image(systemName: "ellipsis").foregroundStyle(Crystal.ink2).frame(width: 20, height: 20)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.borderless)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .disabled(retrying)
+            .help("More")
+            .accessibilityLabel("More")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
+        .contextMenu { if !retrying { actions } }
+    }
+
+    @ViewBuilder private var actions: some View {
+        Button("Export Audio…") { model.pending.export(item.id) }
+        Button("Move to Trash…", role: .destructive) { onDelete() }
     }
 }
 

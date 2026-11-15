@@ -69,9 +69,10 @@ struct PillView: View {
                 liveTextView
                 HStack(spacing: 9) {
                     ProgressView().controlSize(.small)
-                    Text("Transcribing").font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
+                    // "Retrying the host (1 of 2)" once the first attempt has failed.
+                    Text(dictation.transcribingNote ?? "Transcribing").font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
                 }
-                .accessibilityLabel("Transcribing")
+                .accessibilityLabel(dictation.transcribingNote ?? "Transcribing")
             }
         case .done(let result):
             HStack(spacing: 8) {
@@ -80,7 +81,7 @@ struct PillView: View {
                 Text(headline(for: result)).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
                 // A copy-only message tells the user what to do; it gets the room.
                 if case .copied = result.delivery {} else {
-                    Text("\(result.words) words · \(Format.ms(Double(result.latencyMs)))")
+                    Text(result.delivery.isRecovered ? "\(result.words) words · in Recent" : "\(result.words) words · \(Format.ms(Double(result.latencyMs)))")
                         .font(.system(size: 12)).foregroundStyle(Crystal.ink2).lineLimit(1).monospacedDigit()
                 }
             }
@@ -159,6 +160,7 @@ struct PillView: View {
         case .pasted: "checkmark.circle.fill"
         case .copied: "doc.on.clipboard.fill"
         case .shownInApp: "text.badge.checkmark"
+        case .recovered: "arrow.clockwise.circle.fill"
         }
     }
 
@@ -167,6 +169,7 @@ struct PillView: View {
         case .pasted(let app): app.map { "Inserted into \($0)" } ?? "Inserted"
         case .copied(let reason): reason
         case .shownInApp: "Done"
+        case .recovered(let copied): copied ? "Recovered dictation copied" : "Recovered a dictation"
         }
     }
 

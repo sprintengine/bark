@@ -39,6 +39,7 @@ final class AppModel {
     let settings: SettingsStore
     let history: HistoryStore
     let training: TrainingLibrary
+    let pending: PendingDictations
     let permissions: Permissions
     let models: ModelLibrary
     let dictation: DictationController
@@ -59,8 +60,9 @@ final class AppModel {
         training = TrainingLibrary(settings: settings)
         permissions = Permissions()
         models = ModelLibrary()
+        pending = PendingDictations(settings: settings, models: models, history: history, training: training)
         dictation = DictationController(settings: settings, models: models, history: history, permissions: permissions,
-                                        training: training)
+                                        pending: pending)
         micTest = MicTest(capture: dictation.capture)
         hostStatus = HostStatus(settings: settings)
         // A model that failed to load leaves the previous one in use; the saved choice follows it.
@@ -85,6 +87,14 @@ final class AppModel {
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
         hotkeys.onFnPress = { [weak self] in self?.dictation.fnPressed() }
         hotkeys.onFnRelease = { [weak self] in self?.dictation.fnReleased() }
+
+        pending.onRecovered = { [weak self] words, copied, placement in
+            self?.dictation.announceRecovered(words: words, copied: copied, placement: placement)
+        }
+        // The host answering again is the moment to send it what it missed.
+        hostStatus.onConnected = { [weak self] in
+            Task { await self?.pending.retryAll(manual: false) }
+        }
     }
 
     /// Launch-time work: warm the engine so the first dictation is instant, start Fn if enabled.
@@ -93,6 +103,7 @@ final class AppModel {
             models.use(settings.settings.model)
         }
         applyFnSetting()
+        pending.start()
         if settings.settings.transcriptionLocation == .remoteHost { hostStatus.refresh() }
         #if DEBUG
         // -FAIRSPOKEN_UPDATE_STATE available|checking|downloading|ready|error|idle shows that state

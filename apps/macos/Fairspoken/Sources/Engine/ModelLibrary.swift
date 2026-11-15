@@ -150,6 +150,28 @@ final class ModelLibrary {
         }
     }
 
+    /// Transcribes on this Mac with `requested`, an installed model: the fallback for a dictation
+    /// the host couldn't transcribe, and for retrying a kept one. The model is chosen through
+    /// `use`, so it never replaces one a dictation is using; if it can't be loaded now this
+    /// throws at once, and the dictation stays kept.
+    func transcribeOnThisMac(_ samples16k: [Float], model requested: String, options: TranscriptionRequestOptions) async throws -> TranscriptionOutput {
+        let id = SpeechModelCatalog.resolve(requested).id
+        if !(activeModelID == id && engineState.isReady) {
+            use(id)
+            guard activeModelID == id else {
+                throw NSError(domain: "engine", code: 3, userInfo: [NSLocalizedDescriptionKey: "\(SpeechModelCatalog.resolve(id).shortName) isn't loaded yet"])
+            }
+        }
+        let deadline = ContinuousClock.now + .seconds(120)
+        while !(activeModelID == id && engineState.isReady) {
+            if activeModelID != id { throw NSError(domain: "engine", code: 3, userInfo: [NSLocalizedDescriptionKey: "Another speech model was chosen"]) }
+            if case .failed(let message) = engineState { throw NSError(domain: "engine", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
+            if ContinuousClock.now > deadline { throw NSError(domain: "engine", code: 2, userInfo: [NSLocalizedDescriptionKey: "The speech model is still loading"]) }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        return try await engine.transcribe(samples16k, options: options)
+    }
+
     private func apply(_ stage: ModelStage, for id: String) {
         guard activeModelID == id, engineState != .ready else { return }
         // A late report after the load failed would leave the row looking busy.

@@ -65,17 +65,41 @@ final class TrainingLibrary {
 
     // MARK: Capture
 
-    /// Keeps one dictation when capture is on. Never delays delivery: the WAV is written later.
-    func keep(samples: [Float], rawText: String, finalText: String, model: String, appBundleID: String?) {
-        guard persists, settings.settings.trainingCapture else { return }
+    /// Whether a delivered dictation is kept now.
+    var isCapturing: Bool { persists && settings.settings.trainingCapture }
+
+    /// A dictation's audio: in memory, or a WAV file already on disk (16 kHz mono 16-bit) that is
+    /// moved into the folder rather than written again.
+    enum Audio: Sendable {
+        case samples([Float])
+        case file(URL, durationSeconds: Double)
+    }
+
+    /// Keeps one dictation when capture is on. Never delays delivery: the WAV is written (or
+    /// moved) later. A file that can't be kept is deleted: it was only on its way here.
+    func keep(_ audio: Audio, rawText: String, finalText: String, model: String, appBundleID: String?) {
+        guard isCapturing else {
+            if case .file(let url, _) = audio { try? FileManager.default.removeItem(at: url) }
+            return
+        }
+        let duration: Double = switch audio {
+        case .samples(let samples): Double(samples.count) / TrainingDataStore.sampleRate
+        case .file(_, let seconds): seconds
+        }
         let entry = TrainingEntry(
             createdAt: Int64(Date().timeIntervalSince1970),
-            durationSeconds: Double(samples.count) / TrainingDataStore.sampleRate,
+            durationSeconds: duration,
             speechModel: model, appCategory: AppCategory.of(bundleID: appBundleID).rawValue,
             rawText: rawText, finalText: finalText)
         let store = store()
         queue.async { [weak self] in
-            let result = Result { try store.record(entry, samples: samples) }
+            let result = Result {
+                switch audio {
+                case .samples(let samples): try store.record(entry, samples: samples)
+                case .file(let url, _): try store.record(entry, movingAudioFrom: url)
+                }
+            }
+            if case .failure = result, case .file(let url, _) = audio { try? FileManager.default.removeItem(at: url) }
             DispatchQueue.main.async {
                 guard let self else { return }
                 switch result {
