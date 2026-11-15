@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { mountMonthlyUsage, type MonthlyBucket } from "./monthlyUsage";
+import { appsUsed, renderRecentDictations } from "./homeRecent";
 
 // Renders the Home screen from the persistent usage_stats aggregate. Numbers
 // here are real: time saved compares typing the dictated words at 40 wpm
@@ -44,6 +45,8 @@ const statTimeSavedSub = byId("statTimeSavedSub");
 const statTotalWords = byId("statTotalWords");
 const statSpokenTime = byId("statSpokenTime");
 const statThisWeek = byId("statThisWeek");
+const statApps = byId("statApps");
+const statAppsMeta = byId("statAppsMeta");
 const statWeekDelta = byId("statWeekDelta");
 const statStreak = byId("statStreak");
 const statBestStreak = byId("statBestStreak");
@@ -140,10 +143,11 @@ function renderStats(summary: UsageStatsSummary): void {
 
   statTotalWords.textContent = summary.totalWords.toLocaleString();
   statSpokenTime.textContent = formatDuration(summary.totalRecordingSeconds);
-  statThisWeek.textContent = summary.thisWeekWords.toLocaleString();
-  statWeekDelta.textContent = weekDeltaLabel(summary.thisWeekWords, summary.lastWeekWords);
+  statThisWeek.textContent = `${summary.thisWeekWords.toLocaleString()} words`;
+  statWeekDelta.textContent = `${summary.thisWeekWords.toLocaleString()} this week${summary.lastWeekWords > 0 ? ` · ${weekDeltaLabel(summary.thisWeekWords, summary.lastWeekWords).replace(" vs last week", "")}` : ""}`;
+  statWeekDelta.title = weekDeltaLabel(summary.thisWeekWords, summary.lastWeekWords);
   statStreak.textContent = String(summary.currentStreak);
-  statBestStreak.textContent = `best ${summary.bestStreak}`;
+  statBestStreak.textContent = `· best ${summary.bestStreak}`;
   statWpm.textContent = String(summary.speakingWpm);
   statMoneySaved.textContent = formatMoney(summary.moneySavedUsd);
   statMoneySavedMeta.textContent =
@@ -168,8 +172,8 @@ function renderZeroEdit(summary: UsageStatsSummary): void {
   const raw = summary.rawZeroEditRate30d;
   statZeroEditMeta.textContent =
     polished !== null && polished !== undefined && raw !== null && raw !== undefined
-      ? `polished ${Math.round(polished * 100)}% · raw ${Math.round(raw * 100)}% (30 days)`
-      : "last 30 days";
+      ? `· polished ${Math.round(polished * 100)}%, raw ${Math.round(raw * 100)}%`
+      : "· last 30 days";
 }
 
 interface DictationTimings {
@@ -180,7 +184,11 @@ interface DictationTimings {
 }
 
 interface HistoryEntry {
+  id: string;
+  createdAt: number;
+  text: string;
   durationSeconds: number;
+  appName?: string | null;
   timings?: DictationTimings | null;
 }
 
@@ -209,12 +217,15 @@ async function refreshPerformance(): Promise<void> {
   const section = document.getElementById("performanceSection");
   if (!section) return;
   let timed: TimedDictation[] = [];
+  let history: HistoryEntry[] = [];
   try {
-    const history = await invoke<HistoryEntry[]>("get_transcript_history");
-    timed = history.filter((item): item is TimedDictation => Boolean(item.timings));
+    history = await invoke<HistoryEntry[]>("get_transcript_history");
+    timed = history.filter((item): item is HistoryEntry & TimedDictation => Boolean(item.timings));
   } catch {
     /* outside the app: keep the section hidden */
   }
+  renderRecent(history);
+  renderApps(history);
   section.hidden = timed.length === 0;
   if (timed.length === 0) return;
 
@@ -240,6 +251,20 @@ async function refreshPerformance(): Promise<void> {
   const polished = timed.filter((item) => item.timings.polishMs > 0);
   setText("perfPolish", last.timings.polishMs > 0 ? formatMs(last.timings.polishMs) : "off");
   setText("perfPolishMeta", polished.length > 0 ? typical((t) => t.polishMs, polished) : "");
+}
+
+function renderRecent(history: HistoryEntry[]): void {
+  const section = byId("recentSection");
+  section.hidden = history.length === 0;
+  renderRecentDictations(byId("recentList"), history);
+}
+
+// Apps the recent dictations went into. Older dictations carry no app, so
+// the count says which window it covers.
+function renderApps(history: HistoryEntry[]): void {
+  const { count, named } = appsUsed(history);
+  statApps.textContent = named === 0 ? "–" : String(count);
+  statAppsMeta.textContent = named === 0 ? "recorded from now on" : `in the last ${named.toLocaleString()} dictation${named === 1 ? "" : "s"}`;
 }
 
 async function refresh(): Promise<void> {

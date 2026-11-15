@@ -16,17 +16,17 @@
         <!-- Room for the native traffic lights; drags the window. -->
         <div class="sidebar-chrome" data-tauri-drag-region></div>
         <div class="sidebar-brand" data-tauri-drag-region>
-          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10.5v3M7.5 7v10M11 4v16M14.5 8v8M18 5.5v13M21 10.5v3"/></svg></span>
+          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4.5 10.5v3M8 7.5v9M11.5 4.5v15M15 8v8M18.5 10v4"/></svg></span>
           <span class="brand-name">Fairspoken</span>
         </div>
         <nav class="nav" aria-label="Primary">
-          <button class="nav-item" type="button" data-screen="home" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 10.5v3M7.5 7v10M11 4v16M14.5 8v8M18 5.5v13M21 10.5v3"/></svg><span class="nav-label">Home</span></button>
-          <button class="nav-item" type="button" data-screen="notes"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4" stroke-linecap="round"/></svg><span class="nav-label">Notes</span></button>
-          <button class="nav-item" type="button" data-screen="dictionary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h12v17h-12A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M5 18.5A1.5 1.5 0 0 1 6.5 17h12M9.5 13.5l2.5-6.5 2.5 6.5M10.4 11.5h3.2"/></svg><span class="nav-label">Dictionary</span></button>
-          <button class="nav-item" type="button" data-screen="models"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" stroke-linejoin="round"/></svg><span class="nav-label">Models</span></button>
-          <button class="nav-item" type="button" data-screen="activity"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12h4l2.5 7 5-14L17 12h4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="nav-label">Activity</span></button>
-          <button class="nav-item" type="button" data-screen="settings" id="settingsRailButton"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9.81 4.93 10.09 2.59h3.82l.28 2.34 1.26.52 1.85-1.45 2.7 2.7-1.45 1.85.52 1.26 2.34.28v3.82l-2.34.28-.52 1.26 1.45 1.85-2.7 2.7-1.85-1.45-1.26.52-.28 2.34h-3.82l-.28-2.34-1.26-.52-1.85 1.45-2.7-2.7 1.45-1.85-.52-1.26-2.34-.28v-3.82l2.34-.28.52-1.26L4 6.7 6.7 4l1.85 1.45Z"/><circle cx="12" cy="12" r="3.2"/></svg><span class="nav-label">Settings</span><span class="nav-badge" id="settingsUpdateBadge" aria-hidden="true" hidden></span></button>
-          <button class="nav-item" type="button" data-screen="profile"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3.2"/><path d="M6.4 18.6a6.5 6.5 0 0 1 11.2 0"/></svg><span class="nav-label">Profile</span></button>
+          <button class="nav-item" type="button" data-screen="home" aria-current="page"><span class="nav-tile nav-tile--home" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 10.5v3M8.5 7.5v9M12 4.5v15M15.5 8v8M19 10.5v3"/></svg></span><span class="nav-label">Home</span></button>
+          <button class="nav-item" type="button" data-screen="notes"><span class="nav-tile nav-tile--notes" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="3.5" width="13" height="17" rx="2.5"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/></svg></span><span class="nav-label">Notes</span></button>
+          <button class="nav-item" type="button" data-screen="dictionary"><span class="nav-tile nav-tile--dictionary" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14.5H7.5A2.5 2.5 0 0 0 5 20Z"/><path d="M5 20a1.5 1.5 0 0 0 1.5 1H19"/><path d="m9.5 13.5 2.5-6 2.5 6M10.3 11.6h3.4"/></svg></span><span class="nav-label">Dictionary</span></button>
+          <button class="nav-item" type="button" data-screen="models"><span class="nav-tile nav-tile--models" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.5 8 4.25-8 4.25-8-4.25Z"/><path d="m4 12 8 4.25L20 12M4 16.25l8 4.25 8-4.25"/></svg></span><span class="nav-label">Models</span></button>
+          <button class="nav-item" type="button" data-screen="activity"><span class="nav-tile nav-tile--activity" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5h4l2.5 5.5 5-12 2.5 6.5h4"/></svg></span><span class="nav-label">Activity</span></button>
+          <button class="nav-item" type="button" data-screen="settings" id="settingsRailButton"><span class="nav-tile nav-tile--settings" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9.81 4.93 10.09 2.59h3.82l.28 2.34 1.26.52 1.85-1.45 2.7 2.7-1.45 1.85.52 1.26 2.34.28v3.82l-2.34.28-.52 1.26 1.45 1.85-2.7 2.7-1.85-1.45-1.26.52-.28 2.34h-3.82l-.28-2.34-1.26-.52-1.85 1.45-2.7-2.7 1.45-1.85-.52-1.26-2.34-.28v-3.82l2.34-.28.52-1.26L4 6.7 6.7 4l1.85 1.45Z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="nav-label">Settings</span><span class="nav-badge" id="settingsUpdateBadge" aria-hidden="true" hidden></span></button>
+          <button class="nav-item" type="button" data-screen="profile"><span class="nav-tile nav-tile--profile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></span><span class="nav-label">Profile</span></button>
         </nav>
         <div class="nav-spacer"></div>
         <div class="sidebar-foot">
@@ -60,6 +60,10 @@
           <p class="page-subtitle" id="screenSubtitle" hidden></p>
         </div>
         <p id="settingsSaveStatus" class="settings-save-status" role="status" hidden></p>
+        <div class="topbar-actions" id="homeActions">
+          <button class="btn" data-open="voicetest" type="button">Accuracy test</button>
+          <button class="btn" data-open="speedtest" type="button">Speed test</button>
+        </div>
         <div class="search" id="notesSearch" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg>
           <input id="notesSearchInput" type="search" placeholder="Search notes" aria-label="Search notes" />
@@ -77,49 +81,53 @@
           </div>
 
           <div id="homeStats" hidden>
-            <div class="home-top">
-              <section class="glass-card hero" aria-labelledby="timeSavedLabel">
-                <h2 class="eyebrow" id="timeSavedLabel">Time saved</h2>
-                <div class="value num" id="statTimeSaved">—</div>
-                <div class="sub" id="statTimeSavedSub"></div>
-                <div class="hero-actions">
-                  <button class="btn btn-primary" data-open="speedtest" type="button">Speed test</button>
-                  <button class="btn" data-open="voicetest" type="button">Accuracy test</button>
+            <!-- Four headline figures in one card, split by hairlines. -->
+            <section class="card stat-strip" aria-label="Your dictation">
+              <div class="stat"><div class="stat-label">Average pace</div><div class="stat-value"><span class="num" id="statWpm">0</span><span class="stat-unit">wpm</span></div><div class="stat-meta">measured as you speak</div></div>
+              <div class="stat"><div class="stat-label">Words</div><div class="stat-value"><span class="num" id="statTotalWords">0</span></div><div class="stat-meta" id="statWeekDelta"></div></div>
+              <div class="stat"><div class="stat-label">Apps used</div><div class="stat-value"><span class="num" id="statApps">–</span></div><div class="stat-meta" id="statAppsMeta"></div></div>
+              <div class="stat stat--accent"><div class="stat-label">Time saved</div><div class="stat-value num" id="statTimeSaved">—</div><div class="stat-meta" id="statTimeSavedSub"></div></div>
+            </section>
+
+            <!-- The last few dictations as cards, each with its app, when, and copy. -->
+            <section class="home-section" aria-labelledby="recentTitle" id="recentSection" hidden>
+              <div class="section-head">
+                <h2 id="recentTitle">Recent dictations</h2>
+                <button class="link-btn" type="button" data-route="notes">See all</button>
+              </div>
+              <ol class="recent-list" id="recentList"></ol>
+            </section>
+
+            <div class="home-grid">
+              <section class="card home-card" aria-labelledby="weekChartTitle">
+                <div class="card-head">
+                  <h2 id="weekChartTitle">This week</h2>
+                  <span class="card-meta num" id="statThisWeek"></span>
                 </div>
+                <div class="chart" id="statChart" aria-label="Words per day"></div>
               </section>
-              <section class="glass-card totals" aria-labelledby="totalsTitle">
-                <h2 class="eyebrow" id="totalsTitle">All time</h2>
+              <section class="card home-card" aria-labelledby="totalsTitle">
+                <div class="card-head"><h2 id="totalsTitle">All time</h2></div>
                 <dl class="totals-list">
-                  <div><dt>Words dictated</dt><dd class="num" id="statTotalWords">0</dd></div>
+                  <div><dt>Streak</dt><dd class="num"><span id="statStreak">0</span> days <span class="totals-aside" id="statBestStreak"></span></dd></div>
                   <div><dt>Spoken time</dt><dd class="num" id="statSpokenTime">0 m</dd></div>
                   <div><dt>Money saved</dt><dd class="num" id="statMoneySaved">$0</dd></div>
+                  <div id="statZeroEditTile" hidden><dt>Zero-edit</dt><dd class="num"><span id="statZeroEdit">–</span> <span class="totals-aside" id="statZeroEditMeta"></span></dd></div>
                 </dl>
                 <p class="totals-note" id="statMoneySavedMeta">vs cloud transcription</p>
               </section>
             </div>
-            <section class="glass-card metric-strip" aria-labelledby="usageTitle">
-              <h2 id="usageTitle" class="sr-only">Usage</h2>
-              <div class="stat"><div class="stat-label">This week</div><div class="stat-value"><span class="num" id="statThisWeek">0</span><span class="stat-unit">words</span></div><div class="stat-meta" id="statWeekDelta"></div></div>
-              <div class="stat"><div class="stat-label">Speaking pace</div><div class="stat-value"><span class="num" id="statWpm">0</span><span class="stat-unit">wpm</span></div><div class="stat-meta">measured as you speak</div></div>
-              <div class="stat"><div class="stat-label">Streak</div><div class="stat-value"><span class="num" id="statStreak">0</span><span class="stat-unit">days</span></div><div class="stat-meta" id="statBestStreak"></div></div>
-              <div class="stat" id="statZeroEditTile" hidden><div class="stat-label">Zero-edit</div><div class="stat-value"><span class="num" id="statZeroEdit">–</span></div><div class="stat-meta" id="statZeroEditMeta">last 30 days</div></div>
-            </section>
-            <section class="settings-section" aria-labelledby="performanceTitle" id="performanceSection" hidden>
-              <div class="settings-section-header">
+
+            <section class="home-section" aria-labelledby="performanceTitle" id="performanceSection" hidden>
+              <div class="section-head">
                 <h2 id="performanceTitle">Last dictation</h2>
-                <span class="settings-section-meta" id="perfSummary"></span>
+                <span class="section-meta" id="perfSummary"></span>
               </div>
-              <div class="glass-card metric-strip">
+              <div class="card stat-strip stat-strip--compact">
                 <div class="stat"><div class="stat-label">Wait after release</div><div class="stat-value num" id="perfTotal">–</div><div class="stat-meta" id="perfTotalMeta"></div></div>
                 <div class="stat"><div class="stat-label">Final transcription</div><div class="stat-value num" id="perfTranscribe">–</div><div class="stat-meta" id="perfTranscribeMeta"></div></div>
                 <div class="stat"><div class="stat-label">Speech model</div><div class="stat-value num" id="perfModel">–</div><div class="stat-meta" id="perfModelMeta"></div></div>
                 <div class="stat"><div class="stat-label">Polish</div><div class="stat-value num" id="perfPolish">–</div><div class="stat-meta" id="perfPolishMeta"></div></div>
-              </div>
-            </section>
-            <section class="settings-section" aria-labelledby="weekChartTitle">
-              <h2 id="weekChartTitle">This week</h2>
-              <div class="glass-card">
-                <div class="chart" id="statChart" aria-label="Words per day"></div>
               </div>
             </section>
           </div>
