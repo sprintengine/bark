@@ -78,7 +78,7 @@ deleteButton.addEventListener("click", async () => {
   await refresh();
 });
 
-// A finished dictation may have been kept; settings changes may prune.
+// A finished dictation may have been kept; a chosen retention may prune.
 void listen("transcript-history-updated", () => void refresh());
 void listen("settings-updated", () => void refresh());
 window.addEventListener("focus", () => void refresh());

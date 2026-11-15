@@ -14,13 +14,20 @@
 //!
 //! Only the app category is kept about the target app, never its name or
 //! window contents. The export format is documented in docs/training-data.md.
+//!
+//! Kept dictations are hard to replace, so nothing here removes more than it
+//! must: retention is off unless the user picks it, runs only while capture
+//! is on, and only removes entries this app wrote (`RECORDED_BY`); "Delete
+//! all" removes only the folders the index names; ids are checked before
+//! they become paths; and a rewritten index keeps every line it could not
+//! read, byte for byte.
 
 use crate::audio::Recording;
 use crate::settings::Settings;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::io::{ErrorKind, Write};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
@@ -30,6 +37,10 @@ const INDEX_FILE: &str = "index.jsonl";
 const AUDIO_FILE: &str = "audio.wav";
 const META_FILE: &str = "meta.json";
 const SECONDS_PER_DAY: u64 = 24 * 60 * 60;
+/// `recordedBy` of every entry this app writes. Retention only removes
+/// entries that carry it, so a folder shared with the macOS app (which does
+/// not write it), or entries from builds before it, are never pruned.
+const RECORDED_BY: &str = "fairspoken-desktop";
 
 /// One kept dictation.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -53,6 +64,36 @@ pub struct CaptureEntry {
     /// The dictation as the user left it, when the edit watcher saw a change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edited_text: Option<String>,
+    /// `RECORDED_BY` for entries this app wrote; absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recorded_by: Option<String>,
+}
+
+/// One line of index.jsonl. A line this build cannot read (damaged, from a
+/// newer format, or naming an unsafe id) is never touched and is written
+/// back exactly as it was.
+enum IndexLine {
+    Entry(CaptureEntry),
+    Unreadable(Vec<u8>),
+}
+
+/// An id names a folder under the root, so it must be one plain path
+/// component: not empty, no separators, no `..`, not absolute.
+fn is_safe_id(id: &str) -> bool {
+    let mut components = Path::new(id).components();
+    !id.contains("..")
+        && !id.contains(['/', '\\', ':', '\0'])
+        && matches!(components.next(), Some(Component::Normal(_)))
+        && components.next().is_none()
+}
+
+/// Days of retention to apply now: none unless capture is on.
+fn retention_for(settings: &Settings) -> u16 {
+    if settings.training_capture {
+        settings.training_keep_days
+    } else {
+        0
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -84,6 +125,9 @@ impl CaptureStore {
 
     /// Writes the dictation's folder, then appends it to the index.
     pub fn record(&self, entry: &CaptureEntry, samples: &[i16]) -> Result<(), String> {
+        if !is_safe_id(&entry.id) {
+            return Err(format!("Refusing to keep a dictation with id {:?}", entry.id));
+        }
         // The root first, so `create_dir_all` never leaves it world-readable;
         // this also tightens a root an older build created 0755.
         create_private_dir(&self.root)
@@ -109,24 +153,48 @@ impl CaptureStore {
 
     /// Every readable entry; a damaged line is skipped, not fatal.
     pub fn entries(&self) -> Vec<CaptureEntry> {
-        let Ok(file) = fs::File::open(self.index_path()) else {
-            return Vec::new();
-        };
-        BufReader::new(file)
-            .lines()
-            .map_while(Result::ok)
-            .filter_map(|line| serde_json::from_str(&line).ok())
+        self.read_index()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|line| match line {
+                IndexLine::Entry(entry) => Some(entry),
+                IndexLine::Unreadable(_) => None,
+            })
             .collect()
     }
 
-    fn write_index(&self, entries: &[CaptureEntry]) -> Result<(), String> {
-        let mut payload = String::new();
-        for entry in entries {
-            payload.push_str(&serde_json::to_string(entry).map_err(|err| err.to_string())?);
-            payload.push('\n');
+    /// Every line of the index. A missing index is empty; one that exists but
+    /// cannot be read is an error, so it is never rewritten from nothing.
+    fn read_index(&self) -> Result<Vec<IndexLine>, String> {
+        let bytes = match fs::read(self.index_path()) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(err) => return Err(format!("Could not read the training-data index: {err}")),
+        };
+        Ok(bytes
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.iter().all(u8::is_ascii_whitespace))
+            .map(|line| match serde_json::from_slice::<CaptureEntry>(line) {
+                Ok(entry) if is_safe_id(&entry.id) => IndexLine::Entry(entry),
+                _ => IndexLine::Unreadable(line.to_vec()),
+            })
+            .collect())
+    }
+
+    /// Replaces the index atomically (a temporary file, then a rename).
+    fn write_index(&self, lines: &[IndexLine]) -> Result<(), String> {
+        let mut payload = Vec::new();
+        for line in lines {
+            match line {
+                IndexLine::Entry(entry) => {
+                    payload.extend(serde_json::to_vec(entry).map_err(|err| err.to_string())?)
+                }
+                IndexLine::Unreadable(bytes) => payload.extend_from_slice(bytes),
+            }
+            payload.push(b'\n');
         }
         let temporary = self.root.join(format!("{INDEX_FILE}.{}.tmp", uuid::Uuid::new_v4()));
-        write_private(&temporary, payload.as_bytes())
+        write_private(&temporary, &payload)
             .and_then(|_| fs::rename(&temporary, self.index_path()))
             .map_err(|err| {
                 let _ = fs::remove_file(&temporary);
@@ -134,10 +202,28 @@ impl CaptureStore {
             })
     }
 
+    /// Removes one entry's folder. Only ever called with a checked id.
+    fn remove_entry_folder(&self, id: &str) -> Result<(), String> {
+        if !is_safe_id(id) {
+            return Err(format!("Refusing to delete an entry with id {id:?}"));
+        }
+        let folder = self.root.join(id);
+        match fs::remove_dir_all(&folder) {
+            Err(err) if err.kind() != ErrorKind::NotFound => Err(format!("Could not delete {folder:?}: {err}")),
+            _ => Ok(()),
+        }
+    }
+
     /// Records the user's edited text for a kept dictation.
     pub fn attach_edit(&self, id: &str, edited: &str) -> Result<bool, String> {
-        let mut entries = self.entries();
-        let Some(entry) = entries.iter_mut().find(|entry| entry.id == id) else {
+        if !is_safe_id(id) {
+            return Ok(false);
+        }
+        let mut lines = self.read_index()?;
+        let Some(entry) = lines.iter_mut().find_map(|line| match line {
+            IndexLine::Entry(entry) if entry.id == id => Some(entry),
+            _ => None,
+        }) else {
             return Ok(false);
         };
         if entry.final_text.trim() == edited.trim() {
@@ -145,40 +231,79 @@ impl CaptureStore {
         }
         entry.edited_text = Some(edited.trim().to_string());
         write_json(&self.root.join(id).join(META_FILE), &*entry)?;
-        self.write_index(&entries)?;
+        self.write_index(&lines)?;
         Ok(true)
     }
 
-    /// Deletes dictations older than `retention_days` (0 keeps everything).
+    /// Deletes this app's own dictations (`RECORDED_BY`) older than
+    /// `retention_days`; 0 keeps everything. Entries without the marker are
+    /// never pruned. Callers pass `retention_for(settings)`, which is 0 while
+    /// capture is off.
     pub fn prune(&self, retention_days: u16, now: u64) -> Result<usize, String> {
         if retention_days == 0 {
             return Ok(0);
         }
         let cutoff = now.saturating_sub(u64::from(retention_days) * SECONDS_PER_DAY);
-        let (kept, expired): (Vec<_>, Vec<_>) = self
-            .entries()
-            .into_iter()
-            .partition(|entry| entry.created_at >= cutoff);
-        if expired.is_empty() {
-            return Ok(0);
-        }
-        for entry in &expired {
-            let folder = self.root.join(&entry.id);
-            if folder.is_dir() {
-                fs::remove_dir_all(&folder).map_err(|err| format!("Could not delete {folder:?}: {err}"))?;
+        let mut lines = self.read_index()?;
+        let mut removed = 0;
+        let mut failure = None;
+        lines.retain(|line| match line {
+            IndexLine::Entry(entry)
+                if failure.is_none()
+                    && entry.created_at < cutoff
+                    && entry.recorded_by.as_deref() == Some(RECORDED_BY) =>
+            {
+                match self.remove_entry_folder(&entry.id) {
+                    Ok(()) => {
+                        removed += 1;
+                        false
+                    }
+                    Err(err) => {
+                        failure = Some(err);
+                        true
+                    }
+                }
             }
+            _ => true,
+        });
+        if removed > 0 {
+            self.write_index(&lines)?;
         }
-        self.write_index(&kept)?;
-        Ok(expired.len())
+        failure.map_or(Ok(removed), Err)
     }
 
+    /// Applies the user's retention choice, which is none while capture is off.
+    pub fn apply_retention(&self, settings: &Settings, now: u64) -> Result<usize, String> {
+        self.prune(retention_for(settings), now)
+    }
+
+    /// Deletes every kept dictation, and only those: the folders the index
+    /// names, then their index lines. Anything else under the root, and
+    /// index lines this build cannot read, stay where they are.
     pub fn delete_all(&self) -> Result<(), String> {
-        match fs::remove_dir_all(&self.root) {
-            Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
-                Err(format!("Could not delete the kept dictations: {err}"))
+        let mut lines = self.read_index()?;
+        let mut failure = None;
+        lines.retain(|line| match line {
+            IndexLine::Entry(entry) if failure.is_none() => match self.remove_entry_folder(&entry.id) {
+                Ok(()) => false,
+                Err(err) => {
+                    failure = Some(err);
+                    true
+                }
+            },
+            _ => true,
+        });
+        if lines.is_empty() {
+            match fs::remove_file(self.index_path()) {
+                Err(err) if err.kind() != ErrorKind::NotFound => {
+                    return Err(format!("Could not delete the training-data index: {err}"))
+                }
+                _ => {}
             }
-            _ => Ok(()),
+        } else {
+            self.write_index(&lines)?;
         }
+        failure.map_or(Ok(()), Err)
     }
 
     pub fn summary(&self) -> CaptureSummary {
@@ -396,9 +521,10 @@ pub fn capture_dictation(
         polished_text: texts.polished.map(str::to_string),
         final_text: texts.final_text.to_string(),
         edited_text: None,
+        recorded_by: Some(RECORDED_BY.to_string()),
     };
     let id = entry.id.clone();
-    let retention_days = settings.training_retention_days;
+    let retention_days = retention_for(settings);
     let app = app.clone();
     // The copy is cheap; the resample runs on the writer thread so it never
     // delays the paste.
@@ -426,38 +552,33 @@ pub fn attach_edit(id: &str, edited: &str) {
     let _ = with_store(|store| store.attach_edit(id, edited));
 }
 
-fn retention_days(app: &AppHandle) -> u16 {
-    app.state::<crate::AppServices>()
-        .settings
-        .lock()
-        .map(|service| service.current().training_retention_days)
-        .unwrap_or(0)
-}
-
-/// Applies retention while the app runs, so old dictations go even when no
-/// new ones are kept.
+/// Applies a retention the user chose while capture is on, so this app's old
+/// dictations go even when no new ones are kept. Does nothing otherwise, or
+/// when the settings cannot be read.
 pub fn start_retention_sweeper(app: AppHandle) {
     let _ = std::thread::Builder::new()
         .name("training-retention-sweeper".to_string())
         .spawn(move || loop {
-            let days = retention_days(&app);
-            let _ = with_store(|store| store.prune(days, now_seconds()));
+            let settings = app
+                .state::<crate::AppServices>()
+                .settings
+                .lock()
+                .map(|service| service.current())
+                .ok()
+                .filter(|settings| retention_for(settings) > 0);
+            if let Some(settings) = settings {
+                let _ = with_store(|store| store.apply_retention(&settings, now_seconds()));
+            }
             std::thread::sleep(Duration::from_secs(60 * 60));
         });
 }
 
-/// Prunes and sizes the folder off the main thread.
+/// Sizes the folder off the main thread. Never deletes anything.
 #[tauri::command]
-pub async fn get_training_data_summary(app: AppHandle) -> Result<CaptureSummary, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let days = retention_days(&app);
-        with_store(|store| {
-            store.prune(days, now_seconds())?;
-            Ok(store.summary())
-        })?
-    })
-    .await
-    .map_err(|err| err.to_string())?
+pub async fn get_training_data_summary() -> Result<CaptureSummary, String> {
+    tauri::async_runtime::spawn_blocking(|| with_store(CaptureStore::summary))
+        .await
+        .map_err(|err| err.to_string())?
 }
 
 #[tauri::command]
@@ -504,7 +625,141 @@ mod tests {
             polished_text: Some("Ask cloud code.".to_string()),
             final_text: "Ask cloud code.".to_string(),
             edited_text: None,
+            recorded_by: Some(RECORDED_BY.to_string()),
         }
+    }
+
+    fn ids(store: &CaptureStore) -> Vec<String> {
+        store.entries().into_iter().map(|entry| entry.id).collect()
+    }
+
+    fn append_to_index(root: &Path, line: &[u8]) {
+        let mut index = fs::OpenOptions::new().append(true).open(root.join(INDEX_FILE)).unwrap();
+        index.write_all(line).unwrap();
+        index.write_all(b"\n").unwrap();
+    }
+
+    #[test]
+    fn ids_are_checked_before_they_become_paths() {
+        for id in ["a", "6f1c2d3e-0000-4000-8000-000000000000", "demo-0"] {
+            assert!(is_safe_id(id), "{id}");
+        }
+        for id in ["", ".", "..", "../outside", "a/b", "a\\b", "/abs", "C:", "x..y", "a\0"] {
+            assert!(!is_safe_id(id), "{id:?}");
+        }
+
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("training-data");
+        let store = CaptureStore::new(root.clone());
+        assert!(store.record(&entry("../escape", 1), &[0; 10]).is_err());
+        assert!(!directory.path().join("escape").exists());
+        store.record(&entry("a", 1), &[0; 10]).unwrap();
+        // Lines naming the root itself, a parent folder or an absolute path.
+        fs::create_dir(directory.path().join("outside")).unwrap();
+        fs::write(directory.path().join("outside/keep.txt"), "keep").unwrap();
+        for id in ["", "..", "../outside", directory.path().join("outside").to_str().unwrap()] {
+            let line = serde_json::to_vec(&CaptureEntry { created_at: 0, ..entry(id, 0) }).unwrap();
+            append_to_index(&root, &line);
+        }
+
+        assert_eq!(ids(&store), ["a"]);
+        assert!(!store.attach_edit("..", "edit").unwrap());
+        assert_eq!(store.prune(30, 100 * SECONDS_PER_DAY).unwrap(), 1);
+        store.delete_all().unwrap();
+        assert!(directory.path().join("outside/keep.txt").exists());
+        assert!(root.is_dir());
+        // The unsafe lines are kept as they were, not acted on.
+        assert_eq!(fs::read_to_string(root.join(INDEX_FILE)).unwrap().lines().count(), 4);
+    }
+
+    #[test]
+    fn rewrites_keep_unreadable_lines_byte_for_byte() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().to_path_buf();
+        let store = CaptureStore::new(root.clone());
+        store.record(&entry("a", 1), &[0; 10]).unwrap();
+        let damaged: &[u8] = b"{not json";
+        let not_utf8: &[u8] = b"{\"id\":\"\xff\xfe\"}";
+        let newer: &[u8] = br#"{"version":2,"something":"else"}"#;
+        for line in [damaged, not_utf8, newer] {
+            append_to_index(&root, line);
+        }
+        store.record(&entry("b", 2), &[0; 10]).unwrap();
+
+        assert!(store.attach_edit("b", "Ask Claude Code.").unwrap());
+        let index = fs::read(root.join(INDEX_FILE)).unwrap();
+        let lines: Vec<&[u8]> = index.split(|byte| *byte == b'\n').collect();
+        assert_eq!(&lines[1..4], [damaged, not_utf8, newer]);
+        assert_eq!(ids(&store), ["a", "b"]);
+        assert_eq!(store.entries()[1].edited_text.as_deref(), Some("Ask Claude Code."));
+
+        store.delete_all().unwrap();
+        assert_eq!(fs::read(root.join(INDEX_FILE)).unwrap(), [damaged, not_utf8, newer, b""].join(&b'\n'));
+    }
+
+    #[test]
+    fn an_index_that_cannot_be_read_is_never_rewritten() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().to_path_buf();
+        let store = CaptureStore::new(root.clone());
+        store.record(&entry("a", 1), &[0; 10]).unwrap();
+        // Stand in for an unreadable index: a folder where the file should be.
+        fs::rename(root.join(INDEX_FILE), root.join("saved-index")).unwrap();
+        fs::create_dir(root.join(INDEX_FILE)).unwrap();
+
+        assert!(store.attach_edit("a", "Ask Claude Code.").is_err());
+        assert!(store.prune(30, 100 * SECONDS_PER_DAY).is_err());
+        assert!(store.delete_all().is_err());
+        assert!(root.join(INDEX_FILE).is_dir());
+        assert!(root.join("a/audio.wav").exists());
+    }
+
+    #[test]
+    fn delete_all_removes_only_the_entries_the_index_names() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("training-data");
+        let store = CaptureStore::new(root.clone());
+        store.record(&entry("a", 1), &[0; 10]).unwrap();
+        store.record(&entry("b", 2), &[0; 10]).unwrap();
+        fs::write(root.join("notes.txt"), "mine").unwrap();
+        fs::create_dir(root.join("unlisted")).unwrap();
+        fs::write(root.join("unlisted/audio.wav"), "not in the index").unwrap();
+        fs::write(directory.path().join("sibling.txt"), "beside the folder").unwrap();
+
+        store.delete_all().unwrap();
+
+        assert!(store.entries().is_empty());
+        assert!(!root.join("a").exists() && !root.join("b").exists());
+        assert!(!root.join(INDEX_FILE).exists());
+        assert!(root.join("notes.txt").exists());
+        assert!(root.join("unlisted/audio.wav").exists());
+        assert!(directory.path().join("sibling.txt").exists());
+        // Deleting again, or with no index at all, is harmless.
+        store.delete_all().unwrap();
+        assert!(root.join("notes.txt").exists());
+    }
+
+    #[test]
+    fn retention_runs_only_while_capture_is_on_and_only_on_this_apps_entries() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CaptureStore::new(directory.path().to_path_buf());
+        let now = 100 * SECONDS_PER_DAY;
+        store.record(&entry("mine", now - 60 * SECONDS_PER_DAY), &[0; 10]).unwrap();
+        // As the macOS app, or a build before the marker, writes it.
+        let other = CaptureEntry { recorded_by: None, ..entry("other", now - 60 * SECONDS_PER_DAY) };
+        store.record(&other, &[0; 10]).unwrap();
+
+        let off = Settings { training_capture: false, training_keep_days: 30, ..Settings::default() };
+        assert_eq!(store.apply_retention(&off, now).unwrap(), 0);
+        let default = Settings { training_capture: true, ..Settings::default() };
+        assert_eq!(store.apply_retention(&default, now).unwrap(), 0);
+        assert_eq!(ids(&store), ["mine", "other"]);
+
+        let chosen = Settings { training_capture: true, training_keep_days: 30, ..Settings::default() };
+        assert_eq!(store.apply_retention(&chosen, now).unwrap(), 1);
+        assert_eq!(ids(&store), ["other"]);
+        assert!(directory.path().join("other/audio.wav").exists());
+        assert!(!directory.path().join("mine").exists());
     }
 
     #[test]

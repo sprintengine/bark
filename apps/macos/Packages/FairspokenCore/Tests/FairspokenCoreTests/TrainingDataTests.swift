@@ -40,12 +40,12 @@ struct TrainingDataTests {
         let mode = try FileManager.default.attributesOfItem(atPath: store.audioURL(for: "one").path)[.posixPermissions] as? Int
         #expect(mode == 0o600)
 
-        try store.delete("one")
+        try store.delete("one", removal: .permanent)
         #expect(store.entries().map(\.id) == ["two"])
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("one").path))
 
         try "keep me".write(to: root.appendingPathComponent("notes.txt"), atomically: true, encoding: .utf8)
-        try store.deleteAll()
+        try store.deleteAll(removal: .permanent)
         #expect(store.entries().isEmpty)
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("two").path))
         // Only what the index names is removed.
@@ -64,6 +64,131 @@ struct TrainingDataTests {
         try handle.close()
         try store.record(entry("two"), samples: [0.1])
         #expect(store.entries().map(\.id) == ["one", "two"])
+    }
+
+    private func append(_ line: String, to root: URL) throws {
+        let handle = try FileHandle(forWritingTo: root.appendingPathComponent(TrainingDataStore.indexFile))
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((line + "\n").utf8))
+        try handle.close()
+    }
+
+    private func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
+
+    @Test func idsAreCheckedBeforeTheyBecomePaths() throws {
+        for id in ["one", "6f1c2d3e-0000-4000-8000-000000000000", "demo-0"] { #expect(TrainingDataStore.isSafeID(id)) }
+        for id in ["", ".", "..", "../outside", "a/b", "/abs", "a\\b", "x..y", "C:"] { #expect(!TrainingDataStore.isSafeID(id)) }
+
+        let parent = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("data", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        try "keep".write(to: parent.appendingPathComponent("keep.txt"), atomically: true, encoding: .utf8)
+        let store = TrainingDataStore(root: root)
+        #expect(throws: (any Error).self) { try store.record(entry("../escape"), samples: [0.1]) }
+        #expect(!exists(parent.appendingPathComponent("escape")))
+        try store.record(entry("one"), samples: [0.1])
+        for id in ["", "..", parent.path] {
+            try append(String(decoding: JSONEncoder().encode(entry(id)), as: UTF8.self), to: root)
+        }
+
+        #expect(store.entries().map(\.id) == ["one"])
+        try store.delete("..", removal: .permanent)
+        try store.delete("", removal: .permanent)
+        try store.deleteAll(removal: .permanent)
+        #expect(exists(root))
+        #expect(exists(parent.appendingPathComponent("keep.txt")))
+        // The unsafe lines are kept, not acted on.
+        let index = try String(contentsOf: root.appendingPathComponent(TrainingDataStore.indexFile), encoding: .utf8)
+        #expect(index.split(separator: "\n").count == 3)
+    }
+
+    @Test func rewritesKeepUndecodableLinesByteForByte() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = TrainingDataStore(root: root)
+        try store.record(entry("one"), samples: [0.1])
+        let damaged = "{not json"
+        let newer = #"{"version":2,"something":"else"}"#
+        try append(damaged, to: root)
+        try append(newer, to: root)
+        try store.record(entry("two"), samples: [0.1])
+
+        try store.delete("one", removal: .permanent)
+        let index = root.appendingPathComponent(TrainingDataStore.indexFile)
+        let lines = try String(contentsOf: index, encoding: .utf8).split(separator: "\n").map(String.init)
+        #expect(Array(lines.prefix(2)) == [damaged, newer])
+        #expect(store.entries().map(\.id) == ["two"])
+
+        try store.deleteAll(removal: .permanent)
+        #expect(try String(contentsOf: index, encoding: .utf8) == damaged + "\n" + newer + "\n")
+    }
+
+    @Test func anIndexThatCannotBeReadIsNeverRewritten() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = TrainingDataStore(root: root)
+        try store.record(entry("one"), samples: [0.1])
+        // Stand in for an unreadable index: a folder where the file should be.
+        let index = root.appendingPathComponent(TrainingDataStore.indexFile)
+        try FileManager.default.moveItem(at: index, to: root.appendingPathComponent("saved-index"))
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+
+        #expect(throws: TrainingDataStore.StoreError.indexUnreadable(root.path)) { try store.delete("one", removal: .permanent) }
+        #expect(throws: TrainingDataStore.StoreError.indexUnreadable(root.path)) { try store.deleteAll(removal: .permanent) }
+        #expect(throws: TrainingDataStore.StoreError.indexUnreadable(root.path)) { try store.rebuildIndex() }
+        #expect(exists(store.audioURL(for: "one")))
+        var isDirectory: ObjCBool = false
+        #expect(FileManager.default.fileExists(atPath: index.path, isDirectory: &isDirectory) && isDirectory.boolValue)
+    }
+
+    @Test func deleteAllRemovesOnlyTheEntriesTheIndexNames() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = TrainingDataStore(root: root)
+        try store.record(entry("one"), samples: [0.1])
+        try store.record(entry("two"), samples: [0.1])
+        let unlisted = root.appendingPathComponent("unlisted", isDirectory: true)
+        try FileManager.default.createDirectory(at: unlisted, withIntermediateDirectories: false)
+        try Data([1, 2, 3]).write(to: unlisted.appendingPathComponent(TrainingDataStore.audioFile))
+
+        try store.deleteAll(removal: .permanent)
+
+        #expect(store.entries().isEmpty)
+        #expect(!exists(root.appendingPathComponent("one")) && !exists(root.appendingPathComponent("two")))
+        #expect(!exists(root.appendingPathComponent(TrainingDataStore.indexFile)))
+        #expect(exists(unlisted.appendingPathComponent(TrainingDataStore.audioFile)))
+        #expect(exists(root))
+    }
+
+    @Test func rebuildsTheIndexFromEachMetaFile() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = TrainingDataStore(root: root)
+        var older = entry("older")
+        older.createdAt -= 60
+        try store.record(entry("newer"), samples: [0.1])
+        try store.record(older, samples: [0.1])
+        try store.record(entry("gone"), samples: [0.1])
+        try FileManager.default.removeItem(at: root.appendingPathComponent("gone"))
+        try append("{not json", to: root)
+        // A folder without meta.json, and one whose meta.json names another id, are left out.
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("no-meta"), withIntermediateDirectories: false)
+        try FileManager.default.copyItem(at: root.appendingPathComponent("newer"), to: root.appendingPathComponent("copy"))
+
+        #expect(try store.rebuildIndex() == 2)
+        #expect(store.entries().map(\.id) == ["older", "newer"])
+        let index = try String(contentsOf: root.appendingPathComponent(TrainingDataStore.indexFile), encoding: .utf8)
+        #expect(index.hasSuffix("{not json\n"))
+        let backups = try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".bak") }
+        #expect(backups.count == 1)
+        let backup = try String(contentsOf: root.appendingPathComponent(backups[0]), encoding: .utf8)
+        #expect(backup.contains(#""id":"gone""#))
+
+        // With no index at all, say after the folders were put back from the Trash.
+        try FileManager.default.removeItem(at: root.appendingPathComponent(TrainingDataStore.indexFile))
+        #expect(try store.rebuildIndex() == 2)
+        #expect(store.entries().map(\.id) == ["older", "newer"])
     }
 
     @Test func neverCreatesAMissingFolder() throws {
@@ -107,9 +232,9 @@ struct TrainingDataTests {
     }
 
     @Test func settingsKeepTheCaptureChoiceAndFolder() throws {
-        let s = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"trainingCapture":true,"trainingDataFolder":" /Volumes/workdrive/x "}"#.utf8))
+        let s = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"trainingCapture":true,"trainingDataFolder":" /Volumes/External/x "}"#.utf8))
         #expect(s.trainingCapture)
-        #expect(s.trainingDataFolder == "/Volumes/workdrive/x")
+        #expect(s.trainingDataFolder == "/Volumes/External/x")
         #expect(!AppSettings().trainingCapture)
     }
 }

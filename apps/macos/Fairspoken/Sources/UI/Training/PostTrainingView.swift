@@ -10,6 +10,7 @@ struct PostTrainingView: View {
     @Environment(AppModel.self) private var model
     @State private var player = ClipPlayer()
     @State private var confirmDeleteAll = false
+    @State private var confirmDelete: TrainingEntry?
 
     var body: some View {
         let training = model.training
@@ -24,7 +25,8 @@ struct PostTrainingView: View {
                         TrainCard(summary: training.summary, capturing: model.settings.settings.trainingCapture)
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    RecordingsCard(training: training, player: player, confirmDeleteAll: $confirmDeleteAll)
+                    RecordingsCard(training: training, player: player, confirmDeleteAll: $confirmDeleteAll,
+                                   confirmDelete: $confirmDelete)
                 }
                 .padding(.horizontal, Layout.pageH)
                 .padding(.vertical, Layout.pageTop)
@@ -34,12 +36,34 @@ struct PostTrainingView: View {
         .onAppear { training.refresh() }
         .onDisappear { player.stop() }
         .confirmationDialog("Delete all \(Format.number(training.summary.count)) recordings?", isPresented: $confirmDeleteAll) {
-            Button("Delete All", role: .destructive) {
+            Button("Move All to Trash", role: .destructive) {
                 player.stop()
-                training.deleteAll()
+                training.delete(.all)
             }
         } message: {
-            Text("Their audio and text are removed from \(training.folder.path). This can't be undone.")
+            Text("Their audio and text move from \(training.folder.path) to the Trash.")
+        }
+        .confirmationDialog("Delete this recording?",
+                            isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
+                            presenting: confirmDelete) { entry in
+            Button("Move to Trash", role: .destructive) {
+                if player.playingID == entry.id { player.stop() }
+                training.delete(.one(entry.id))
+            }
+        } message: { _ in
+            Text("It moves to the Trash.")
+        }
+        // Only reached when the Trash couldn't be used: nothing is gone yet.
+        .confirmationDialog("Delete permanently?",
+                            isPresented: Binding(get: { training.needsPermanentDeletion != nil },
+                                                 set: { if !$0 { training.keepAfterTrashFailed() } }),
+                            presenting: training.needsPermanentDeletion) { deletion in
+            Button(deletion == .all ? "Delete All Permanently" : "Delete Permanently", role: .destructive) {
+                player.stop()
+                training.deletePermanently(deletion)
+            }
+        } message: { deletion in
+            Text("\(deletion == .all ? "These recordings" : "This recording") couldn't be moved to the Trash, so nothing was deleted. Deleting permanently can't be undone.")
         }
     }
 }
@@ -193,6 +217,7 @@ private struct RecordingsCard: View {
     var training: TrainingLibrary
     var player: ClipPlayer
     @Binding var confirmDeleteAll: Bool
+    @Binding var confirmDelete: TrainingEntry?
     private static let shown = 30
 
     var body: some View {
@@ -249,14 +274,13 @@ private struct RecordingsCard: View {
             }
             Spacer(minLength: 8)
             Button {
-                if playing { player.stop() }
-                training.delete(entry.id)
+                confirmDelete = entry
             } label: {
                 Image(systemName: "trash")
             }
             .buttonStyle(.plain)
             .foregroundStyle(Crystal.ink3)
-            .help("Delete this recording")
+            .help("Move this recording to the Trash")
             .accessibilityLabel("Delete recording")
         }
         .padding(.vertical, 2)

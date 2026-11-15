@@ -177,8 +177,10 @@ dictation's audio (16 kHz mono 16-bit WAV) and text, in the Tauri app's layout a
 `~/Library/Application Support/<bundle id>/training-data/` unless you choose a folder
 (`trainingDataFolder`; the app makes `Fairspoken Training Data` inside the one you pick). A chosen folder
 is never created at save time: when its drive isn't connected, dictation carries on and nothing is
-kept. Recordings stay until deleted on that screen. The Post-train button stays disabled until
-the training step ships.
+kept. Recordings stay until deleted on that screen; deleting asks first and moves them to the
+Trash (permanent deletion only after a second confirmation, on a drive without a Trash). Only the
+folders `index.jsonl` names are ever touched. The Post-train button stays disabled until the
+training step ships.
 
 ## Model download links
 

@@ -14,6 +14,15 @@ final class TrainingLibrary {
     /// False when a chosen folder is missing, e.g. its drive isn't connected.
     private(set) var isAvailable = true
     private(set) var lastError: String?
+    /// A deletion that couldn't move its recordings to the Trash (a volume without one), waiting
+    /// for the user to confirm deleting them permanently. Nothing has been deleted yet.
+    private(set) var needsPermanentDeletion: Deletion?
+
+    /// What a delete removes.
+    enum Deletion: Equatable, Sendable {
+        case one(String)
+        case all
+    }
 
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let persists: Bool
@@ -95,22 +104,52 @@ final class TrainingLibrary {
         }
     }
 
-    func delete(_ id: String) {
-        mutate { try $0.delete(id) }
+    /// Moves recordings to the Trash. When that fails, nothing is deleted and
+    /// `needsPermanentDeletion` asks the user before anything is removed for good.
+    func delete(_ deletion: Deletion) {
+        run(deletion, removal: .trash)
     }
 
-    func deleteAll() {
-        mutate { try $0.deleteAll() }
+    /// Only after the user confirmed it, when moving to the Trash failed.
+    func deletePermanently(_ deletion: Deletion) {
+        needsPermanentDeletion = nil
+        run(deletion, removal: .permanent)
     }
 
-    private func mutate(_ change: @escaping @Sendable (TrainingDataStore) throws -> Void) {
+    func keepAfterTrashFailed() {
+        needsPermanentDeletion = nil
+    }
+
+    private enum Outcome: Sendable {
+        case done
+        case trashUnavailable
+        case failed(String)
+    }
+
+    private func run(_ deletion: Deletion, removal: TrainingDataStore.Removal) {
         guard persists else { return }
         let store = store()
         queue.async { [weak self] in
-            let error = (try? change(store)) == nil ? "Couldn't change the recordings in \(store.root.path)." : nil
+            let outcome: Outcome
+            do {
+                switch deletion {
+                case .one(let id): try store.delete(id, removal: removal)
+                case .all: try store.deleteAll(removal: removal)
+                }
+                outcome = .done
+            } catch TrainingDataStore.StoreError.couldNotTrash {
+                outcome = .trashUnavailable
+            } catch {
+                outcome = .failed("Couldn't change the recordings in \(store.root.path): \(error.localizedDescription)")
+            }
             DispatchQueue.main.async {
-                self?.lastError = error
-                self?.refresh()
+                guard let self else { return }
+                switch outcome {
+                case .done: self.lastError = nil
+                case .trashUnavailable: self.needsPermanentDeletion = deletion
+                case .failed(let message): self.lastError = message
+                }
+                self.refresh()
             }
         }
     }
