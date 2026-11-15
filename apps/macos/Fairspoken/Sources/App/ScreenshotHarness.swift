@@ -262,7 +262,8 @@ final class ScreenshotHarness {
         var controllers: [DictationController] = []
         var feeders: [Task<Void, Never>] = []
         for (name, phase) in phases {
-            let c = DictationController(settings: model.settings, models: model.models, history: model.history, permissions: model.permissions)
+            let c = DictationController(settings: model.settings, models: model.models, history: model.history, permissions: model.permissions,
+                                        pending: model.pending)
             c.showcase(phase, liveText: name == "listening-text"
                 ? "The patient reports a dry cough for two weeks, with no fever, and mild shortness of breath when climbing stairs"
                 : "")

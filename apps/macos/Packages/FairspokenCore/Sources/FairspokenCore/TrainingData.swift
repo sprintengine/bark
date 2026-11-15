@@ -193,6 +193,28 @@ public struct TrainingDataStore: Sendable {
         try appendToIndex(entry)
     }
 
+    /// Writes the dictation's folder around a recording already on disk (a 16 kHz mono 16-bit
+    /// WAV, as `wav` writes), moving it in rather than writing the audio again, then appends it
+    /// to the index. A move between volumes copies, then removes the original.
+    public func record(_ entry: TrainingEntry, movingAudioFrom source: URL) throws {
+        guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
+        guard Self.isSafeID(entry.id) else { throw CocoaError(.fileWriteInvalidFileName) }
+        let folder = root.appendingPathComponent(entry.id, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        Self.restrict(folder, to: 0o700)
+        let audio = folder.appendingPathComponent(Self.audioFile)
+        do {
+            try FileManager.default.moveItem(at: source, to: audio)
+        } catch {
+            // The folder was made just now and holds nothing: don't leave it behind.
+            try? FileManager.default.removeItem(at: folder)
+            throw error
+        }
+        Self.restrict(audio, to: 0o600)
+        try Self.private(Self.metaEncoder.encode(entry), at: folder.appendingPathComponent(Self.metaFile))
+        try appendToIndex(entry)
+    }
+
     /// Every readable entry, oldest first; a damaged line is skipped, not fatal.
     public func entries() -> [TrainingEntry] {
         ((try? readIndex()) ?? []).compactMap {
