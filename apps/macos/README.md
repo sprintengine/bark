@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Fairspoken,Fairspoken Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (166), FairspokenHost (78), FairspokenUpdates (19), FairspokenSpeech (11)
+scripts/test.sh                       # unit tests: FairspokenCore (197), FairspokenHost (78), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Fairspoken → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Fairspoken Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Fairspoken-<version>-macos-arm64.{zip,dmg}
@@ -212,6 +212,37 @@ Accessibility, such as terminals and web-view apps) is pasted as before. If a di
 front than when recording started, the text is pasted but the old clipboard is not restored, so the
 dictation can still be pasted again.
 
+## Learning from your corrections
+
+**Settings › Vocabulary › Learn from your corrections** (`learnFromEdits`, on by default) is the
+Tauri app's edit watcher, ported. As a recording ends, while it is transcribed, the app reads the
+focused field it will paste into (its text and selection, for the text either side of the
+dictation). It reads that field again when the next dictation starts, when another app or field
+takes focus, or after 60 s, finds the dictation by its surrounding text and diffs it word by word
+(`EditDiff` in FairspokenCore). A 1–3-word replacement that sounds like what was written ("cloud
+code" → "Claude Code") is a fix; rewrites, insertions and unrelated replacements are ignored.
+
+Fixes go to `learned.json` (the Tauri app's format: word pairs, sighting counts and the speech models
+that misheard them, never the sentence) and are promoted by `LearnedStore`'s rules: an uncommon
+capitalised name or term joins Your terms on the first fix; a mapping becomes a correction, scoped to
+those speech models, after two; a mapping between two medicine-like words (the suffix rules, a
+look-alike/sound-alike list and every medicine in the bundled Irish general practice pack) or a
+single short word waits under Suggestions for Accept or Dismiss. Learned entries carry a Learned
+marker; once applied, accepted or dismissed a pair is never promoted again, so a deleted one stays
+deleted. Corrections, manual and learned, are applied to every dictation after casing.
+
+Never read: password managers, terminals, secure fields, fields without a plain-text value and
+values over 100,000 characters. Every read is time-limited (250 ms) and off the main thread, a read
+still running when the paste starts is not used, and insertion never waits for it. When the dictation
+was kept for post-training, the edited text is attached to it as `editedText`.
+
+Electron apps and Chromium browsers only expose their text fields to Accessibility clients they know
+about. When a recording starts in one (Electron is found by its `Electron Framework.framework`), the
+app sets `AXManualAccessibility` on it, the attribute Electron and Chromium provide for this, so
+the field can be read by the time the dictation is pasted. `AXEnhancedUserInterface`, which changes
+how some apps animate and place their windows, is never set. `--ax-probe` (Developer switches)
+reports whether the field in front can be read.
+
 ## Post-training recordings
 
 **Post-training › Save recordings for post-training** (`trainingCapture`, off by default) keeps each
@@ -362,6 +393,7 @@ Run as `…/Contents/MacOS/<name> <flags>`:
 | both | `--screenshots <dir>` | Renders every screen in light and dark into `<dir>` and quits (`scripts/screenshots.sh`). The server uses a sample configuration and binds nothing |
 | both | `--screenshots <dir> --updates` | Captures the update UI instead: every update state, the toast and the Updates settings (simulated, no Sparkle) |
 | client | `--selftest <wav> [--model id] [--host URL --token T]` | Headless end-to-end check of the engine, the streaming client and the SSE feed, with no microphone or TCC |
+| client | `--ax-probe [seconds]` | After the delay, says whether the edit watcher can read the focused field of the app in front (lengths and offsets only, never the text), before and after asking a Chromium-based app for its accessibility tree. Needs Accessibility |
 | client | `--show-dashboard` | Opens the dashboard at launch |
 | server | `--headless` | Serve with no UI (see Run modes) |
 | server | `--show-window` | Opens the window at launch (it also opens on first launch and when the server can't start) |
@@ -427,8 +459,9 @@ Fairspoken/                      Fairspoken
   Sources/Audio/                 AVAudioEngine capture → 16 kHz mono Float32, device selection, level meter
   Sources/Engine/                ModelLibrary, local/remote sessions, HostStatus (network device reachability)
   Sources/Dictation/             DictationController state machine
-  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, copy-only with no text field), hotkeys + Fn tap, sounds
-  Sources/Storage/               settings.json / transcript-history.json / usage-stats.json (Rust schemas), Keychain
+  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, copy-only with no text field), EditWatcher +
+                                 FieldReader (learning from corrections), hotkeys + Fn tap, sounds
+  Sources/Storage/               settings.json / transcript-history.json / usage-stats.json / learned.json (Rust schemas), Keychain
   Sources/UI/                    Home, Models, Settings, Onboarding, Pill
 FairspokenServer/                Fairspoken Server
   Sources/App/                   main (app or --headless), delegate + menu bar, headless runner, login item, sleep guard, screenshots
@@ -437,7 +470,8 @@ FairspokenServer/                Fairspoken Server
   Sources/UI/                    window, Activity + constellation (HostGraphView, FlowAnimator), Clients, Models, Connect, Configuration
 Packages/
   FairspokenCore/                platform-neutral core + tests: frame codec, URL policy, protocol types, SSE parser,
-                                 host events/stats/live-state reducer, polling differ, simulator, settings/history models
+                                 host events/stats/live-state reducer, polling differ, simulator, settings/history models,
+                                 edit diff and learned dictionary
   FairspokenSpeech/              FairspokenSpeech: the only FluidAudio code (pinned 0.17.5): model registry, the client's engine,
                                  the server's worker pool (shared weights, one decoder per worker);
                                  FairspokenWhisper (client only): the only WhisperKit code (pinned 1.1.1), the

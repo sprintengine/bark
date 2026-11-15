@@ -11,13 +11,31 @@ public enum RecordingShortcutMode: String, Codable, Sendable, CaseIterable {
     case pushToTalk = "push-to-talk"
 }
 
+/// Who wrote a dictionary entry (`EntryOrigin` in settings.rs). Learned entries come from the
+/// edit watcher and carry a "Learned" marker on the Vocabulary screen.
+public enum EntryOrigin: String, Codable, Sendable {
+    case manual
+    case learned
+}
+
 public struct TranscriptCorrection: Codable, Equatable, Sendable {
     public var enabled = true
     public var from = ""
     public var to = ""
     public var caseSensitive = false
     public var wholePhrase = true
+    public var origin: EntryOrigin = .manual
+    /// Speech models (`AppSettings.speechModelID`) the correction applies to; empty means every
+    /// model. Learned mappings are scoped to the models that actually produced the mishearing.
+    public var models: [String] = []
+
     public init() {}
+    public init(from: String, to: String, origin: EntryOrigin = .manual, models: [String] = []) {
+        self.from = from
+        self.to = to
+        self.origin = origin
+        self.models = models
+    }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         enabled = c.lenient(Bool.self, .enabled) ?? true
@@ -25,6 +43,22 @@ public struct TranscriptCorrection: Codable, Equatable, Sendable {
         to = c.lenient(String.self, .to) ?? ""
         caseSensitive = c.lenient(Bool.self, .caseSensitive) ?? false
         wholePhrase = c.lenient(Bool.self, .wholePhrase) ?? true
+        origin = c.lenient(EntryOrigin.self, .origin) ?? .manual
+        models = c.lenient([String].self, .models) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey { case enabled, from, to, caseSensitive, wholePhrase, origin, models }
+
+    /// As settings.rs writes it: an unscoped correction has no `models` key.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(enabled, forKey: .enabled)
+        try c.encode(from, forKey: .from)
+        try c.encode(to, forKey: .to)
+        try c.encode(caseSensitive, forKey: .caseSensitive)
+        try c.encode(wholePhrase, forKey: .wholePhrase)
+        try c.encode(origin, forKey: .origin)
+        if !models.isEmpty { try c.encode(models, forKey: .models) }
     }
 }
 
@@ -81,6 +115,13 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var contextAwareness = false
     /// Keep each dictation's audio and text for post-training (`training_capture` in Rust).
     public var trainingCapture = false
+    /// Learn from the user fixing a dictated word in place: misheard names join the vocabulary
+    /// and repeated mishearings become corrections. Only `heard → intended` word pairs are kept,
+    /// never the sentence (`learn_from_edits` in Rust, on by default).
+    public var learnFromEdits = true
+    /// The subset of `vocabularyHints` the edit watcher added, shown with a "Learned" marker. A
+    /// separate list keeps `vocabularyHints` a plain string array for every other reader.
+    public var learnedVocabularyHints: [String] = []
 
     // Mac-only (ignored by the Rust app).
     /// Download links for models, by model id (`SpeechModelCatalog`): an archive of the model's
@@ -135,6 +176,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         polishTones = c.lenient([String: String].self, .polishTones) ?? d.polishTones
         contextAwareness = c.lenient(Bool.self, .contextAwareness) ?? d.contextAwareness
         trainingCapture = c.lenient(Bool.self, .trainingCapture) ?? d.trainingCapture
+        learnFromEdits = c.lenient(Bool.self, .learnFromEdits) ?? d.learnFromEdits
+        learnedVocabularyHints = c.lenient([String].self, .learnedVocabularyHints) ?? d.learnedVocabularyHints
         modelLinks = c.lenient([String: String].self, .modelLinks) ?? d.modelLinks
         restoreClipboard = c.lenient(Bool.self, .restoreClipboard) ?? d.restoreClipboard
         trainingDataFolder = c.lenient(String.self, .trainingDataFolder) ?? d.trainingDataFolder
@@ -154,6 +197,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         s.cloudAuthToken = s.cloudAuthToken.trimmingCharacters(in: .whitespacesAndNewlines)
         s.trainingDataFolder = s.trainingDataFolder.trimmingCharacters(in: .whitespacesAndNewlines)
         s.vocabularyHints = Self.normalizeVocabulary(s.vocabularyHints)
+        s.learnedVocabularyHints = Self.normalizeLearnedVocabulary(s.learnedVocabularyHints, vocabulary: s.vocabularyHints)
+        s.transcriptCorrections = Self.normalizeCorrections(s.transcriptCorrections)
         s.enabledPacks = VocabularyPacks.normalizeEnabled(s.enabledPacks)
         if s.recordingShortcut.trimmingCharacters(in: .whitespaces).isEmpty { s.recordingShortcut = AcceleratorString.defaultRecording }
         if s.transcriptStackShortcut.trimmingCharacters(in: .whitespaces).isEmpty { s.transcriptStackShortcut = AcceleratorString.defaultTranscriptStack }
@@ -181,16 +226,67 @@ public struct AppSettings: Codable, Equatable, Sendable {
         return (settings, raw)
     }
 
+    /// Most vocabulary terms kept (`normalize_vocabulary_hints`).
+    public static let maxVocabularyHints = 50
+    /// Most corrections kept (`normalize_transcript_corrections`).
+    public static let maxCorrections = 100
+
     /// Trim, collapse whitespace, cap at 100 characters, de-duplicate, keep at most 50.
     public static func normalizeVocabulary(_ hints: [String]) -> [String] {
         var out: [String] = []
         for hint in hints {
-            let collapsed = hint.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-            let clean = String(collapsed.prefix(100))
+            let clean = cleanText(hint, max: 100)
             guard !clean.isEmpty, !out.contains(clean) else { continue }
             out.append(clean)
-            if out.count >= 50 { break }
+            if out.count >= maxVocabularyHints { break }
         }
         return out
+    }
+
+    /// Learned markers only survive for terms still in the vocabulary, so removing a term also
+    /// removes its marker (`normalize_learned_hints`).
+    public static func normalizeLearnedVocabulary(_ learned: [String], vocabulary: [String]) -> [String] {
+        var out: [String] = []
+        for hint in learned {
+            let clean = cleanText(hint, max: 100)
+            if vocabulary.contains(clean) && !out.contains(clean) { out.append(clean) }
+        }
+        return out
+    }
+
+    /// Same as `normalize_transcript_corrections`: both sides trimmed and capped at 120
+    /// characters, blank ones dropped, at most 8 distinct model scopes, at most 100 in all.
+    public static func normalizeCorrections(_ corrections: [TranscriptCorrection]) -> [TranscriptCorrection] {
+        var out: [TranscriptCorrection] = []
+        for correction in corrections {
+            var clean = correction
+            clean.from = cleanText(correction.from, max: 120)
+            clean.to = cleanText(correction.to, max: 120)
+            guard !clean.from.isEmpty, !clean.to.isEmpty else { continue }
+            var models: [String] = []
+            for model in correction.models {
+                let id = cleanText(model, max: 80)
+                if !id.isEmpty && !models.contains(id) && models.count < 8 { models.append(id) }
+            }
+            clean.models = models
+            out.append(clean)
+            if out.count >= maxCorrections { break }
+        }
+        return out
+    }
+
+    /// Whitespace collapsed to single spaces, then cut to `max` characters (`clean_text_setting`).
+    static func cleanText(_ value: String, max: Int) -> String {
+        String(value.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(max))
+    }
+
+    /// The id a correction's `models` scope matches (`speech_model_id` in settings.rs): the local
+    /// speech model, or the location for a remote host, which chooses its own model.
+    public var speechModelID: String {
+        switch transcriptionLocation {
+        case .local: model
+        case .remoteHost: "remote-host"
+        case .cloud: "cloud"
+        }
     }
 }

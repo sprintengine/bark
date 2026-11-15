@@ -26,6 +26,21 @@ struct TrainingDataTests {
         #expect(decoded.polishedText == "Hi.")
     }
 
+    @Test func attachesTheUsersEdit() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = TrainingDataStore(root: root)
+        try store.record(entry("one"), samples: [0, 0.1])
+        // The same text as inserted is no edit.
+        #expect(try store.attachEdit("one", edited: " Ask cloud code. ") == false)
+        #expect(try store.attachEdit("one", edited: "Ask Claude Code. "))
+        #expect(store.entries().first?.editedText == "Ask Claude Code.")
+        let meta = try Data(contentsOf: root.appendingPathComponent("one/meta.json"))
+        #expect(try JSONDecoder().decode(TrainingEntry.self, from: meta).editedText == "Ask Claude Code.")
+        #expect(try store.attachEdit("gone", edited: "x") == false)
+        #expect(try store.attachEdit("../one", edited: "x") == false)
+    }
+
     @Test func recordsListsAndDeletes() throws {
         let root = try temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }

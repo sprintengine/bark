@@ -78,6 +78,8 @@ final class DictationController {
     private let training: TrainingLibrary?
     private let permissions: Permissions
     @ObservationIgnored var hotkeys: HotkeyController?
+    /// Learns from the user fixing a dictation in place (`learnFromEdits`).
+    @ObservationIgnored var editWatcher: EditWatcher?
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "dictation")
 
     var meter: LevelMeter { capture.meter }
@@ -116,6 +118,8 @@ final class DictationController {
 
     func start(_ trigger: Trigger) {
         guard !phase.isActive else { return }
+        // The next dictation may land in the field the last one is being watched in.
+        editWatcher?.flush()
         onWillStart?()
         permissions.refresh()
         switch permissions.microphone {
@@ -154,6 +158,7 @@ final class DictationController {
         let front = NSWorkspace.shared.frontmostApplication
         targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
         startedInWindow = targetApp == nil ? NSApp.keyWindow?.identifier : nil
+        editWatcher?.prime(targetApp)
         do {
             try capture.start(deviceName: s.audioDevice, maxSeconds: s.maxRecordingSeconds) { [newSession] chunk in
                 newSession.append(chunk)
@@ -213,6 +218,8 @@ final class DictationController {
         phase = .transcribing
         let target = targetApp
         let placement = self.placement
+        // The field the dictation goes into, read while the speech is transcribed.
+        let fieldRead = editWatcher?.prepare(for: target)
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -220,11 +227,14 @@ final class DictationController {
                 let output = try await session.finish(allSamples: samples)
                 let transcribed = ContinuousClock.now
                 let text = await self.postProcessor.process(
-                    output.text, context: PostProcessContext(appBundleID: target?.bundleIdentifier, vocabulary: s.vocabularyHints))
+                    output.text, context: PostProcessContext(appBundleID: target?.bundleIdentifier, vocabulary: s.vocabularyHints,
+                                                             corrections: s.transcriptCorrections, speechModel: s.speechModelID))
                 guard !text.isEmpty else {
+                    fieldRead?.cancel()
                     self.fail("No speech detected")
                     return
                 }
+                let pasteStarted = ContinuousClock.now
                 let delivery = await self.deliver(text, settings: s, target: target)
                 let total = Int((ContinuousClock.now - released) / .milliseconds(1))
                 let transcribeMs = Int((transcribed - released) / .milliseconds(1))
@@ -236,8 +246,13 @@ final class DictationController {
                     timings: DictationTimings(transcribeMs: transcribeMs, speechModelMs: output.modelMs, totalMs: total),
                     model: output.model, appName: target?.localizedName, appBundleId: target?.bundleIdentifier)
                 self.history.add(item)
-                self.training?.keep(samples: samples, rawText: output.text, finalText: text, model: output.model,
-                                    appBundleID: target?.bundleIdentifier)
+                let captureID = self.training?.keep(samples: samples, rawText: output.text, finalText: text, model: output.model,
+                                                    appBundleID: target?.bundleIdentifier)
+                if case .pasted = delivery, let fieldRead {
+                    self.editWatcher?.arm(await fieldRead.value, insertedAfter: pasteStarted,
+                                          dictation: .init(inserted: text, raw: output.text, speechModel: s.speechModelID,
+                                                           captureID: captureID))
+                }
                 let result = Result(text: text, words: WordCounter.count(text), delivery: delivery, latencyMs: total, placement: placement)
                 if delivery == .shownInApp { self.lastInAppResult = result }
                 self.session = nil

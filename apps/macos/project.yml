@@ -45,6 +45,11 @@ targets:
       - path: Fairspoken
         excludes:
           - Info.plist
+      # The medicines in this pack keep a learned mapping between two of them a suggestion
+      # (LearnedLibrary). The Tauri app's own file, bundled as-is (never copied by hand).
+      - path: ../../src-tauri/packs/ie-general-practice.json
+        buildPhase: resources
+        group: Fairspoken/Resources
     dependencies:
       - package: KeyboardShortcuts
       - package: FairspokenCore

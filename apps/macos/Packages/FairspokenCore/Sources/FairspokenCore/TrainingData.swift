@@ -243,6 +243,27 @@ public struct TrainingDataStore: Sendable {
         if let failure { throw failure }
     }
 
+    /// Records the user's edited text for a kept dictation (`attach_edit` in
+    /// training_capture.rs): in its meta.json and its index line. Returns false when the entry
+    /// is gone or the edit leaves the inserted text as it was.
+    @discardableResult
+    public func attachEdit(_ id: String, edited: String) throws -> Bool {
+        guard isAvailable, Self.isSafeID(id) else { return false }
+        guard let lock = lockIndex() else { throw StoreError.busy(root.path) }
+        defer { close(lock) }
+        var lines = try readIndex()
+        guard let index = lines.firstIndex(where: { if case .entry(let entry) = $0 { entry.id == id } else { false } }),
+              case .entry(var entry) = lines[index] else { return false }
+        let text = edited.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard entry.finalText.trimmingCharacters(in: .whitespacesAndNewlines) != text else { return false }
+        entry.editedText = text
+        let folder = root.appendingPathComponent(id, isDirectory: true)
+        try Self.private(Self.metaEncoder.encode(entry), at: folder.appendingPathComponent(Self.metaFile))
+        lines[index] = .entry(entry)
+        try writeIndex(lines)
+        return true
+    }
+
     /// Rebuilds index.jsonl from each `<id>/meta.json`, e.g. after recordings were put back from
     /// the Trash or copied in by hand. Folders whose meta.json is missing, unreadable or names
     /// another id are left out. The old index is copied beside it first

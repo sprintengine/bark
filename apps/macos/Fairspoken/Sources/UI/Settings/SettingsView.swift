@@ -531,10 +531,23 @@ private struct ManualHostSection: View {
 private struct VocabularySettings: View {
     @Environment(AppModel.self) private var model
     @State private var newTerm = ""
+    @State private var newHeard = ""
+    @State private var newReplacement = ""
 
     var body: some View {
-        let hints = model.settings.settings.vocabularyHints
+        let s = model.settings.settings
+        let suggestions = model.learned.suggestions
         Form {
+            if !suggestions.isEmpty {
+                Section {
+                    ForEach(suggestions) { item in SuggestionRow(item: item) }
+                } header: {
+                    Text("Suggestions")
+                } footer: {
+                    Text("Fixes you made that are never applied on their own. Accept one to correct it from now on.")
+                        .font(.caption).foregroundStyle(Crystal.ink3)
+                }
+            }
             Section {
                 HStack {
                     TextField("Add a term", text: $newTerm, prompt: Text("A name, drug or term"))
@@ -542,24 +555,60 @@ private struct VocabularySettings: View {
                         .onSubmit(add)
                     Button("Add", action: add).disabled(newTerm.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
-                ForEach(hints, id: \.self) { term in
-                    HStack {
+                ForEach(s.vocabularyHints, id: \.self) { term in
+                    HStack(spacing: 8) {
                         Text(term)
+                        if s.learnedVocabularyHints.contains(term) { LearnedTag(help: "Learned from your corrections") }
                         Spacer()
-                        Button { remove(term) } label: { Image(systemName: "minus.circle.fill") }
-                            .buttonStyle(.plain).foregroundStyle(Crystal.ink3)
-                            .accessibilityLabel("Remove \(term)")
+                        RemoveButton(label: "Remove \(term)") { remove(term) }
                     }
                 }
             } header: {
                 HStack {
                     Text("Your terms")
                     Spacer()
-                    Text("\(hints.count) of 50").monospacedDigit()
+                    Text("\(s.vocabularyHints.count) of \(AppSettings.maxVocabularyHints)").monospacedDigit()
                 }
             } footer: {
                 Text("Your spelling is applied to every dictation and sent to your host as hints.")
                     .font(.caption).foregroundStyle(Crystal.ink3)
+            }
+            Section {
+                HStack {
+                    TextField("Heard", text: $newHeard, prompt: Text("Heard as"))
+                        .labelsHidden()
+                        .onSubmit(addCorrection)
+                    Image(systemName: "arrow.right").foregroundStyle(Crystal.ink3).accessibilityHidden(true)
+                    TextField("Replace with", text: $newReplacement, prompt: Text("Replace with"))
+                        .labelsHidden()
+                        .onSubmit(addCorrection)
+                    Button("Add", action: addCorrection).disabled(!canAddCorrection)
+                }
+                ForEach(Array(s.transcriptCorrections.enumerated()), id: \.offset) { index, correction in
+                    CorrectionRow(correction: correction, index: index)
+                }
+            } header: {
+                HStack {
+                    Text("Corrections")
+                    Spacer()
+                    Text("\(s.transcriptCorrections.count) of \(AppSettings.maxCorrections)").monospacedDigit()
+                }
+            } footer: {
+                Text("Whole words and phrases, in any case, replaced in every dictation.")
+                    .font(.caption).foregroundStyle(Crystal.ink3)
+            }
+            Section {
+                Toggle(isOn: Binding(get: { s.learnFromEdits }, set: { v in model.settings.update { $0.learnFromEdits = v } })) {
+                    Text("Learn from your corrections")
+                    Text("When you fix a misheard word right after dictating, names join your terms and words misheard twice become corrections. Only the word pair is kept, never what you wrote.")
+                }
+                .tint(Crystal.clientAccent)
+                if s.learnFromEdits, let change = model.learned.lastChange {
+                    Label("Learned from your edit: \(change)", systemImage: "sparkles")
+                        .font(.caption).foregroundStyle(Crystal.ink2)
+                }
+            } header: {
+                Text("Learning")
             }
             Section {
                 ForEach(VocabularyPacks.all) { pack in
@@ -575,6 +624,10 @@ private struct VocabularySettings: View {
                     .font(.caption).foregroundStyle(Crystal.ink3)
             }
         }
+    }
+
+    private var canAddCorrection: Bool {
+        !newHeard.trimmingCharacters(in: .whitespaces).isEmpty && !newReplacement.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private func packBinding(_ id: String) -> Binding<Bool> {
@@ -595,6 +648,102 @@ private struct VocabularySettings: View {
 
     private func remove(_ term: String) {
         model.settings.update { $0.vocabularyHints.removeAll { $0 == term } }
+    }
+
+    private func addCorrection() {
+        guard canAddCorrection else { return }
+        model.settings.update { $0.transcriptCorrections.append(TranscriptCorrection(from: newHeard, to: newReplacement)) }
+        newHeard = ""
+        newReplacement = ""
+    }
+}
+
+/// One correction: on/off, heard → replacement, its "Learned" marker, and delete. A learned
+/// correction that is deleted is never learned again.
+private struct CorrectionRow: View {
+    @Environment(AppModel.self) private var model
+    var correction: TranscriptCorrection
+    var index: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Toggle("Use this correction", isOn: Binding(get: { correction.enabled }, set: { v in
+                model.settings.update { s in
+                    guard s.transcriptCorrections.indices.contains(index) else { return }
+                    s.transcriptCorrections[index].enabled = v
+                }
+            }))
+            .labelsHidden()
+            .toggleStyle(.checkbox)
+            Text(correction.from).foregroundStyle(correction.enabled ? Crystal.ink : Crystal.ink3)
+            Image(systemName: "arrow.right").font(.caption).foregroundStyle(Crystal.ink3).accessibilityLabel("to")
+            Text(correction.to).foregroundStyle(correction.enabled ? Crystal.ink : Crystal.ink3)
+            if correction.origin == .learned { LearnedTag(help: learnedHelp) }
+            Spacer()
+            RemoveButton(label: "Delete correction \(correction.from)") {
+                model.settings.update { s in
+                    guard s.transcriptCorrections.indices.contains(index) else { return }
+                    s.transcriptCorrections.remove(at: index)
+                }
+            }
+        }
+    }
+
+    private var learnedHelp: String {
+        let names = correction.models.map { id in
+            id == "remote-host" ? "your host" : (SpeechModelCatalog.model(id: id)?.shortName ?? id)
+        }
+        return names.isEmpty ? "Learned from your corrections."
+            : "Learned from your corrections. Applies to \(names.joined(separator: ", "))."
+    }
+}
+
+/// A fix the app will not apply on its own, waiting for the user.
+private struct SuggestionRow: View {
+    @Environment(AppModel.self) private var model
+    var item: LearnedItem
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(item.heard)
+                    Image(systemName: "arrow.right").font(.caption).foregroundStyle(Crystal.ink3).accessibilityLabel("to")
+                    Text(item.intended).fontWeight(.medium)
+                }
+                if let reason = item.reason {
+                    Text(reason).font(.caption).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer()
+            Button("Dismiss") { model.learned.dismiss(item.id) }
+            // Several can be listed at once, so none is the screen's one primary action.
+            Button("Accept") { model.learned.accept(item.id) }
+                .foregroundStyle(Crystal.clientAccent)
+                .fontWeight(.medium)
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// The "Learned" marker beside an entry the app added from the user's corrections.
+private struct LearnedTag: View {
+    var help: String
+    var body: some View {
+        Tag(text: "Learned", symbol: "sparkles", color: Crystal.clientAccent)
+            .help(help)
+            .accessibilityLabel("Learned. \(help)")
+    }
+}
+
+private struct RemoveButton: View {
+    var label: String
+    var action: () -> Void
+    var body: some View {
+        Button(action: action) { Image(systemName: "minus.circle.fill") }
+            .buttonStyle(.plain).foregroundStyle(Crystal.ink3)
+            .help(label)
+            .accessibilityLabel(label)
     }
 }
 
@@ -624,7 +773,7 @@ private struct AboutSettings: View {
                 }
             }
             Section("Privacy") {
-                Text("Audio stays in memory and is never saved, unless you turn on Post-training › Save recordings. Your last 50 dictations stay on this device. With a network device, audio goes to that device only.")
+                Text("Audio stays in memory and is never saved, unless you turn on Post-training › Save recordings. Your last 50 dictations stay on this device. With a network device, audio goes to that device only. To learn from your corrections, the text around a dictation is read again after you edit it and only the corrected words are kept.")
                     .font(.callout).foregroundStyle(Crystal.ink2)
             }
         }

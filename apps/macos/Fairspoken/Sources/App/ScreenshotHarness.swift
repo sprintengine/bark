@@ -120,6 +120,18 @@ final class ScreenshotHarness {
         await freshFrame()
         if let window = windows.dashboard { await capture(window, as: "settings-host-\(suffix)") }
         model.settings.update { $0.transcriptionLocation = location }
+        // Entries learned from corrections beside the user's own (screenshot settings are never saved).
+        model.settings.update { s in
+            for term in ["Beaumont", "Niamh"] where !s.vocabularyHints.contains(term) {
+                s.vocabularyHints.append(term)
+                if term == "Niamh" { s.learnedVocabularyHints.append(term) }
+            }
+            if !s.transcriptCorrections.contains(where: { $0.from == "cloud code" }) {
+                s.transcriptCorrections.append(TranscriptCorrection(from: "fair spoken", to: "Fairspoken"))
+                s.transcriptCorrections.append(TranscriptCorrection(from: "cloud code", to: "Claude Code", origin: .learned,
+                                                                    models: ["parakeet-tdt-0.6b-v3"]))
+            }
+        }
         model.settingsTab = .vocabulary
         try? await Task.sleep(for: .milliseconds(800))
         await freshFrame()

@@ -65,9 +65,11 @@ final class TrainingLibrary {
 
     // MARK: Capture
 
-    /// Keeps one dictation when capture is on. Never delays delivery: the WAV is written later.
-    func keep(samples: [Float], rawText: String, finalText: String, model: String, appBundleID: String?) {
-        guard persists, settings.settings.trainingCapture else { return }
+    /// Keeps one dictation when capture is on, and returns its id. Never delays delivery: the
+    /// WAV is written later.
+    @discardableResult
+    func keep(samples: [Float], rawText: String, finalText: String, model: String, appBundleID: String?) -> String? {
+        guard persists, settings.settings.trainingCapture else { return nil }
         let entry = TrainingEntry(
             createdAt: Int64(Date().timeIntervalSince1970),
             durationSeconds: Double(samples.count) / TrainingDataStore.sampleRate,
@@ -89,6 +91,20 @@ final class TrainingLibrary {
                     self.isAvailable = store.isAvailable
                     self.lastError = error.localizedDescription
                 }
+            }
+        }
+        return entry.id
+    }
+
+    /// Records the user's edit of a kept dictation (the edit watcher saw it), if it is still kept.
+    func attachEdit(_ id: String, edited: String) {
+        guard persists else { return }
+        let store = store()
+        queue.async { [weak self] in
+            guard (try? store.attachEdit(id, edited: edited)) == true else { return }
+            DispatchQueue.main.async {
+                guard let self, store.root == self.folder, let index = self.entries.firstIndex(where: { $0.id == id }) else { return }
+                self.entries[index].editedText = edited.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
     }

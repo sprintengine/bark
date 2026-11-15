@@ -39,6 +39,8 @@ final class AppModel {
     let settings: SettingsStore
     let history: HistoryStore
     let training: TrainingLibrary
+    let learned: LearnedLibrary
+    @ObservationIgnored let editWatcher: EditWatcher
     let permissions: Permissions
     let models: ModelLibrary
     let dictation: DictationController
@@ -57,6 +59,8 @@ final class AppModel {
         ParakeetModels.setLinks(settings.settings.modelLinks)
         history = HistoryStore()
         training = TrainingLibrary(settings: settings)
+        learned = LearnedLibrary(settings: settings)
+        editWatcher = EditWatcher(settings: settings)
         permissions = Permissions()
         models = ModelLibrary()
         dictation = DictationController(settings: settings, models: models, history: history, permissions: permissions,
@@ -74,6 +78,9 @@ final class AppModel {
         updates = UpdateController(configuration: updateConfig)
         hotkeys = HotkeyController()
         dictation.hotkeys = hotkeys
+        dictation.editWatcher = editWatcher
+        editWatcher.onFix = { [weak learned] fix, model in learned?.learn(fix, model: model) }
+        editWatcher.onEdit = { [weak training] id, edited in training?.attachEdit(id, edited: edited) }
 
         // Carry an imported Tauri shortcut over once (KeyboardShortcuts owns it afterwards).
         if settings.importedFromTauri { HotkeyController.adoptAccelerator(settings.settings.recordingShortcut) }
