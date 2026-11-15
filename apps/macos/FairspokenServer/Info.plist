@@ -38,7 +38,7 @@
 	     <sparkle:channel>nightly</sparkle:channel>. Debug builds may override the feed with the
 	     FAIRSPOKEN_APPCAST_URL default (apps/macos/README.md › Updates). -->
 	<key>SUFeedURL</key>
-	<string>https://github.com/sprintengine/fairspoken/releases/download/update-feeds/appcast-fairspoken-server.xml</string>
+	<string>https://github.com/sprintengine/speakeasy/releases/download/update-feeds/appcast-fairspoken-server.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>SPGwzOHQk1H5lvqePdjg11xTC8LT3/AX3kILlbOIxp0=</string>
 	<key>SUEnableAutomaticChecks</key>

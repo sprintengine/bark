@@ -40,7 +40,7 @@ with ratings, sizes and one-click downloads.
 ## Install
 
 Pre-built releases are published on the
-[Releases page](https://github.com/sprintengine/fairspoken/releases).
+[Releases page](https://github.com/sprintengine/speakeasy/releases).
 macOS is the primary platform. Each release carries:
 
 - **macOS** (Apple Silicon, macOS 26): the native app,

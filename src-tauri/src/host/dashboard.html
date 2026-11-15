@@ -2817,8 +2817,8 @@
     if (!DEMO) return null;
     const now = Date.now();
     const offer = (channel) => (channel === "nightly"
-      ? { version: "0.3.0-nightly.20261005.4", channel: "nightly", notes: "https://github.com/sprintengine/fairspoken/releases/tag/v0.3.0-nightly.20261005.4", pubDate: "2026-10-05T12:00:00Z", switchToStable: false }
-      : { version: "0.3.0", channel: "stable", notes: "https://github.com/sprintengine/fairspoken/releases/tag/v0.3.0", pubDate: "2026-10-01T12:00:00Z", switchToStable: false });
+      ? { version: "0.3.0-nightly.20261005.4", channel: "nightly", notes: "https://github.com/sprintengine/speakeasy/releases/tag/v0.3.0-nightly.20261005.4", pubDate: "2026-10-05T12:00:00Z", switchToStable: false }
+      : { version: "0.3.0", channel: "stable", notes: "https://github.com/sprintengine/speakeasy/releases/tag/v0.3.0", pubDate: "2026-10-01T12:00:00Z", switchToStable: false });
     const st = { currentVersion: "0.2.0", channel: "stable", channelSource: "version", defaultChannel: "stable", autoUpdate: false, checksEnabled: true, platform: "linux-x86_64", state: "available", available: offer("stable"), progress: null, error: null, lastCheckedMs: now - 42 * 60000, installedVersion: null, restartMode: "service" };
     const start = params.get("update") || "available";
     if (start === "idle") { st.state = "idle"; st.available = null; }

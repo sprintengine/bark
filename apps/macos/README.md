@@ -326,8 +326,8 @@ in the app's own UI rather than Sparkle's windows.
   items; stable only the default channel. Sparkle never downgrades, so a nightly switched to Stable
   stays put until the next stable release (Settings says so).
 - **Feeds** (one appcast per app, both channels in it, on the rolling `update-feeds` release):
-  - Fairspoken: `https://github.com/sprintengine/fairspoken/releases/download/update-feeds/appcast-fairspoken.xml`
-  - Fairspoken Server: `https://github.com/sprintengine/fairspoken/releases/download/update-feeds/appcast-fairspoken-server.xml`
+  - Fairspoken: `https://github.com/sprintengine/speakeasy/releases/download/update-feeds/appcast-fairspoken.xml`
+  - Fairspoken Server: `https://github.com/sprintengine/speakeasy/releases/download/update-feeds/appcast-fairspoken-server.xml`
 - **Versions:** Sparkle compares `CFBundleVersion` = `CURRENT_PROJECT_VERSION`, which releases set to the
   UTC build timestamp `YYYYMMDDHHMM` (`xcodebuild … CURRENT_PROJECT_VERSION=202610051200`). Local builds
   keep `1`. Updates must be EdDSA-signed with the key whose public half is `SUPublicEDKey` in both
