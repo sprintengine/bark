@@ -49,7 +49,9 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
-            .frame(maxWidth: 780, alignment: .leading)
+            // The grouped form centres its rows in its own width, so it gets exactly the rows'
+            // width plus its 20 pt inset: the wells then line up with the title at every size.
+            .frame(maxWidth: 744, alignment: .leading)
             // The form's own inset lines its groups up with the title.
             .padding(.horizontal, Layout.pageH - 20)
         }
@@ -62,6 +64,14 @@ struct SettingsView: View {
 
     /// One flat capsule on the canvas; the selected tab is a raised card that slides between tabs.
     private func tabStrip(selection: Binding<Tab>) -> some View {
+        // Labels when they fit; icons with tooltips in a narrow window, never a truncated label.
+        ViewThatFits(in: .horizontal) {
+            tabs(selection: selection, labels: true)
+            tabs(selection: selection, labels: false)
+        }
+    }
+
+    private func tabs(selection: Binding<Tab>, labels: Bool) -> some View {
         HStack(spacing: 2) {
             ForEach(Tab.allCases) { tab in
                 let selected = selection.wrappedValue == tab
@@ -70,6 +80,7 @@ struct SettingsView: View {
                     withAnimation(Motion.unlessReduced(Motion.normal, reduceMotion)) { selection.wrappedValue = tab }
                 } label: {
                     Label(tab.title, systemImage: tab.symbol)
+                        .labelStyle(TabLabelStyle(showsTitle: labels || selected))
                         .font(.system(size: 12, weight: selected ? .semibold : .medium))
                         .foregroundStyle(selected ? Crystal.ink : Crystal.ink2)
                         .padding(.horizontal, 11)
@@ -90,6 +101,7 @@ struct SettingsView: View {
                         Circle().fill(Crystal.clientAccent).frame(width: 7, height: 7).offset(x: -6, y: 5).accessibilityHidden(true)
                     }
                 }
+                .help(tab.title)
                 .accessibilityLabel(badged ? "\(tab.title), update available" : tab.title)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
@@ -97,6 +109,17 @@ struct SettingsView: View {
         .padding(3)
         .background(Crystal.well, in: .capsule)
         .overlay(Capsule().strokeBorder(Crystal.hairline))
+    }
+}
+
+/// A settings tab's label: icon and title, or the icon alone in a narrow window.
+private struct TabLabelStyle: LabelStyle {
+    var showsTitle: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 5) {
+            configuration.icon
+            if showsTitle { configuration.title }
+        }
     }
 }
 
@@ -128,11 +151,12 @@ private struct GeneralSettings: View {
                 }
                 .tint(Crystal.clientAccent)
                 LabeledContent {
-                    Button("Review Recordings…") { model.section = .training }
+                    Button("Review Recordings") { model.section = .training }
                         .help("Choose the folder and review recordings in Post-training")
                 } label: {
                     Text("Saved to")
-                    Text(model.training.folder.lastPathComponent)
+                    Text(model.training.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                        .lineLimit(1).truncationMode(.middle)
                 }
             } header: {
                 Text("Recordings")
@@ -263,7 +287,7 @@ private struct TranscriptionSettings: View {
                     Text("Network device").tag(TranscriptionLocation.remoteHost)
                 }
                 .pickerStyle(.segmented)
-                
+                .tint(Crystal.clientAccent)
                 if !remote {
                     Picker("Model", selection: Binding(get: { s.model }, set: { v in
                         model.useModel(v)

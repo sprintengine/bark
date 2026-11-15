@@ -199,7 +199,6 @@ private struct StepHeader: View {
 private struct WelcomeStep: View {
     var body: some View {
         VStack(spacing: 18) {
-            Spacer(minLength: 0).frame(height: 120)
             BrandMark(size: 96)
                 .padding(.bottom, 10)
             Text(AppInfo.displayName)
@@ -221,6 +220,8 @@ private struct WelcomeStep: View {
                 .padding(.top, 28)
         }
         .frame(maxWidth: .infinity)
+        // Centred in the space above the buttons.
+        .containerRelativeFrame(.vertical, alignment: .center) { height, _ in max(height - 40, 420) }
     }
 }
 
@@ -555,7 +556,7 @@ private struct ShortcutStep: View {
         let s = model.settings.settings
         VStack(alignment: .leading, spacing: 12) {
             StepHeader(title: "Your shortcut",
-                       subtitle: "Use it in any app to start dictating. \(SetupGuide.keyLabel(HotkeyController.cancelShortcutSymbols ?? "⎋").capitalized) cancels.")
+                       subtitle: "Use it in any app to start dictating. Press \(SetupGuide.keyLabel(HotkeyController.cancelShortcutSymbols ?? "⎋")) to cancel.")
             Card(padding: 20) {
                 VStack(spacing: 16) {
                     if HotkeyController.hasShortcut {
@@ -723,6 +724,8 @@ private struct TryItStep: View {
                 .padding(16)
             }
             .frame(minHeight: 260, maxHeight: .infinity)
+            // Messages sit by the message box, as in any thread.
+            .defaultScrollAnchor(.bottom)
             .onChange(of: messages) { _, list in
                 if let last = list.last {
                     withAnimation(Motion.unlessReduced(Motion.normal, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
@@ -812,7 +815,6 @@ private struct FinishStep: View {
             StepHeader(title: ready ? "You're all set" : "Almost there",
                        subtitle: ready
                            ? "\(model.settings.settings.recordingShortcutMode == .pushToTalk ? "Hold" : "Press") \(HotkeyController.currentShortcutSymbols) in any app to dictate. \(AppInfo.displayName) lives in the menu bar."
-                               + (model.permissions.accessibility.isGranted ? "" : " Until you allow typing into apps, each dictation is copied for you to paste.")
                            : "\(AppInfo.displayName) can't dictate until the items marked below are done.")
             Card(padding: 6) {
                 VStack(spacing: 0) {
@@ -822,7 +824,7 @@ private struct FinishStep: View {
                     }
                 }
             }
-            Text("To keep recordings for training a model on your voice, turn on Save recordings in Settings › General.")
+            Text("To keep recordings for training a model on your voice, turn on “Save recordings to improve models” in Settings › General.")
                 .font(TypeScale.meta).foregroundStyle(Crystal.ink3)
                 .padding(.top, 8)
         }

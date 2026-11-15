@@ -124,7 +124,7 @@ public struct PrimaryButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(isEnabled ? Crystal.onAccent : Crystal.ink3)
+                .foregroundStyle(isEnabled ? Crystal.onAccent : Crystal.ink3.opacity(0.7))
                 .padding(.horizontal, large ? 18 : 12)
                 .frame(minHeight: large ? 32 : 26)
                 .background {
@@ -133,8 +133,9 @@ public struct PrimaryButtonStyle: ButtonStyle {
                             .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
                             .shadow(color: tint.opacity(0.25), radius: 2, y: 1)
                     } else {
-                        // Unavailable reads as neutral, never as a quieter version of the action.
-                        Capsule().fill(Crystal.well).overlay(Capsule().strokeBorder(Crystal.hairline))
+                        // Unavailable reads as neutral and flat: no edge, so it never looks like a
+                        // secondary button.
+                        Capsule().fill(Crystal.well)
                     }
                 }
                 .contentShape(.capsule)

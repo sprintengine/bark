@@ -101,7 +101,7 @@ private struct FirstUseCard: View {
                     .font(TypeScale.body)
                     .foregroundStyle(Crystal.ink2)
                     Divider().overlay(Crystal.hairline)
-                    DictateBarContent()
+                    DictateBarContent(showsShortcut: false)
                 } else {
                     HStack(alignment: .top, spacing: 14) {
                         IconTile("checklist", color: Crystal.Tile.orange, size: 36)
@@ -217,6 +217,8 @@ private struct DictateBar: View {
 }
 
 private struct DictateBarContent: View {
+    /// The idle hint names the shortcut, unless the card above already shows it.
+    var showsShortcut = true
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var copied = false
@@ -269,11 +271,14 @@ private struct DictateBarContent: View {
                     .help("Copy")
                 }
             } else {
-                HStack(spacing: 6) {
-                    Text("Click to try it here, or")
-                    Text(model.settings.settings.recordingShortcutMode == .pushToTalk ? "hold" : "press")
-                    ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
-                    Text("in any app")
+                HStack(spacing: 5) {
+                    if showsShortcut {
+                        Text("Click to try it here, or \(model.settings.settings.recordingShortcutMode == .pushToTalk ? "hold" : "press")")
+                        ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
+                        Text("in any app")
+                    } else {
+                        Text("Click to try it here")
+                    }
                 }
                 .font(TypeScale.body)
                 .foregroundStyle(Crystal.ink2)
@@ -340,9 +345,9 @@ private struct RecentDictations: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeading("Recent dictations") {
                 Button("See all") { model.homeShowsAllDictations = true }
-                    .buttonStyle(.link)
-                    .font(TypeScale.meta)
-                    .tint(Crystal.clientAccent)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Crystal.clientAccent)
                     .accessibilityLabel("See all dictations")
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 8, alignment: .top)], spacing: 8) {
@@ -395,7 +400,7 @@ private struct DictationCard: View {
             }
         }
         .onHover { hovered = $0 }
-        .help(item.text)
+        .help(item.text.count > 300 ? String(item.text.prefix(300)) + "…" : item.text)
         .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hovered)
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: "Copy") { copy() }
@@ -485,7 +490,6 @@ private struct DictationRow: View {
             AppIconView(bundleID: item.appBundleId, size: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.text).font(TypeScale.body).foregroundStyle(Crystal.ink).lineLimit(expanded ? nil : 2)
-                    .textSelection(.enabled)
                 Text("\(item.appName ?? AppInfo.displayName) · \(item.wordCount) words")
                     .font(.system(size: 11)).foregroundStyle(Crystal.ink3).lineLimit(1)
             }
@@ -502,12 +506,14 @@ private struct DictationRow: View {
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.borderless)
-            .opacity(hovered || copied ? 1 : 0.0001)
+            .opacity(hovered || copied ? 1 : 0)
+            .allowsHitTesting(hovered || copied)
             .help("Copy")
             .accessibilityLabel("Copy dictation")
         }
         .contentShape(.rect)
         .onTapGesture { expanded.toggle() }
+        .accessibilityAction(named: expanded ? "Show less" : "Show all") { expanded.toggle() }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(hovered ? Crystal.rowHover : .clear, in: .rect(cornerRadius: 8, style: .continuous))

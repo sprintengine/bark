@@ -111,7 +111,7 @@ public struct Badge: View {
     private var background: Color {
         switch style {
         case .neutral: Crystal.well
-        case .accent: Crystal.clientAccent.opacity(0.12)
+        case .accent: Crystal.clientAccent.opacity(0.08)
         case .positive: Crystal.ok.opacity(0.12)
         case .outline: .clear
         }

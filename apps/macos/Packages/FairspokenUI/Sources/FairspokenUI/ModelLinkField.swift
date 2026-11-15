@@ -77,8 +77,7 @@ public struct ModelLinkEditor: View {
 
     private var downloadButton: some View {
         Button("Download", action: download)
-            .buttonStyle(.borderedProminent).buttonBorderShape(.capsule)
-            .tint(tint)
+            .buttonStyle(PrimaryButtonStyle(tint: tint))
             .fixedSize()
             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }

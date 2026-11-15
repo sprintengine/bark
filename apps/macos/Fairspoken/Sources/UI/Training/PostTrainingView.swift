@@ -270,7 +270,7 @@ private struct RecordingsCard: View {
                 Text(entry.rawText).font(.callout).foregroundStyle(Crystal.ink)
                     .lineLimit(3).textSelection(.enabled)
                 HStack(spacing: 6) {
-                    Text("\(Format.relative(entry.date)) · \(Format.duration(entry.durationSeconds)) · \(entry.speechModel)")
+                    Text("\(Format.relative(entry.date)) · \(Format.duration(entry.durationSeconds)) · \(SpeechModelCatalog.model(id: entry.speechModel)?.shortName ?? entry.speechModel)")
                         .font(.caption).foregroundStyle(Crystal.ink3)
                     if entry.appCategory != AppCategory.other.rawValue {
                         Tag(text: entry.appCategory.capitalized, color: Crystal.ink2)

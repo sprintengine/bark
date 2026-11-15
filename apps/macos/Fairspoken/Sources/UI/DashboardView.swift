@@ -83,8 +83,8 @@ private struct Sidebar: View {
             Spacer(minLength: 12)
             VStack(alignment: .leading, spacing: 6) {
                 SidebarStatus()
-                UpdateSidebarButton(updates: model.updates, style: .client)
-                    .padding(.horizontal, 4)
+                UpdateSidebarButton(updates: model.updates, style: .client, compact: true)
+                    .padding(.horizontal, 6)
             }
         }
         .padding(.horizontal, 10)

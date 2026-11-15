@@ -233,7 +233,8 @@ struct ModelBadges: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if let engine { Badge(engine.label) }
+            // The engine, where the column has collapsed, unless the name already says it.
+            if let engine, !info.name.contains(engine.label) { Badge(engine.label) }
             if inUse { Badge("In use", style: .positive) }
             if info.isRecommended { Badge("Recommended", style: .accent) }
             if info.englishOnly { Badge("EN", style: .outline).help("English only") }
@@ -407,13 +408,16 @@ struct ModelDetailSheet: View {
                 case .installed:
                     EmptyView()
                 }
-                Button(active ? "In Use" : state == .installed ? "Use This Model" : "Download and Use") {
-                    model.useModel(info.id)
-                    dismiss()
+                // With the link editor open, its own Download is the one action.
+                if !(model.linkEditorModel == info.id && state == .available) {
+                    Button(active ? "In Use" : state == .installed ? "Use This Model" : "Download and Use") {
+                        model.useModel(info.id)
+                        dismiss()
+                    }
+                    .buttonStyle(PrimaryButtonStyle(large: true))
+                    .disabled(active || state.isBusy)
+                    .help(state == .available ? "Downloads the model, then uses it for dictation" : "Use it for dictation")
                 }
-                .buttonStyle(PrimaryButtonStyle(large: true))
-                .disabled(active || state.isBusy)
-                .help(state == .available ? "Downloads the model, then uses it for dictation" : "Use it for dictation")
             }
             .controlSize(.regular)
         }
