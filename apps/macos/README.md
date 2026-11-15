@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Bark,Bark Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (240), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
+scripts/test.sh                       # unit tests: FairspokenCore (255), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Bark → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Bark Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Bark-<version>-macos-arm64.{zip,dmg}
@@ -174,8 +174,18 @@ host is Bark Server's job (or the web dashboard at the host's `/`); the client h
 ### Text while speaking
 
 Settings › General › **Show text while speaking** (`showTextWhileSpeaking`, on by default, a Mac-only
-key) grows the recording pill to show the newest line or two of what you have said, under the level
-bars; with Reduce Motion it changes without animating. It works with on-device transcription
+key) grows the recording pill to show everything said so far, above the level meter: up to four lines
+(three on screens under 820 pt tall), following the newest words. Scroll over the pill with a trackpad
+or mouse wheel to read earlier words; following pauses until you scroll back to the bottom, and a fade
+at the top marks text above. The panel takes the mouse only while the pointer is over the pill and
+never becomes key or activates the app, so the dictation still lands in the app you were in. With
+Reduce Motion it changes without animating.
+
+The pill's dot and bars follow the microphone: `MicLevelTracker` (FairspokenCore) measures 10 ms
+windows on a dBFS scale (-52 dBFS and below reads as silence, -20 dBFS fills the meter), smooths them
+with a fast attack and a slower release, and replays one value per 30 Hz tick a buffer behind the
+clock, so the meter moves smoothly even though capture arrives in 100 ms buffers. With Reduce Motion
+the bars stay put and light up with the level, and the dot's glow follows it instead of its halo. It works with on-device transcription
 (`LiveTranscriptionSession` in FairspokenCore): about every 0.45 s the audio not yet in a finished
 segment is decoded again by the loaded Parakeet model, and once that reaches 12 s it is cut at the
 quietest 20 ms between 7 and 12 s and decoded once, so no decode exceeds the model's 15 s window.

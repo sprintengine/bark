@@ -2,20 +2,33 @@ import FairspokenUI
 import FairspokenCore
 import SwiftUI
 
-/// The floating recording pill: listening (live level, timer and the keys that stop or cancel)
-/// → transcribing → inserted / error. One small glass piece that morphs between states. With
-/// "Show text while speaking" it grows to show the newest line or two of the words so far, over
-/// the level and keys. Callers place it (it takes only the room it needs).
+/// The floating recording pill: listening (a recording dot and bars that follow the voice, and
+/// a timer) → transcribing → inserted / error. One small glass piece that morphs between states.
+/// With "Show text while speaking" it grows to show the whole dictation so far, up to
+/// `maxLines` lines, following the newest words; the person can scroll up to read earlier ones.
+/// Callers place it (it takes only the room it needs).
 struct PillView: View {
     var dictation: DictationController
     var shortcut: String
+    /// Lines of live text shown before it scrolls (fewer on small screens).
+    var maxLines = PillView.defaultMaxLines
+    /// The pill's frame (in the window's SwiftUI global space) while it shows live text, which
+    /// can be scrolled; nil while it can't. The panel takes the mouse only over that frame.
+    var onScrollableFrame: ((CGRect?) -> Void)? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var scheme
+    @State private var follow = ScrollFollow()
+    @State private var scrollPosition = ScrollPosition(edge: .bottom)
+    @State private var textHeight: CGFloat = 0
+    @State private var moreAbove = false
+    @State private var pillFrame: CGRect = .zero
 
-    /// Width of the live text, and how many characters of it the pill shows (two lines of
-    /// 13 pt text at this width, so the newest words are never cut off).
+    /// Width of the live text.
     static let liveTextWidth: CGFloat = 400
-    static let liveTextCharacters = 104
+    static let liveTextFont = Font.system(size: 13)
+    /// One line of `liveTextFont`, with its leading.
+    static let liveTextLineHeight: CGFloat = 16
+    static let defaultMaxLines = 4
     static let height: CGFloat = 44
 
     var body: some View {
@@ -23,19 +36,37 @@ struct PillView: View {
             .padding(.horizontal, showsLiveText ? 16 : 14)
             .padding(.vertical, showsLiveText ? 12 : 0)
             .frame(minHeight: Self.height)
-            // A light wash under the glass keeps the hints legible over any desktop.
+            // A light wash under the glass keeps the text legible over any desktop.
             .background(Crystal.card.opacity(scheme == .dark ? 0.35 : 0.55),
                         in: RoundedRectangle(cornerRadius: showsLiveText ? 20 : Self.height / 2, style: .continuous))
             .glassEffect(dictation.phase.isListening ? .regular.tint(Crystal.live.opacity(0.06)) : .regular,
                          in: RoundedRectangle(cornerRadius: showsLiveText ? 20 : Self.height / 2, style: .continuous))
             .animation(Motion.unlessReduced(Motion.deliberate, reduceMotion), value: stateKey)
-            .animation(Motion.unlessReduced(Motion.normal, reduceMotion), value: liveText)
+            .animation(Motion.unlessReduced(Motion.normal, reduceMotion), value: showsLiveText)
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .global)
+            } action: { frame in
+                pillFrame = frame
+                onScrollableFrame?(showsLiveText ? frame : nil)
+            }
+            .onChange(of: showsLiveText) { _, scrollable in
+                onScrollableFrame?(scrollable ? pillFrame : nil)
+            }
+            .onChange(of: liveText.isEmpty) { _, empty in
+                // A new dictation starts following its newest words again.
+                if empty {
+                    follow.reset()
+                    scrollPosition = ScrollPosition(edge: .bottom)
+                    moreAbove = false
+                    textHeight = 0
+                }
+            }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.updatesFrequently)
     }
 
     private var liveText: String {
-        LiveTranscript.displayTail(dictation.liveText, maxCharacters: Self.liveTextCharacters)
+        dictation.liveText.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
     private var showsLiveText: Bool {
@@ -50,17 +81,17 @@ struct PillView: View {
         case .listening(let since):
             VStack(alignment: .leading, spacing: 10) {
                 liveTextView
-                HStack(spacing: 10) {
-                    StatusDot(color: Crystal.live, pulsing: true)
-                    LevelBars(meter: dictation.meter, active: true, bars: 18, color: Crystal.live)
-                        .frame(width: 84, height: 20)
+                HStack(spacing: 8) {
+                    VoiceDot(meter: dictation.meter, active: true)
+                    LevelBars(meter: dictation.meter, active: true, bars: 16, color: Crystal.live)
+                        .frame(width: 84, height: 22)
                     TimelineView(.periodic(from: since, by: 1)) { ctx in
                         Text(Self.clock(ctx.date.timeIntervalSince(since)))
                             .font(.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit())
                             .foregroundStyle(Crystal.ink2)
+                            .padding(.leading, 2)
                     }
-                    if showsLiveText { Spacer(minLength: 12) } else { divider }
-                    hints
+                    if showsLiveText { Spacer(minLength: 0) }
                 }
                 .accessibilityLabel("Listening")
             }
@@ -100,49 +131,51 @@ struct PillView: View {
         }
     }
 
-    private var divider: some View {
-        Rectangle().fill(Crystal.hairline).frame(width: 1, height: 18)
-    }
-
-    /// "Stop ⇧⌘1 · Cancel esc", from the person's own keys and how this recording started.
-    private var hints: some View {
-        let list = SetupGuide.listeningHints(mode: dictation.shortcutMode, trigger: Self.trigger(dictation.trigger),
-                                             shortcut: HotkeyController.currentShortcutSymbols,
-                                             cancel: HotkeyController.cancelShortcutSymbols ?? "⎋")
-        return HStack(spacing: 6) {
-            ForEach(Array(list.enumerated()), id: \.offset) { index, hint in
-                if index > 0 { Text("·").foregroundStyle(Crystal.ink3) }
-                Text(hint.action).foregroundStyle(Crystal.ink2)
-                if let keys = hint.keys { ShortcutCaps(description: keys) }
-            }
-        }
-        .font(.system(size: 12, weight: .medium))
-        .fixedSize()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(list.map { [$0.action, $0.keys].compactMap { $0 }.joined(separator: " ") }.joined(separator: ", "))
-    }
-
-    static func trigger(_ trigger: DictationController.Trigger) -> SetupGuide.Trigger {
-        switch trigger {
-        case .hotkey: .shortcut
-        case .fn: .fn
-        case .button: .button
-        }
-    }
-
+    /// The words so far, in a few lines that follow the newest words. Scrolling up pauses the
+    /// following (a fade at the top says there is more above); scrolling back down resumes it.
     @ViewBuilder private var liveTextView: some View {
         if showsLiveText {
-            Text(liveText)
-                .font(.system(size: 13))
-                .foregroundStyle(Crystal.ink)
-                .lineLimit(2)
-                .truncationMode(.head)
-                .multilineTextAlignment(.leading)
-                .frame(width: Self.liveTextWidth, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .transition(.opacity)
-                .accessibilityLabel(dictation.liveText)
+            let maxHeight = Self.liveTextLineHeight * CGFloat(max(1, maxLines))
+            ScrollView(.vertical) {
+                Text(liveText)
+                    .font(Self.liveTextFont)
+                    .foregroundStyle(Crystal.ink)
+                    .multilineTextAlignment(.leading)
+                    .frame(width: Self.liveTextWidth, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .scrollPosition($scrollPosition)
+            .scrollIndicators(.never)
+            .frame(width: Self.liveTextWidth, height: min(maxHeight, max(Self.liveTextLineHeight, textHeight)))
+            // The pill grows a line at a time until it is full, then the text scrolls.
+            .animation(Motion.unlessReduced(Motion.normal, reduceMotion), value: min(maxHeight, textHeight))
+            .onScrollGeometryChange(for: TextScroll.self) { geometry in
+                TextScroll(offset: geometry.visibleRect.minY, content: geometry.contentSize.height,
+                           viewport: geometry.containerSize.height)
+            } action: { _, scroll in
+                textHeight = scroll.content
+                moreAbove = ScrollFollow.hasMoreAbove(offset: scroll.offset)
+                if follow.update(offset: scroll.offset, contentHeight: scroll.content, viewportHeight: scroll.viewport) {
+                    scrollPosition.scrollTo(edge: .bottom)
+                }
+            }
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.black.opacity(moreAbove ? 0 : 1), .black], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 14)
+                    Color.black
+                }
+            }
+            .transition(.opacity)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(liveText)
         }
+    }
+
+    private struct TextScroll: Equatable {
+        var offset: CGFloat
+        var content: CGFloat
+        var viewport: CGFloat
     }
 
     private var stateKey: Int {

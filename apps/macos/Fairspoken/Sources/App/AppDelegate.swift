@@ -34,6 +34,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             harness?.run()
             return
         }
+        #if DEBUG
+        if AppInfo.arguments.contains("--pill-demo") {
+            PillDemo.run(model: model, pill: pill)
+            return
+        }
+        #endif
         model.startServices()
         if model.needsOnboarding {
             windows.showOnboarding()

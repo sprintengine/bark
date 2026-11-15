@@ -59,8 +59,11 @@ final class ScreenshotHarness {
             }
             for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)] {
                 NSApp.appearance = NSAppearance(named: appearance)
-                await dashboardShots(suffix: name)
-                await onboardingShots(suffix: name)
+                // `--pill-only`: just the recording pill, for quick review of its states.
+                if !AppInfo.arguments.contains("--pill-only") {
+                    await dashboardShots(suffix: name)
+                    await onboardingShots(suffix: name)
+                }
                 await pillShots(suffix: name)
             }
             NSApp.terminate(nil)
@@ -328,10 +331,6 @@ final class ScreenshotHarness {
     /// The pill states over a wallpaper-like backdrop (the real pill samples the desktop,
     /// which a window capture can't include, so it is staged in a showcase window).
     private func pillShots(suffix: String) async {
-        // Toggle mode, so the hints show the shortcut that stops ("Stop ⇧⌘1 · Cancel esc").
-        let mode = model.settings.settings.recordingShortcutMode
-        model.settings.update { $0.recordingShortcutMode = .toggle }
-        defer { model.settings.update { $0.recordingShortcutMode = mode } }
         let phases: [(String, DictationController.Phase)] = [
             ("listening", .listening(since: Date().addingTimeInterval(-12))),
             ("listening-text", .listening(since: Date().addingTimeInterval(-9))),
@@ -350,17 +349,7 @@ final class ScreenshotHarness {
             feeders.append(feedLevels(into: c.meter))
             controllers.append(c)
         }
-        let view = PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols)
-        let hosting = NSHostingController(rootView: view)
-        let window = AppWindow(contentViewController: hosting)
-        window.styleMask = [.titled, .fullSizeContentView]
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 760, height: 600))
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-        showcaseWindow = window
+        let window = stageShowcase(PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols))
         try? await Task.sleep(for: .milliseconds(1500))
         window.contentViewController = NSHostingController(rootView: PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols))
         window.setContentSize(NSSize(width: 760, height: 600))
@@ -368,6 +357,84 @@ final class ScreenshotHarness {
         await capture(window, as: "pill-\(suffix)")
         feeders.forEach { $0.cancel() }
         window.orderOut(nil)
+        await pillLevelShots(suffix: suffix)
+        await pillScrollShots(suffix: suffix)
+    }
+
+    /// The level indicator at a few voice levels (peak dBFS RMS), with and without Reduce Motion.
+    private func pillLevelShots(suffix: String) async {
+        let levels: [Float?] = [nil, -42, -32, -22]
+        for reduceMotion in [false, true] {
+            var controllers: [DictationController] = []
+            var feeders: [Task<Void, Never>] = []
+            for peak in levels {
+                let c = DictationController(settings: model.settings, models: model.models, history: model.history,
+                                            permissions: model.permissions, pending: model.pending)
+                c.showcase(.listening(since: Date().addingTimeInterval(-4)))
+                feeders.append(feedLevels(into: c.meter, peakDB: peak))
+                controllers.append(c)
+            }
+            let showcase = PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols)
+                .environment(\.showcaseReduceMotion, reduceMotion)
+            let window = stageShowcase(showcase, size: NSSize(width: 760, height: 380))
+            try? await Task.sleep(for: .milliseconds(1800))
+            // A fresh hosting controller renders the level as it is now (see `freshFrame`).
+            window.contentViewController = NSHostingController(rootView: showcase)
+            window.setContentSize(NSSize(width: 760, height: 380))
+            try? await Task.sleep(for: .milliseconds(250))
+            await capture(window, as: "pill-levels\(reduceMotion ? "-reduce-motion" : "")-\(suffix)")
+            feeders.forEach { $0.cancel() }
+            window.orderOut(nil)
+        }
+    }
+
+    /// Long live text: following the newest words, then scrolled partway up by a real scroll
+    /// event (which pauses the following while more words arrive).
+    private func pillScrollShots(suffix: String) async {
+        let text = Self.longDictation
+        let c = DictationController(settings: model.settings, models: model.models, history: model.history,
+                                    permissions: model.permissions, pending: model.pending)
+        c.showcase(.listening(since: Date().addingTimeInterval(-48)), liveText: text)
+        let feeder = feedLevels(into: c.meter)
+        let window = stageShowcase(PillShowcase(controllers: [c], shortcut: HotkeyController.currentShortcutSymbols),
+                                    size: NSSize(width: 760, height: 260))
+        try? await Task.sleep(for: .milliseconds(1500))
+        await capture(window, as: "pill-scroll-bottom-\(suffix)")
+        if let scroll = Self.scrollViews(in: window.contentView).first,
+           let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 14, wheel2: 0, wheel3: 0),
+           let event = NSEvent(cgEvent: cg) {
+            scroll.scrollWheel(with: event)
+        }
+        try? await Task.sleep(for: .milliseconds(400))
+        // More words arrive while scrolled up: the view stays where it was.
+        c.showcase(.listening(since: Date().addingTimeInterval(-50)), liveText: text + " Please also send a copy to the practice nurse.")
+        try? await Task.sleep(for: .milliseconds(600))
+        await capture(window, as: "pill-scroll-up-\(suffix)")
+        feeder.cancel()
+        window.orderOut(nil)
+    }
+
+    static let longDictation = "The patient reports a dry cough for two weeks, with no fever, and mild shortness of breath when "
+        + "climbing stairs. She has no chest pain. She stopped smoking three years ago. On examination her chest is clear "
+        + "and her oxygen saturation is ninety seven percent on room air. Plan: a chest X-ray, bloods including a full "
+        + "blood count, and review in ten days, sooner if she gets worse."
+
+    private static func scrollViews(in view: NSView?) -> [NSScrollView] {
+        guard let view else { return [] }
+        return (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrollViews(in: $0) }
+    }
+
+    private func stageShowcase(_ view: some View, size: NSSize = NSSize(width: 760, height: 600)) -> NSWindow {
+        let window = AppWindow(contentViewController: NSHostingController(rootView: view))
+        window.styleMask = [.titled, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isReleasedWhenClosed = false
+        window.setContentSize(size)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        showcaseWindow = window
+        return window
     }
 
     /// Dev-only: the session may be locked while screenshots run, and then the app can't become
@@ -381,13 +448,22 @@ final class ScreenshotHarness {
         #endif
     }
 
-    private func feedLevels(into meter: LevelMeter) -> Task<Void, Never> {
+    /// Speech-like levels: syllables peaking near `peakDB` (dBFS RMS) over a quiet room, or only
+    /// the room (about -62 dBFS) when nil.
+    private func feedLevels(into meter: LevelMeter, peakDB: Float? = -28) -> Task<Void, Never> {
         Task {
             var t = 0.0
             while !Task.isCancelled {
-                t += 0.05
-                let speech = 0.5 + 0.5 * sin(t * 3.1) * sin(t * 1.3 + 0.6)
-                meter.push(rms: Float(0.004 + 0.09 * max(0, speech) * (0.7 + 0.3 * sin(t * 11))))
+                t += 0.03
+                let db: Float
+                if let peakDB {
+                    // Syllables about five a second near the peak, dipping 18 dB between them.
+                    let syllable = pow(abs(sin(t * 5.5)), 0.6) * (0.75 + 0.25 * sin(t * 1.3))
+                    db = peakDB - 18 * (1 - Float(syllable))
+                } else {
+                    db = -62 + Float(2 * sin(t * 7))
+                }
+                meter.push(rms: pow(10, db / 20))
                 try? await Task.sleep(for: .milliseconds(30))
             }
         }
@@ -417,13 +493,16 @@ final class ScreenshotHarness {
             try? await Task.sleep(for: .milliseconds(100))
         }
         window.displayIfNeeded()
-        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return }
+        try? Self.png(of: window)?.write(to: output.appendingPathComponent("\(name).png"))
+    }
+
+    /// The window's own pixels as PNG.
+    static func png(of window: NSWindow) -> Data? {
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return nil }
         let create = unsafeBitCast(symbol, to: CreateImage.self)
         // includingWindow = 1 << 3; boundsIgnoreFraming = 1 << 0, bestResolution = 1 << 3
-        guard let image = create(.null, 1 << 3, UInt32(window.windowNumber), (1 << 0) | (1 << 3))?.takeRetainedValue() else { return }
-        let rep = NSBitmapImageRep(cgImage: image)
-        guard let png = rep.representation(using: .png, properties: [:]) else { return }
-        try? png.write(to: output.appendingPathComponent("\(name).png"))
+        guard let image = create(.null, 1 << 3, UInt32(window.windowNumber), (1 << 0) | (1 << 3))?.takeRetainedValue() else { return nil }
+        return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
     }
 }
 
