@@ -58,7 +58,7 @@ and never deleted by nightly retention (its tag is not a version, so nothing
 that lists releases by version ever picks it up). Base URL:
 
 ```
-https://github.com/sprintengine/fairspoken/releases/download/update-feeds/
+https://github.com/sprintengine/speakeasy/releases/download/update-feeds/
 ```
 
 | Asset | Read by | Contents |
@@ -334,7 +334,7 @@ sprintengine/studio's, so the same values carry over.
 | `SPARKLE_ED_PRIVATE_KEY` | Sparkle | The base64 32-byte Ed25519 seed whose public key is `SUPublicEDKey` in both apps' Info.plist (`SPGwzOHQk1H5lvqePdjg11xTC8LT3/AX3kILlbOIxp0=`): the single line in `~/.sparkle/fairspoken_ed25519.private-seed.b64`, which Sparkle's `sign_update --ed-key-file` reads as is. `pbcopy < ~/.sparkle/fairspoken_ed25519.private-seed.b64`. Used only when the Apple group is complete. |
 | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TRUSTED_SIGNING_ENDPOINT`, `AZURE_TRUSTED_SIGNING_ACCOUNT_NAME`, `AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME` | Azure | Windows Authenticode signing through Azure Trusted Signing: the service principal (tenant, client id, client secret) with the "Trusted Signing Certificate Profile Signer" role, and the account's endpoint, name and certificate profile. Without them the installer is unsigned and SmartScreen warns on first run. |
 
-Set them with `gh secret set <NAME> --repo sprintengine/fairspoken` (it reads
+Set them with `gh secret set <NAME> --repo sprintengine/speakeasy` (it reads
 the value from stdin, so `gh secret set SPARKLE_ED_PRIVATE_KEY < ~/.sparkle/...`
 never echoes it). Secret values never reach a log: certificates go to a
 temporary keychain that is deleted, the Sparkle key goes to `sign_update` on
@@ -365,7 +365,7 @@ never update again; keep backups outside this machine.
    all of Apple plus `SPARKLE_ED_PRIVATE_KEY` for Mac updates).
 4. **Keys match the apps.** `tauri.conf.json` `plugins.updater.pubkey` is the
    public half of the Tauri key, its endpoint is
-   `https://github.com/sprintengine/fairspoken/releases/download/update-feeds/desktop-stable.json`,
+   `https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-stable.json`,
    and both Mac apps' `SUPublicEDKey` is
    `SPGwzOHQk1H5lvqePdjg11xTC8LT3/AX3kILlbOIxp0=`. The release fails, before
    publishing, if a signature does not verify against these.
@@ -378,7 +378,7 @@ never update again; keep backups outside this machine.
    The `feeds` job creates the `update-feeds` release and uploads
    `desktop-nightly.json`, `host-nightly.json` and both appcasts (stable JSON
    feeds appear with the first stable). Check
-   `curl -sL https://github.com/sprintengine/fairspoken/releases/download/update-feeds/desktop-nightly.json`.
+   `curl -sL https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-nightly.json`.
 8. **First stable.** `gh workflow run release.yml --ref main -f channel=stable`
    promotes that nightly; all six feeds now exist.
 9. From then on the schedule cuts nightlies by itself.

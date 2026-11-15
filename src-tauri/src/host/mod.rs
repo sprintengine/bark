@@ -704,7 +704,7 @@ mod tests {
             "version": version,
             "channel": channel,
             "pub_date": "2026-10-05T12:00:00Z",
-            "notes": format!("https://github.com/sprintengine/fairspoken/releases/tag/v{version}"),
+            "notes": format!("https://github.com/sprintengine/speakeasy/releases/tag/v{version}"),
             "platforms": { platform: asset },
         })
         .to_string()
