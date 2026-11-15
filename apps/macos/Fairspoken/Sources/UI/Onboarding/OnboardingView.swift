@@ -204,7 +204,7 @@ struct OnboardingView: View {
 
     private func go(_ delta: Int) {
         guard let next = Step(rawValue: step.rawValue + delta) else { return }
-        if next == .ready { model.models.prepare(model.settings.settings.model) }
+        if next == .ready { model.models.use(model.settings.settings.model) }
         withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.45, dampingFraction: 0.85)) { step = next }
     }
 }

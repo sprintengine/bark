@@ -12,14 +12,7 @@ let speechLog = Logger(subsystem: "ie.fairspoken.speech", category: "engine")
 /// shared by every app on the Mac. The cache is fixed on purpose: the Neural Engine's compiled
 /// cache is keyed by model path and OS build, so moving a model costs a 13–15 s recompile.
 public enum ParakeetModels {
-    public enum Stage: Sendable, Equatable {
-        case downloading(Double)
-        /// Unpacking and installing a model downloaded from a link.
-        case unpacking
-        case compiling
-        case loading
-        case warming
-    }
+    public typealias Stage = ModelStage
 
     static func version(for id: String) -> AsrModelVersion? {
         switch id {
@@ -176,8 +169,8 @@ public enum SpeechEngineError: LocalizedError, Sendable {
 
 /// One loaded model for the dictation client. Parakeet runs on the Apple Neural Engine
 /// (`.cpuAndNeuralEngine`, FluidAudio's default).
-public actor FluidAudioEngine: SpeechEngine {
-    public typealias Stage = ParakeetModels.Stage
+public actor FluidAudioEngine: LocalSpeechEngine {
+    public typealias Stage = ModelStage
 
     private var manager: AsrManager?
     public private(set) var loadedModelID: String?

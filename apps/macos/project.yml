@@ -49,6 +49,10 @@ targets:
       - package: KeyboardShortcuts
       - package: FairspokenCore
       - package: FairspokenSpeech
+        product: FairspokenSpeech
+      # Whisper through WhisperKit: the client only (the server runs Parakeet).
+      - package: FairspokenSpeech
+        product: FairspokenWhisper
       - package: FairspokenUI
       - package: FairspokenUpdates
       - package: Sparkle

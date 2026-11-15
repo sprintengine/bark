@@ -1,4 +1,5 @@
 import FairspokenSpeech
+import FairspokenWhisper
 import FairspokenUI
 import FairspokenUpdates
 import KeyboardShortcuts
@@ -237,7 +238,7 @@ private struct TranscriptionSettings: View {
                 Picker("Transcribe on", selection: Binding(get: { remote ? TranscriptionLocation.remoteHost : .local },
                                                            set: { v in
                                                                model.settings.update { $0.transcriptionLocation = v }
-                                                               if v == .local { model.models.prepare(model.settings.settings.model) }
+                                                               if v == .local { model.models.use(model.settings.settings.model) }
                                                            })) {
                     Text("This device").tag(TranscriptionLocation.local)
                     Text("Network device").tag(TranscriptionLocation.remoteHost)
@@ -246,11 +247,10 @@ private struct TranscriptionSettings: View {
                 .tint(Crystal.clientAccent)
                 if !remote {
                     Picker("Model", selection: Binding(get: { s.model }, set: { v in
-                        model.settings.update { $0.model = v }
-                        model.models.prepare(v)
+                        model.useModel(v)
                     })) {
                         ForEach(SpeechModelCatalog.all) { info in
-                            Text(info.name + (FluidAudioEngine.isInstalled(info.id) ? "" : " (\(Format.bytes(info.approxBytes)) download)")).tag(info.id)
+                            Text(info.name + (SpeechModels.isInstalled(info.id) ? "" : " (\(Format.bytes(info.approxBytes)) download)")).tag(info.id)
                         }
                     }
                     let state = model.models.engineState
