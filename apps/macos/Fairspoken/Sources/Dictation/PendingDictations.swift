@@ -163,7 +163,7 @@ final class PendingDictations {
         case .delivered(let output):
             Self.log.info("Transcribed a kept dictation (\(item.durationSeconds, format: .fixed(precision: 1)) s) \(output.placement == .remoteHost ? "on the host" : "on this Mac", privacy: .public)")
         case .noSpeech:
-            Self.log.info("A kept dictation had no speech; deleted")
+            Self.log.info("A kept dictation had no speech; moved to the Trash")
         case .kept(let kept):
             Self.log.error("A kept dictation failed again (\(kept.attempts) tries): \(kept.lastError ?? "", privacy: .public)")
         }
