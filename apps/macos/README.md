@@ -229,7 +229,9 @@ those speech models, after two; a mapping between two medicine-like words (the s
 look-alike/sound-alike list and every medicine in the bundled Irish general practice pack) or a
 single short word waits under Suggestions for Accept or Dismiss. Learned entries carry a Learned
 marker; once applied, accepted or dismissed a pair is never promoted again, so a deleted one stays
-deleted. Corrections, manual and learned, are applied to every dictation after casing.
+deleted. Corrections, manual and learned, are applied to every dictation after casing (not with `postProcess`
+off, as in the Tauri app). Until this app has its own `learned.json`, it reads the Tauri app's, so
+what was dismissed or deleted there stays that way.
 
 Never read: password managers, terminals, secure fields, fields without a plain-text value and
 values over 100,000 characters. Every read is time-limited (250 ms before insertion, 500 ms after) and off the main thread, a read

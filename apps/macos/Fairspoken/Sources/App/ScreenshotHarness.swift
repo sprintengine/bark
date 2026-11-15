@@ -127,7 +127,7 @@ final class ScreenshotHarness {
                 if term == "Niamh" { s.learnedVocabularyHints.append(term) }
             }
             if !s.transcriptCorrections.contains(where: { $0.from == "cloud code" }) {
-                s.transcriptCorrections.append(TranscriptCorrection(from: "fair spoken", to: "Fairspoken"))
+                s.transcriptCorrections.append(TranscriptCorrection(from: "h b a one c", to: "HbA1c"))
                 s.transcriptCorrections.append(TranscriptCorrection(from: "cloud code", to: "Claude Code", origin: .learned,
                                                                     models: ["parakeet-tdt-0.6b-v3"]))
             }

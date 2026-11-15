@@ -80,6 +80,8 @@ final class EditWatcher {
         let name = app.bundleIdentifier ?? "?"
         Task {
             let enabled = await FieldReader.withTimeout { FieldReader.enableManualAccessibility(pid: pid) }
+            // A busy app (one still launching) is asked again next time.
+            if enabled != true { primed.remove(pid) }
             Self.log.debug("Accessibility tree for \(name, privacy: .public): \(enabled == true ? "enabled" : "not supported", privacy: .public)")
         }
     }

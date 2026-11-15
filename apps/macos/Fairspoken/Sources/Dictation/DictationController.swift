@@ -228,7 +228,8 @@ final class DictationController {
                 let transcribed = ContinuousClock.now
                 let text = await self.postProcessor.process(
                     output.text, context: PostProcessContext(appBundleID: target?.bundleIdentifier, vocabulary: s.vocabularyHints,
-                                                             corrections: s.transcriptCorrections, speechModel: s.speechModelID))
+                                                             corrections: s.postProcess ? s.transcriptCorrections : [],
+                                                             speechModel: s.speechModelID))
                 guard !text.isEmpty else {
                     fieldRead?.cancel()
                     self.fail("No speech detected")

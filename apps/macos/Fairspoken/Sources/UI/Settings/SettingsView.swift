@@ -627,7 +627,8 @@ private struct VocabularySettings: View {
     }
 
     private var canAddCorrection: Bool {
-        !newHeard.trimmingCharacters(in: .whitespaces).isEmpty && !newReplacement.trimmingCharacters(in: .whitespaces).isEmpty
+        model.settings.settings.transcriptCorrections.count < AppSettings.maxCorrections
+            && !newHeard.trimmingCharacters(in: .whitespaces).isEmpty && !newReplacement.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private func packBinding(_ id: String) -> Binding<Bool> {
