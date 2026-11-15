@@ -57,13 +57,13 @@ struct PostTrainingView: View {
         .confirmationDialog("Delete permanently?",
                             isPresented: Binding(get: { training.needsPermanentDeletion != nil },
                                                  set: { if !$0 { training.keepAfterTrashFailed() } }),
-                            presenting: training.needsPermanentDeletion) { deletion in
-            Button(deletion == .all ? "Delete All Permanently" : "Delete Permanently", role: .destructive) {
+                            presenting: training.needsPermanentDeletion) { pending in
+            Button(pending.deletion == .all ? "Delete All Permanently" : "Delete Permanently", role: .destructive) {
                 player.stop()
-                training.deletePermanently(deletion)
+                training.deletePermanently(pending)
             }
-        } message: { deletion in
-            Text("\(deletion == .all ? "These recordings" : "This recording") couldn't be moved to the Trash, so nothing was deleted. Deleting permanently can't be undone.")
+        } message: { pending in
+            Text("\(pending.deletion == .all ? "These recordings" : "This recording") in \(pending.root.path) couldn't be moved to the Trash, so nothing was deleted. Deleting permanently can't be undone.")
         }
     }
 }

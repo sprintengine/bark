@@ -112,23 +112,34 @@ public enum TrainingReadiness {
 /// confirms it), only folders the index names are touched, ids are checked before they become
 /// paths, an index that can't be read is never rewritten, and a rewrite keeps every line it
 /// couldn't decode, byte for byte.
+///
+/// The desktop app can share the folder, so both hold an advisory `flock` on `.index.lock` around
+/// anything that reads and then writes the index. The index itself is never locked: rewrites
+/// replace it.
 public struct TrainingDataStore: Sendable {
     public static let sampleRate: Double = 16_000
     public static let indexFile = "index.jsonl"
     public static let audioFile = "audio.wav"
     public static let metaFile = "meta.json"
+    /// Advisory lock shared with the desktop app (`LOCK_FILE` in training_capture.rs).
+    public static let lockFile = ".index.lock"
+    /// How long to wait for the other app to finish with the index.
+    static let lockWait: TimeInterval = 2
 
     public enum StoreError: LocalizedError, Equatable {
         case folderUnavailable(String)
         case indexUnreadable(String)
         /// Moving to the Trash failed, e.g. on a volume without one. Nothing was deleted.
         case couldNotTrash(String)
+        /// The other app held the index lock too long. Nothing was changed.
+        case busy(String)
 
         public var errorDescription: String? {
             switch self {
             case .folderUnavailable(let path): "The recordings folder isn't available (\(path)). Is the drive connected?"
             case .indexUnreadable(let path): "Couldn't read the recordings index in \(path), so it was left as it is."
             case .couldNotTrash(let path): "Couldn't move recordings in \(path) to the Trash."
+            case .busy(let path): "The recordings in \(path) are busy in another app. Try again."
             }
         }
     }
@@ -194,6 +205,8 @@ public struct TrainingDataStore: Sendable {
     public func delete(_ id: String, removal: Removal = .trash) throws {
         guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
         guard Self.isSafeID(id) else { return }
+        guard let lock = lockIndex() else { throw StoreError.busy(root.path) }
+        defer { close(lock) }
         var lines = try readIndex()
         try removeFolder(id, removal)
         let before = lines.count
@@ -206,6 +219,8 @@ public struct TrainingDataStore: Sendable {
     /// first folder it can't remove, keeping the index lines of everything not yet removed.
     public func deleteAll(removal: Removal = .trash) throws {
         guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
+        guard let lock = lockIndex() else { throw StoreError.busy(root.path) }
+        defer { close(lock) }
         var remaining: [IndexLine] = []
         var failure: Error?
         for line in try readIndex() {
@@ -236,6 +251,8 @@ public struct TrainingDataStore: Sendable {
     @discardableResult
     public func rebuildIndex() throws -> Int {
         guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
+        guard let lock = lockIndex() else { throw StoreError.busy(root.path) }
+        defer { close(lock) }
         let fm = FileManager.default
         let decoder = JSONDecoder()
         var rebuilt: [TrainingEntry] = []
@@ -299,17 +316,43 @@ public struct TrainingDataStore: Sendable {
         }
     }
 
+    /// Waits for the other app to finish rewriting the index, but appends even if it doesn't
+    /// let go: a recording is never dropped.
     private func appendToIndex(_ entry: TrainingEntry) throws {
+        let lock = lockIndex()
+        defer { if let lock { close(lock) } }
         var line = try JSONEncoder().encode(entry)
         line.append(UInt8(ascii: "\n"))
         if !FileManager.default.fileExists(atPath: indexURL.path) {
             try Self.private(line, at: indexURL)
             return
         }
-        let handle = try FileHandle(forWritingTo: indexURL)
+        let handle = try FileHandle(forUpdating: indexURL)
         defer { try? handle.close() }
-        try handle.seekToEnd()
+        let end = try handle.seekToEnd()
+        if end > 0 {
+            // A last line without its newline would swallow this one.
+            try handle.seek(toOffset: end - 1)
+            if try handle.read(upToCount: 1) != Data([UInt8(ascii: "\n")]) { line.insert(UInt8(ascii: "\n"), at: 0) }
+            try handle.seekToEnd()
+        }
         try handle.write(contentsOf: line)
+    }
+
+    /// Takes the `flock` shared with the desktop app, waiting up to `lockWait`. Returns the open
+    /// descriptor (closing it releases the lock), or nil if the lock is still held.
+    func lockIndex() -> Int32? {
+        let fd = open(root.appendingPathComponent(Self.lockFile).path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { return nil }
+        let deadline = Date().addingTimeInterval(Self.lockWait)
+        while flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            guard errno == EWOULDBLOCK, Date() < deadline else {
+                close(fd)
+                return nil
+            }
+            usleep(25_000)
+        }
+        return fd
     }
 
     /// Replaces the index atomically (`Data.write(options: .atomic)`).

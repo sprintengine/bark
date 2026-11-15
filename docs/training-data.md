@@ -58,7 +58,15 @@ Both apps protect the folder the same way:
 - An index line that cannot be read (damaged, or from a newer version) is
   never dropped: every rewrite of `index.jsonl` keeps it byte for byte.
 - An index that exists but cannot be read is never rewritten.
-- Rewrites are atomic (a temporary file, then a rename).
+- Rewrites of `index.jsonl` and `meta.json` are atomic (a temporary file,
+  then a rename).
+- An append starts a new line if the index's last line lacks its newline.
+- Both apps hold an advisory lock on `.index.lock` in the folder (`flock` on
+  macOS and Linux) around every change that reads and then writes the index:
+  appends, edits, deletes, retention and rebuilds. The index itself is never
+  locked, since a rewrite replaces it. If the other app holds the lock for
+  more than two seconds, retention waits for its next run and deletes ask you
+  to try again; an append goes ahead anyway, so a recording is never lost.
 
 The macOS app can also rebuild `index.jsonl` from each `<id>/meta.json`
 (`TrainingDataStore.rebuildIndex()`), for example after recordings are put
@@ -74,6 +82,7 @@ macOS and Linux, `%LOCALAPPDATA%\Fairspoken\training-data` on Windows;
 ```text
 training-data/
   index.jsonl          one entry per line (camelCase fields, as in meta.json)
+  .index.lock          empty; the lock both apps share (see above)
   <id>/audio.wav
   <id>/meta.json
 ```

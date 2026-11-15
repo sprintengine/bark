@@ -191,6 +191,40 @@ struct TrainingDataTests {
         #expect(store.entries().map(\.id) == ["older", "newer"])
     }
 
+    @Test func anAppendAfterALineWithoutItsNewlineStartsANewLine() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = TrainingDataStore(root: root)
+        try store.record(entry("one"), samples: [0.1])
+        // As if a writer stopped before its newline.
+        let index = root.appendingPathComponent(TrainingDataStore.indexFile)
+        let data = try Data(contentsOf: index)
+        try data.dropLast().write(to: index)
+
+        try store.record(entry("two"), samples: [0.1])
+        #expect(store.entries().map(\.id) == ["one", "two"])
+    }
+
+    @Test func theSharedLockHoldsOffRewritesButNeverDropsARecording() throws {
+        let root = try temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = TrainingDataStore(root: root)
+        try store.record(entry("one"), samples: [0.1])
+        // The desktop app holding the lock (flock, on the same file it uses).
+        let held = try #require(TrainingDataStore(root: root).lockIndex())
+
+        #expect(throws: TrainingDataStore.StoreError.busy(root.path)) { try store.delete("one", removal: .permanent) }
+        #expect(throws: TrainingDataStore.StoreError.busy(root.path)) { try store.deleteAll(removal: .permanent) }
+        #expect(throws: TrainingDataStore.StoreError.busy(root.path)) { try store.rebuildIndex() }
+        try store.record(entry("two"), samples: [0.1])
+        #expect(store.entries().map(\.id) == ["one", "two"])
+        #expect(exists(store.audioURL(for: "one")))
+
+        close(held)
+        try store.delete("one", removal: .permanent)
+        #expect(store.entries().map(\.id) == ["two"])
+    }
+
     @Test func neverCreatesAMissingFolder() throws {
         let missing = FileManager.default.temporaryDirectory.appendingPathComponent("unmounted-\(UUID().uuidString)/Training")
         let store = TrainingDataStore(root: missing)

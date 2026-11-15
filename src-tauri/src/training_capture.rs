@@ -21,6 +21,10 @@
 //! all" removes only the folders the index names; ids are checked before
 //! they become paths; and a rewritten index keeps every line it could not
 //! read, byte for byte.
+//!
+//! The macOS app can share the folder, so both hold an advisory lock on
+//! `.index.lock` (flock on Unix) around anything that reads and then writes
+//! the index. The index itself is never locked: rewrites replace it.
 
 use crate::audio::Recording;
 use crate::settings::Settings;
@@ -29,13 +33,18 @@ use std::fs;
 use std::io::{ErrorKind, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
 const SAMPLE_RATE: u32 = 16_000;
 const INDEX_FILE: &str = "index.jsonl";
 const AUDIO_FILE: &str = "audio.wav";
 const META_FILE: &str = "meta.json";
+/// Advisory lock shared with the macOS app (`TrainingDataStore.lockFile`).
+const LOCK_FILE: &str = ".index.lock";
+/// How long to wait for the other app to finish with the index.
+const LOCK_WAIT: Duration = Duration::from_secs(2);
+const BUSY: &str = "The training-data folder is busy; try again";
 const SECONDS_PER_DAY: u64 = 24 * 60 * 60;
 /// `recordedBy` of every entry this app writes. Retention only removes
 /// entries that carry it, so a folder shared with the macOS app (which does
@@ -123,6 +132,26 @@ impl CaptureStore {
         self.root.join(INDEX_FILE)
     }
 
+    /// Takes the lock shared with the macOS app, waiting up to `LOCK_WAIT`.
+    /// `None` when it is still held, or the root is missing. Released when the
+    /// returned file is dropped.
+    fn lock_index(&self) -> Option<fs::File> {
+        let mut options = fs::OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        private_mode(&mut options);
+        let file = options.open(self.root.join(LOCK_FILE)).ok()?;
+        let deadline = Instant::now() + LOCK_WAIT;
+        loop {
+            match file.try_lock() {
+                Ok(()) => return Some(file),
+                Err(fs::TryLockError::WouldBlock) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(25))
+                }
+                Err(_) => return None,
+            }
+        }
+    }
+
     /// Writes the dictation's folder, then appends it to the index.
     pub fn record(&self, entry: &CaptureEntry, samples: &[i16]) -> Result<(), String> {
         if !is_safe_id(&entry.id) {
@@ -136,17 +165,24 @@ impl CaptureStore {
         create_private_dir(&folder).map_err(|err| format!("Could not create {folder:?}: {err}"))?;
         write_wav(&folder.join(AUDIO_FILE), samples)?;
         write_json(&folder.join(META_FILE), entry)?;
-        let mut line = serde_json::to_string(entry).map_err(|err| err.to_string())?;
-        line.push('\n');
+        let mut line = serde_json::to_vec(entry).map_err(|err| err.to_string())?;
+        line.push(b'\n');
+        // Wait for the other app to finish rewriting the index, but append
+        // even if it doesn't let go: a recording is never dropped.
+        let _lock = self.lock_index();
         let mut options = fs::OpenOptions::new();
-        options.create(true).append(true);
+        options.create(true).read(true).append(true);
         private_mode(&mut options);
         options
             .open(self.index_path())
             .and_then(|mut index| {
                 // `mode` only applies on creation; tighten an older 0644 index.
                 restrict_to_owner(&index)?;
-                index.write_all(line.as_bytes())
+                // A last line without its newline would swallow this one.
+                if !ends_with_newline(&mut index)? {
+                    line.insert(0, b'\n');
+                }
+                index.write_all(&line)
             })
             .map_err(|err| format!("Could not update the training-data index: {err}"))
     }
@@ -193,13 +229,8 @@ impl CaptureStore {
             }
             payload.push(b'\n');
         }
-        let temporary = self.root.join(format!("{INDEX_FILE}.{}.tmp", uuid::Uuid::new_v4()));
-        write_private(&temporary, &payload)
-            .and_then(|_| fs::rename(&temporary, self.index_path()))
-            .map_err(|err| {
-                let _ = fs::remove_file(&temporary);
-                format!("Could not rewrite the training-data index: {err}")
-            })
+        replace_private(&self.index_path(), &payload)
+            .map_err(|err| format!("Could not rewrite the training-data index: {err}"))
     }
 
     /// Removes one entry's folder. Only ever called with a checked id.
@@ -219,6 +250,7 @@ impl CaptureStore {
         if !is_safe_id(id) {
             return Ok(false);
         }
+        let _lock = self.lock_index().ok_or(BUSY)?;
         let mut lines = self.read_index()?;
         let Some(entry) = lines.iter_mut().find_map(|line| match line {
             IndexLine::Entry(entry) if entry.id == id => Some(entry),
@@ -243,6 +275,10 @@ impl CaptureStore {
         if retention_days == 0 {
             return Ok(0);
         }
+        // Pruning can wait for the next sweep.
+        let Some(_lock) = self.lock_index() else {
+            return Ok(0);
+        };
         let cutoff = now.saturating_sub(u64::from(retention_days) * SECONDS_PER_DAY);
         let mut lines = self.read_index()?;
         let mut removed = 0;
@@ -281,6 +317,10 @@ impl CaptureStore {
     /// names, then their index lines. Anything else under the root, and
     /// index lines this build cannot read, stay where they are.
     pub fn delete_all(&self) -> Result<(), String> {
+        if !self.root.is_dir() {
+            return Ok(());
+        }
+        let _lock = self.lock_index().ok_or(BUSY)?;
         let mut lines = self.read_index()?;
         let mut failure = None;
         lines.retain(|line| match line {
@@ -416,9 +456,34 @@ fn write_wav(path: &Path, samples: &[i16]) -> Result<(), String> {
         .map_err(|err| format!("Could not write audio: {err}"))
 }
 
+/// Written beside, then renamed over, so a crash never leaves a half-written meta.json.
 fn write_json(path: &Path, entry: &CaptureEntry) -> Result<(), String> {
     let payload = serde_json::to_string_pretty(entry).map_err(|err| err.to_string())?;
-    write_private(path, payload.as_bytes()).map_err(|err| format!("Could not write {path:?}: {err}"))
+    replace_private(path, payload.as_bytes()).map_err(|err| format!("Could not write {path:?}: {err}"))
+}
+
+/// Replaces `path` atomically with an owner-only file: a temporary file in
+/// the same folder, then a rename over it.
+fn replace_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("file");
+    let temporary = path.with_file_name(format!(".{name}.{}.tmp", uuid::Uuid::new_v4()));
+    write_private(&temporary, bytes)
+        .and_then(|_| fs::rename(&temporary, path))
+        .inspect_err(|_| {
+            let _ = fs::remove_file(&temporary);
+        })
+}
+
+/// Whether an index opened for reading ends with a newline (an empty one does).
+fn ends_with_newline(file: &mut fs::File) -> std::io::Result<bool> {
+    use std::io::{Read, Seek, SeekFrom};
+    if file.metadata()?.len() == 0 {
+        return Ok(true);
+    }
+    file.seek(SeekFrom::End(-1))?;
+    let mut last = [0u8; 1];
+    file.read_exact(&mut last)?;
+    Ok(last[0] == b'\n')
 }
 
 /// Owner-only (0600) for newly created files: they hold the text of kept
@@ -524,7 +589,6 @@ pub fn capture_dictation(
         recorded_by: Some(RECORDED_BY.to_string()),
     };
     let id = entry.id.clone();
-    let retention_days = retention_for(settings);
     let app = app.clone();
     // The copy is cheap; the resample runs on the writer thread so it never
     // delays the paste.
@@ -537,7 +601,7 @@ pub fn capture_dictation(
             entry.duration_seconds = samples.len() as f32 / SAMPLE_RATE as f32;
             let result = with_store(|store| {
                 store.record(&entry, &samples)?;
-                store.prune(retention_days, entry.created_at)
+                apply_current_retention(&app, store)
             });
             if let Err(err) | Ok(Err(err)) = result {
                 crate::emit_backend_event(&app, "warning", format!("Could not keep dictation: {err}"));
@@ -552,23 +616,24 @@ pub fn attach_edit(id: &str, edited: &str) {
     let _ = with_store(|store| store.attach_edit(id, edited));
 }
 
+/// Applies the retention in the settings as they are now, read while the
+/// caller holds the store lock, so turning capture off or choosing "until I
+/// delete them" a moment earlier always wins. Keeps everything when the
+/// settings cannot be read.
+fn apply_current_retention(app: &AppHandle, store: &CaptureStore) -> Result<usize, String> {
+    let Ok(settings) = app.state::<crate::AppServices>().settings.lock().map(|service| service.current()) else {
+        return Ok(0);
+    };
+    store.apply_retention(&settings, now_seconds())
+}
+
 /// Applies a retention the user chose while capture is on, so this app's old
-/// dictations go even when no new ones are kept. Does nothing otherwise, or
-/// when the settings cannot be read.
+/// dictations go even when no new ones are kept. Does nothing otherwise.
 pub fn start_retention_sweeper(app: AppHandle) {
     let _ = std::thread::Builder::new()
         .name("training-retention-sweeper".to_string())
         .spawn(move || loop {
-            let settings = app
-                .state::<crate::AppServices>()
-                .settings
-                .lock()
-                .map(|service| service.current())
-                .ok()
-                .filter(|settings| retention_for(settings) > 0);
-            if let Some(settings) = settings {
-                let _ = with_store(|store| store.apply_retention(&settings, now_seconds()));
-            }
+            let _ = with_store(|store| apply_current_retention(&app, store));
             std::thread::sleep(Duration::from_secs(60 * 60));
         });
 }
@@ -737,6 +802,57 @@ mod tests {
         // Deleting again, or with no index at all, is harmless.
         store.delete_all().unwrap();
         assert!(root.join("notes.txt").exists());
+    }
+
+    #[test]
+    fn an_append_after_a_line_without_its_newline_starts_a_new_line() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().to_path_buf();
+        let store = CaptureStore::new(root.clone());
+        store.record(&entry("a", 1), &[0; 10]).unwrap();
+        // As if a writer stopped before its newline.
+        let index = fs::read(root.join(INDEX_FILE)).unwrap();
+        fs::write(root.join(INDEX_FILE), &index[..index.len() - 1]).unwrap();
+
+        store.record(&entry("b", 2), &[0; 10]).unwrap();
+        assert_eq!(ids(&store), ["a", "b"]);
+    }
+
+    #[test]
+    fn the_shared_lock_holds_off_rewrites_but_never_drops_a_recording() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().to_path_buf();
+        let store = CaptureStore::new(root.clone());
+        store.record(&entry("old", 1), &[0; 10]).unwrap();
+        // The macOS app holding the lock.
+        let held = fs::OpenOptions::new().read(true).write(true).open(root.join(LOCK_FILE)).unwrap();
+        held.lock().unwrap();
+
+        assert_eq!(store.prune(30, 100 * SECONDS_PER_DAY).unwrap(), 0);
+        assert_eq!(store.delete_all().unwrap_err(), BUSY);
+        assert_eq!(store.attach_edit("old", "Ask Claude Code.").unwrap_err(), BUSY);
+        store.record(&entry("new", 2), &[0; 10]).unwrap();
+        assert_eq!(ids(&store), ["old", "new"]);
+        assert!(root.join("old/audio.wav").exists());
+
+        held.unlock().unwrap();
+        assert_eq!(store.prune(30, 100 * SECONDS_PER_DAY).unwrap(), 2);
+    }
+
+    #[test]
+    fn edits_replace_meta_json_without_leaving_temporary_files() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().to_path_buf();
+        let store = CaptureStore::new(root.clone());
+        store.record(&entry("a", 1), &[0; 10]).unwrap();
+        assert!(store.attach_edit("a", "Ask Claude Code.").unwrap());
+        let mut names: Vec<String> = fs::read_dir(root.join("a"))
+            .unwrap()
+            .map(|item| item.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        assert_eq!(names, [AUDIO_FILE, META_FILE]);
+        assert!(fs::read_dir(&root).unwrap().all(|item| !item.unwrap().file_name().to_string_lossy().ends_with(".tmp")));
     }
 
     #[test]

@@ -16,12 +16,19 @@ final class TrainingLibrary {
     private(set) var lastError: String?
     /// A deletion that couldn't move its recordings to the Trash (a volume without one), waiting
     /// for the user to confirm deleting them permanently. Nothing has been deleted yet.
-    private(set) var needsPermanentDeletion: Deletion?
+    private(set) var needsPermanentDeletion: PendingDeletion?
 
     /// What a delete removes.
     enum Deletion: Equatable, Sendable {
         case one(String)
         case all
+    }
+
+    /// A deletion bound to the folder it was asked of, so confirming it can never act on a folder
+    /// chosen since.
+    struct PendingDeletion: Equatable, Sendable {
+        let deletion: Deletion
+        let root: URL
     }
 
     @ObservationIgnored private let settings: SettingsStore
@@ -107,13 +114,16 @@ final class TrainingLibrary {
     /// Moves recordings to the Trash. When that fails, nothing is deleted and
     /// `needsPermanentDeletion` asks the user before anything is removed for good.
     func delete(_ deletion: Deletion) {
-        run(deletion, removal: .trash)
+        guard persists else { return }
+        run(deletion, removal: .trash, in: store())
     }
 
-    /// Only after the user confirmed it, when moving to the Trash failed.
-    func deletePermanently(_ deletion: Deletion) {
+    /// Only after the user confirmed it, when moving to the Trash failed, and only in the folder
+    /// it was asked of: a prompt left over from another folder is dropped.
+    func deletePermanently(_ pending: PendingDeletion) {
         needsPermanentDeletion = nil
-        run(deletion, removal: .permanent)
+        guard persists, pending.root == folder else { return }
+        run(pending.deletion, removal: .permanent, in: TrainingDataStore(root: pending.root))
     }
 
     func keepAfterTrashFailed() {
@@ -126,9 +136,7 @@ final class TrainingLibrary {
         case failed(String)
     }
 
-    private func run(_ deletion: Deletion, removal: TrainingDataStore.Removal) {
-        guard persists else { return }
-        let store = store()
+    private func run(_ deletion: Deletion, removal: TrainingDataStore.Removal, in store: TrainingDataStore) {
         queue.async { [weak self] in
             let outcome: Outcome
             do {
@@ -146,7 +154,11 @@ final class TrainingLibrary {
                 guard let self else { return }
                 switch outcome {
                 case .done: self.lastError = nil
-                case .trashUnavailable: self.needsPermanentDeletion = deletion
+                case .trashUnavailable:
+                    // Asked of a folder that is no longer the current one: don't offer it.
+                    if store.root == self.folder {
+                        self.needsPermanentDeletion = PendingDeletion(deletion: deletion, root: store.root)
+                    }
                 case .failed(let message): self.lastError = message
                 }
                 self.refresh()
@@ -180,11 +192,13 @@ final class TrainingLibrary {
             return
         }
         settings.update { $0.trainingDataFolder = target.path }
+        needsPermanentDeletion = nil
         refresh()
     }
 
     func useDefaultFolder() {
         settings.update { $0.trainingDataFolder = "" }
+        needsPermanentDeletion = nil
         refresh()
     }
 
