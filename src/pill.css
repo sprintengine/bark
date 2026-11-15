@@ -217,23 +217,9 @@ body[data-pill="transcribing"] .status-dot { background: var(--text-secondary); 
   padding: 0 6px;
 }
 
-/* Recording: the hint names what the shortcut does now. A hairline sets it
-   apart from the meter and the timer. */
-body[data-pill="recording"] .pill { gap: 9px; padding: 0 8px 0 12px; }
-body[data-pill="recording"] .pill-hint {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-left: 2px; padding: 0 0 0 10px;
-  background: none; border-left: 1px solid var(--hairline); border-radius: 0;
-  color: var(--text-secondary);
-}
-body[data-pill="recording"] .pill-hint { color: var(--text-primary); }
-body[data-pill="recording"] .pill-hint::before {
-  content: "Stop";
-  font: 500 11px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  letter-spacing: 0;
-  color: var(--text-secondary);
-}
-body[data-record-mode="push-to-talk"][data-pill="recording"] .pill-hint::before { content: "Release"; }
+/* Recording: the live dot, the level and the timer, nothing else. The keys
+   that stop or cancel are explained in Settings and the setup guide. */
+body[data-pill="recording"] .pill { gap: 9px; }
 
 /* Visibility matrix: every state shows the dot plus its own content. */
 body[data-pill="hover"] .pill-label,
@@ -244,6 +230,7 @@ body[data-pill="starting"] .timer,
 body[data-pill="starting"] .pill-hint,
 body[data-pill="recording"] .brand,
 body[data-pill="recording"] .pill-label,
+body[data-pill="recording"] .pill-hint,
 body[data-pill="transcribing"] .brand,
 body[data-pill="transcribing"] .wave,
 body[data-pill="transcribing"] .timer,

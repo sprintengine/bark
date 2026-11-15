@@ -183,8 +183,13 @@ function reconcileHover(): void {
   }
   if (hovering) updateInteraction(false);
 }
+// A soft fade at the top says there is more above.
+function markMoreAbove(): void {
+  text.classList.toggle("has-more-above", text.scrollTop > 4);
+}
 text.addEventListener("scroll", () => {
   following = text.scrollHeight - text.clientHeight - text.scrollTop <= parseFloat(getComputedStyle(text).lineHeight);
+  markMoreAbove();
 });
 
 function paint(): void {
@@ -225,6 +230,7 @@ function paint(): void {
   fitPreview();
   text.scrollTop = tail ? text.scrollHeight : offset;
   following = tail;
+  markMoreAbove();
   scheduleAnnouncement();
   clearTimeout(cleanup);
   if (edits.length) {

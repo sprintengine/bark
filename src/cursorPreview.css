@@ -151,6 +151,10 @@ body { box-sizing: border-box; padding: var(--sem-space-xl); user-select: none; 
   box-sizing: border-box;
   transition: padding-right var(--sem-motion-duration-deliberate) var(--sem-motion-ease-standard);
 }
+.cursor-preview-text.has-more-above {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.1em);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.1em);
+}
 /* Clearance = how far the brush reaches past the text column (its offset plus
    its width, less the box padding the text already sits inside), plus a gap. */
 .cursor-preview.is-live .cursor-preview-text {

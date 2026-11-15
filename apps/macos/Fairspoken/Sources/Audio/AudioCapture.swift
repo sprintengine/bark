@@ -110,10 +110,9 @@ nonisolated final class AudioCapture: @unchecked Sendable {
             return next
         }
         guard status != .error, out.frameLength > 0, let channel = out.floatChannelData?[0] else { return }
-        let chunk = Array(UnsafeBufferPointer(start: channel, count: Int(out.frameLength)))
-        var sum: Float = 0
-        for s in chunk { sum += s * s }
-        meter.push(rms: (sum / Float(chunk.count)).squareRoot())
+        let converted = UnsafeBufferPointer(start: channel, count: Int(out.frameLength))
+        meter.process(converted, sampleRate: target.sampleRate)
+        let chunk = Array(converted)
         let deliver: (@Sendable ([Float]) -> Void)? = lock.withLock {
             guard running else { return nil }
             let room = maxSamples - samples.count

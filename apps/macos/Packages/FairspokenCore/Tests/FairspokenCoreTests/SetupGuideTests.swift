@@ -130,22 +130,6 @@ struct SetupGuideTests {
         #expect(ownership.owns(dictation))
     }
 
-    // MARK: Key hints
-
-    @Test func hintsUseThePersonsOwnKeys() {
-        let toggle = SetupGuide.listeningHints(mode: .toggle, trigger: .shortcut, shortcut: "⌥Space", cancel: "⎋")
-        #expect(toggle == [.init(action: "Stop", keys: "⌥Space"), .init(action: "Cancel", keys: "esc")])
-
-        let hold = SetupGuide.listeningHints(mode: .pushToTalk, trigger: .shortcut, shortcut: "⇧⌘1", cancel: "⎋")
-        #expect(hold.first == .init(action: "Release to finish", keys: nil))
-
-        let fn = SetupGuide.listeningHints(mode: .toggle, trigger: .fn, shortcut: "⇧⌘1", cancel: nil)
-        #expect(fn == [.init(action: "Release fn to finish", keys: nil)])
-
-        let button = SetupGuide.listeningHints(mode: .toggle, trigger: .button, shortcut: "", cancel: "F5")
-        #expect(button == [.init(action: "Stop", keys: nil), .init(action: "Cancel", keys: "F5")])
-    }
-
     // MARK: Home
 
     @Test func countsDistinctApps() {

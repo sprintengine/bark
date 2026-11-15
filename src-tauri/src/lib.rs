@@ -936,8 +936,8 @@ fn pill_window_bounds(state: &str) -> Option<(f64, f64)> {
         // The name, the shortcut and the settings gear side by side.
         "hover" => Some((208.0, 46.0)),
         "starting" | "transcribing" => Some((186.0, 46.0)),
-        // Room for the level meter, the timer and the "Stop" shortcut hint.
-        "recording" => Some((244.0, 46.0)),
+        // The live dot, the level meter and the timer (up to "10:00").
+        "recording" => Some((156.0, 46.0)),
         "copied" => Some((128.0, 46.0)),
         // "Copied — press ⌘V to paste" and the other delivery notices.
         "notice" => Some((248.0, 46.0)),
@@ -2247,6 +2247,14 @@ mod tests {
         assert_eq!(outcome(DictationDelivery::NotCopied)["delivery"], "notCopied");
         assert_eq!(outcome(DictationDelivery::Inserted)["delivery"], "inserted");
         assert_eq!(outcome(DictationDelivery::Copied)["delivery"], "copied");
+    }
+
+    #[test]
+    fn recording_pill_has_no_room_for_key_hints() {
+        // Only the dot, the meter and the timer: narrower than the transcribing pill.
+        let (recording, _) = pill_window_bounds("recording").unwrap();
+        let (transcribing, _) = pill_window_bounds("transcribing").unwrap();
+        assert!(recording < transcribing);
     }
 
     #[test]
