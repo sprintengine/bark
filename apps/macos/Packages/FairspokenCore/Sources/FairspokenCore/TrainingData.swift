@@ -106,20 +106,57 @@ public enum TrainingReadiness {
 /// Never creates `root` itself: on an external drive that isn't mounted, creating it would
 /// quietly fill the startup disk under `/Volumes`. The app creates it when the folder is chosen.
 /// Not thread-safe; the app calls it from one serial queue.
+///
+/// Recordings are hard to replace, so nothing here removes more than it must: deletions move
+/// folders to the Trash unless the caller asks for `.permanent` (the app only does after the user
+/// confirms it), only folders the index names are touched, ids are checked before they become
+/// paths, an index that can't be read is never rewritten, and a rewrite keeps every line it
+/// couldn't decode, byte for byte.
+///
+/// The desktop app can share the folder, so both hold an advisory `flock` on `.index.lock` around
+/// anything that reads and then writes the index. The index itself is never locked: rewrites
+/// replace it.
 public struct TrainingDataStore: Sendable {
     public static let sampleRate: Double = 16_000
     public static let indexFile = "index.jsonl"
     public static let audioFile = "audio.wav"
     public static let metaFile = "meta.json"
+    /// Advisory lock shared with the desktop app (`LOCK_FILE` in training_capture.rs).
+    public static let lockFile = ".index.lock"
+    /// How long to wait for the other app to finish with the index.
+    static let lockWait: TimeInterval = 2
 
     public enum StoreError: LocalizedError, Equatable {
         case folderUnavailable(String)
+        case indexUnreadable(String)
+        /// Moving to the Trash failed, e.g. on a volume without one. Nothing was deleted.
+        case couldNotTrash(String)
+        /// The other app held the index lock too long. Nothing was changed.
+        case busy(String)
 
         public var errorDescription: String? {
             switch self {
             case .folderUnavailable(let path): "The recordings folder isn't available (\(path)). Is the drive connected?"
+            case .indexUnreadable(let path): "Couldn't read the recordings index in \(path), so it was left as it is."
+            case .couldNotTrash(let path): "Couldn't move recordings in \(path) to the Trash."
+            case .busy(let path): "The recordings in \(path) are busy in another app. Try again."
             }
         }
+    }
+
+    /// How a deletion removes a recording's folder.
+    public enum Removal: Sendable {
+        /// To the Trash, so a mistake can be undone.
+        case trash
+        /// For good: only after the user confirms it, when the Trash can't be used.
+        case permanent
+    }
+
+    /// One line of index.jsonl: an entry, or a line this build can't decode (damaged, a newer
+    /// format, an unsafe id), which is written back exactly as it was.
+    enum IndexLine {
+        case entry(TrainingEntry)
+        case unreadable(Data)
     }
 
     public let root: URL
@@ -131,6 +168,15 @@ public struct TrainingDataStore: Sendable {
         return FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
+    private var indexURL: URL { root.appendingPathComponent(Self.indexFile) }
+
+    /// An id names a folder under `root`, so it must be one plain path component: not empty,
+    /// no separators, no `..`, not absolute.
+    public static func isSafeID(_ id: String) -> Bool {
+        !id.isEmpty && id != "." && !id.contains("..") && !id.contains("/") && !id.contains("\\")
+            && !id.contains(":") && !id.contains("\0")
+    }
+
     public func audioURL(for id: String) -> URL {
         root.appendingPathComponent(id, isDirectory: true).appendingPathComponent(Self.audioFile)
     }
@@ -138,66 +184,203 @@ public struct TrainingDataStore: Sendable {
     /// Writes the dictation's folder, then appends it to the index.
     public func record(_ entry: TrainingEntry, samples: [Float]) throws {
         guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
+        guard Self.isSafeID(entry.id) else { throw CocoaError(.fileWriteInvalidFileName) }
         let folder = root.appendingPathComponent(entry.id, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
         Self.restrict(folder, to: 0o700)
         try Self.private(Self.wav(samples), at: folder.appendingPathComponent(Self.audioFile))
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        try Self.private(encoder.encode(entry), at: folder.appendingPathComponent(Self.metaFile))
+        try Self.private(Self.metaEncoder.encode(entry), at: folder.appendingPathComponent(Self.metaFile))
         try appendToIndex(entry)
     }
 
     /// Every readable entry, oldest first; a damaged line is skipped, not fatal.
     public func entries() -> [TrainingEntry] {
-        guard let data = try? Data(contentsOf: root.appendingPathComponent(Self.indexFile)) else { return [] }
+        ((try? readIndex()) ?? []).compactMap {
+            if case .entry(let entry) = $0 { entry } else { nil }
+        }
+    }
+
+    /// Moves one recording to the Trash (or deletes it, with `.permanent`), then drops its line
+    /// from the index. Throws `couldNotTrash` with nothing changed when the Trash can't be used.
+    public func delete(_ id: String, removal: Removal = .trash) throws {
+        guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
+        guard Self.isSafeID(id) else { return }
+        guard let lock = lockIndex() else { throw StoreError.busy(root.path) }
+        defer { close(lock) }
+        var lines = try readIndex()
+        try removeFolder(id, removal)
+        let before = lines.count
+        lines.removeAll { if case .entry(let entry) = $0 { entry.id == id } else { false } }
+        if lines.count != before { try writeIndex(lines) }
+    }
+
+    /// Removes every kept dictation, and only those: the folders the index names, then their
+    /// lines. Anything else in the folder, and lines this build can't decode, stay. Stops at the
+    /// first folder it can't remove, keeping the index lines of everything not yet removed.
+    public func deleteAll(removal: Removal = .trash) throws {
+        guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
+        guard let lock = lockIndex() else { throw StoreError.busy(root.path) }
+        defer { close(lock) }
+        var remaining: [IndexLine] = []
+        var failure: Error?
+        for line in try readIndex() {
+            if failure == nil, case .entry(let entry) = line {
+                do {
+                    try removeFolder(entry.id, removal)
+                    continue
+                } catch {
+                    failure = error
+                }
+            }
+            remaining.append(line)
+        }
+        if remaining.isEmpty {
+            // Every entry's text is also in its meta.json, which went with its folder.
+            if FileManager.default.fileExists(atPath: indexURL.path) { try FileManager.default.removeItem(at: indexURL) }
+        } else {
+            try writeIndex(remaining)
+        }
+        if let failure { throw failure }
+    }
+
+    /// Rebuilds index.jsonl from each `<id>/meta.json`, e.g. after recordings were put back from
+    /// the Trash or copied in by hand. Folders whose meta.json is missing, unreadable or names
+    /// another id are left out. The old index is copied beside it first
+    /// (`index.jsonl.<epoch>-<suffix>.bak`) and its undecodable lines are carried over.
+    /// Returns how many entries the new index lists.
+    @discardableResult
+    public func rebuildIndex() throws -> Int {
+        guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
+        guard let lock = lockIndex() else { throw StoreError.busy(root.path) }
+        defer { close(lock) }
+        let fm = FileManager.default
         let decoder = JSONDecoder()
-        return data.split(separator: UInt8(ascii: "\n")).compactMap { try? decoder.decode(TrainingEntry.self, from: Data($0)) }
-    }
-
-    public func delete(_ id: String) throws {
-        guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
-        let kept = entries().filter { $0.id != id }
-        try writeIndex(kept)
-        let folder = root.appendingPathComponent(id, isDirectory: true)
-        if !id.isEmpty, !id.contains("/"), FileManager.default.fileExists(atPath: folder.path) {
-            try FileManager.default.removeItem(at: folder)
+        var rebuilt: [TrainingEntry] = []
+        for folder in try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+            let id = folder.lastPathComponent
+            guard Self.isSafeID(id), (try? folder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+                  let data = try? Data(contentsOf: folder.appendingPathComponent(Self.metaFile)),
+                  let entry = try? decoder.decode(TrainingEntry.self, from: data), entry.id == id
+            else { continue }
+            rebuilt.append(entry)
         }
-    }
-
-    /// Removes every kept dictation, and only those: the index and the folders it names.
-    public func deleteAll() throws {
-        guard isAvailable else { throw StoreError.folderUnavailable(root.path) }
-        for entry in entries() where !entry.id.isEmpty && !entry.id.contains("/") {
-            try? FileManager.default.removeItem(at: root.appendingPathComponent(entry.id, isDirectory: true))
+        rebuilt.sort { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
+        var lines = rebuilt.map(IndexLine.entry)
+        if fm.fileExists(atPath: indexURL.path) {
+            let old = try readIndex()
+            let suffix = UUID().uuidString.prefix(8).lowercased()
+            let backup = root.appendingPathComponent("\(Self.indexFile).\(Int(Date().timeIntervalSince1970))-\(suffix).bak")
+            try fm.copyItem(at: indexURL, to: backup)
+            lines += old.filter { if case .unreadable = $0 { true } else { false } }
         }
-        try? FileManager.default.removeItem(at: root.appendingPathComponent(Self.indexFile))
+        try writeIndex(lines)
+        return rebuilt.count
     }
 
     // MARK: Files
 
+    private static let metaEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return encoder
+    }()
+
+    /// Every line of the index. A missing index is empty; one that exists but can't be read
+    /// throws, so it is never rewritten from nothing.
+    func readIndex() throws -> [IndexLine] {
+        guard FileManager.default.fileExists(atPath: indexURL.path) else { return [] }
+        let data: Data
+        do { data = try Data(contentsOf: indexURL) } catch { throw StoreError.indexUnreadable(root.path) }
+        let decoder = JSONDecoder()
+        return data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true).compactMap { slice in
+            let line = Data(slice)
+            if line.allSatisfy({ $0 == 0x20 || $0 == 0x09 || $0 == 0x0D }) { return nil }
+            if let entry = try? decoder.decode(TrainingEntry.self, from: line), Self.isSafeID(entry.id) { return .entry(entry) }
+            return .unreadable(line)
+        }
+    }
+
+    private func removeFolder(_ id: String, _ removal: Removal) throws {
+        guard Self.isSafeID(id) else { return }
+        let folder = root.appendingPathComponent(id, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: folder.path) else { return }
+        switch removal {
+        case .trash:
+            do {
+                try FileManager.default.trashItem(at: folder, resultingItemURL: nil)
+            } catch {
+                throw StoreError.couldNotTrash(root.path)
+            }
+        case .permanent:
+            try FileManager.default.removeItem(at: folder)
+        }
+    }
+
+    /// Waits for as long as the other app holds the index: appending without the lock could be
+    /// undone by its rewrite. Callers are off the main thread, the audio and meta.json are already
+    /// on disk, and the lock goes when the other app's process does.
     private func appendToIndex(_ entry: TrainingEntry) throws {
+        let lock = try lockIndexWaiting()
+        defer { close(lock) }
         var line = try JSONEncoder().encode(entry)
         line.append(UInt8(ascii: "\n"))
-        let url = root.appendingPathComponent(Self.indexFile)
-        if !FileManager.default.fileExists(atPath: url.path) {
-            try Self.private(line, at: url)
+        if !FileManager.default.fileExists(atPath: indexURL.path) {
+            try Self.private(line, at: indexURL)
             return
         }
-        let handle = try FileHandle(forWritingTo: url)
+        let handle = try FileHandle(forUpdating: indexURL)
         defer { try? handle.close() }
-        try handle.seekToEnd()
+        let end = try handle.seekToEnd()
+        if end > 0 {
+            // A last line without its newline would swallow this one.
+            try handle.seek(toOffset: end - 1)
+            if try handle.read(upToCount: 1) != Data([UInt8(ascii: "\n")]) { line.insert(UInt8(ascii: "\n"), at: 0) }
+            try handle.seekToEnd()
+        }
         try handle.write(contentsOf: line)
     }
 
-    private func writeIndex(_ entries: [TrainingEntry]) throws {
+    /// Takes the `flock` shared with the desktop app, however long that takes.
+    func lockIndexWaiting() throws -> Int32 {
+        let fd = open(root.appendingPathComponent(Self.lockFile).path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
+        while flock(fd, LOCK_EX) != 0 {
+            guard errno == EINTR else {
+                close(fd)
+                throw CocoaError(.fileWriteUnknown)
+            }
+        }
+        return fd
+    }
+
+    /// Takes the `flock` shared with the desktop app, waiting up to `lockWait`. Returns the open
+    /// descriptor (closing it releases the lock), or nil if the lock is still held.
+    func lockIndex() -> Int32? {
+        let fd = open(root.appendingPathComponent(Self.lockFile).path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { return nil }
+        let deadline = Date().addingTimeInterval(Self.lockWait)
+        while flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            guard errno == EWOULDBLOCK, Date() < deadline else {
+                close(fd)
+                return nil
+            }
+            usleep(25_000)
+        }
+        return fd
+    }
+
+    /// Replaces the index atomically (`Data.write(options: .atomic)`).
+    private func writeIndex(_ lines: [IndexLine]) throws {
         let encoder = JSONEncoder()
         var payload = Data()
-        for entry in entries {
-            payload.append(try encoder.encode(entry))
+        for line in lines {
+            switch line {
+            case .entry(let entry): payload.append(try encoder.encode(entry))
+            case .unreadable(let bytes): payload.append(bytes)
+            }
             payload.append(UInt8(ascii: "\n"))
         }
-        try Self.private(payload, at: root.appendingPathComponent(Self.indexFile))
+        try Self.private(payload, at: indexURL)
     }
 
     /// Atomic, owner-only: kept dictations can hold anything the user said.

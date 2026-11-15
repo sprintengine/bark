@@ -63,8 +63,9 @@ export interface Settings {
   polishLocalAdapters: string[];
   contextAwareness: boolean;
   trainingCapture: boolean;
-  /** 30, 90, or 0 for "until deleted". */
-  trainingRetentionDays: number;
+  /** 0 (the default) keeps kept dictations until deleted; 30 or 90 days only
+   * while capture is on. Replaces `trainingRetentionDays`, whose default was 30. */
+  trainingKeepDays: number;
   formatAiDetection: boolean;
   superMode: SuperMode;
   superModeModel: string;
@@ -145,7 +146,7 @@ export const DEFAULTS: Settings = {
   polishLocalAdapters: [],
   contextAwareness: false,
   trainingCapture: false,
-  trainingRetentionDays: 30,
+  trainingKeepDays: 0,
   formatAiDetection: false,
   superMode: "off",
   superModeModel: "small",
@@ -184,9 +185,9 @@ export function normalizeSettings(settings: Partial<Settings>): Settings {
     polishTones: normalizePolishTones(settings.polishTones ?? DEFAULTS.polishTones),
     contextAwareness: settings.contextAwareness ?? DEFAULTS.contextAwareness,
     trainingCapture: settings.trainingCapture ?? DEFAULTS.trainingCapture,
-    trainingRetentionDays: [0, 30, 90].includes(Number(settings.trainingRetentionDays))
-      ? Number(settings.trainingRetentionDays)
-      : DEFAULTS.trainingRetentionDays,
+    trainingKeepDays: [0, 30, 90].includes(Number(settings.trainingKeepDays))
+      ? Number(settings.trainingKeepDays)
+      : DEFAULTS.trainingKeepDays,
     formatAiDetection: settings.formatAiDetection ?? DEFAULTS.formatAiDetection,
     polishLocalModelPath: (settings.polishLocalModelPath ?? "").trim(),
     polishLocalModelPrompt: settings.polishLocalModelPrompt === "instructed" || settings.polishLocalModelPrompt === "speakoflow"
