@@ -75,8 +75,8 @@
   --crystal-glass: var(--crystal-card);
   --crystal-glass-strong: var(--crystal-card);
   --crystal-glass-edge: var(--crystal-card-edge);
-  /* The brand mark: the app icon's near-black tile, which is the cow's black, with a
-     light edge so it holds on dark surfaces too. */
+  /* The brand mark: the app icon's black tile behind its photo, with a hairline edge
+     so it holds on any surface. */
   --crystal-mark-top: #2a2a2d;
   --crystal-mark-bottom: #0a0a0b;
   --crystal-mark-sheen: rgba(255, 255, 255, 0.08);

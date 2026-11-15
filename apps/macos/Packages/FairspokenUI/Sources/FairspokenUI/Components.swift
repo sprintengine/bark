@@ -308,24 +308,24 @@ public struct Tag: View {
     }
 }
 
-/// Brand mark: a small copy of the app icon, the white cow mark on a near-black tile in
-/// either appearance, so the mark's black is the tile's (design/brand/logo/cow/).
+/// Brand mark: a small copy of the app icon, the sheepdog photo on its black tile with a
+/// light hairline edge. The photo is the client's `BrandTile` image, so only Fairspoken
+/// itself can show this; elsewhere use `FairspokenMark`.
 public struct BrandMark: View {
     var size: CGFloat = 28
     public init(size: CGFloat = 28) { self.size = size }
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous)
-        ZStack {
-            shape.fill(LinearGradient(colors: [Color(white: 0.165), Color(white: 0.04)], startPoint: .top, endPoint: .bottom))
-            shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.30), .white.opacity(0.10), .white.opacity(0.16)],
-                                              startPoint: .top, endPoint: .bottom), lineWidth: max(0.5, size / 90))
-            // The icon's proportions: the mark 664 wide on the 824 tile, a touch up and left.
-            CowMark(width: size * 0.806, color: .white)
-                .offset(x: -size * 0.007, y: -size * 0.007)
-        }
-        .frame(width: size, height: size)
-        .shadow(color: .black.opacity(0.25), radius: size * 0.06, y: size * 0.03)
-        .accessibilityHidden(true)
+        Image("BrandTile")
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size, height: size)
+            .background(Color.black)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.32), .white.opacity(0.12), .white.opacity(0.18)],
+                                                       startPoint: .top, endPoint: .bottom), lineWidth: max(0.5, size / 90)))
+            .shadow(color: .black.opacity(0.25), radius: size * 0.06, y: size * 0.03)
+            .accessibilityHidden(true)
     }
 }
 
@@ -378,9 +378,9 @@ public enum Format {
     }
 }
 
-/// The Fairspoken mark, fitted to a square: the cow mark in one colour (`Crystal.ink`
-/// unless `monochrome` says otherwise). On a light surface its shapes read as the dark
-/// patches of a white cow, on a dark one as the white patches of a black cow.
+/// The Fairspoken mark, fitted to a square: the sheepdog mark in one colour (`Crystal.ink`
+/// unless `monochrome` says otherwise). On a dark surface its shapes are the dog's white
+/// markings; on a light one they read as a dark-marked dog.
 public struct FairspokenMark: View {
     var size: CGFloat
     var monochrome: Color?
@@ -390,50 +390,31 @@ public struct FairspokenMark: View {
     }
 
     public var body: some View {
-        CowMark(width: size, color: monochrome ?? Crystal.ink)
+        DogMark(height: size, color: monochrome ?? Crystal.ink)
             .frame(width: size, height: size)
     }
 }
 
-/// The cow mark from design/brand/logo/cow/: a Holstein's head drawn only by its white
-/// patches, ears, eyes and nostrils, mouth open, with voice level bars coming out of it.
-/// Whatever it sits on is the cow's black. `width` is the mark's width; it is about 0.71 as
-/// tall. Below about 70 px it draws the simplified masters the small app icons use.
-public struct CowMark: View {
-    var width: CGFloat
+/// The one-colour sheepdog mark from design/brand/logo/dog/dog-mark.svg, traced from the
+/// app icon's photo: the blaze, the muzzle with the nose cut out, the open mouth with its
+/// tongue, and the catchlights. Whatever it sits on is the dog's black. `height` is the
+/// mark's height; it is about half as wide.
+public struct DogMark: View {
+    var height: CGFloat
     var color: Color
-    @Environment(\.displayScale) private var displayScale
-    public init(width: CGFloat, color: Color = .white) {
-        self.width = width
+    public init(height: CGFloat, color: Color = .white) {
+        self.height = height
         self.color = color
     }
 
-    struct Parsed {
-        let cow: Path
-        let eyes: Path
-        let stroke: CGFloat
-        let bars: [CGRect]
-        init(_ master: Master) {
-            cow = CowMark.path(master.cow)
-            eyes = CowMark.path(master.eyes)
-            stroke = master.stroke
-            bars = master.bars
-        }
-    }
-    static let parsed: (full: Parsed, medium: Parsed, small: Parsed, tiny: Parsed) =
-        (Parsed(full), Parsed(medium), Parsed(small), Parsed(tiny))
+    static let path = DogMark.parse(pathData)
 
-    /// The master for a mark `px` pixels wide, at the app icons' thresholds.
-    static func master(forPixelWidth px: CGFloat) -> Parsed {
-        px >= 70 ? parsed.full : px >= 24 ? parsed.medium : px >= 14 ? parsed.small : parsed.tiny
-    }
-
-    /// Parses the M / L / Q / C / Z commands (absolute) the masters use.
-    static func path(_ d: String) -> Path {
+    /// Parses the absolute M / L / C / Z commands the master uses.
+    static func parse(_ d: String) -> Path {
         var path = Path()
         var spaced = ""
         for ch in d {
-            if "MLQCZ".contains(ch) { spaced += " \(ch) " } else if ch == "," { spaced += " " } else { spaced.append(ch) }
+            if "MLCZ".contains(ch) { spaced += " \(ch) " } else if ch == "," { spaced += " " } else { spaced.append(ch) }
         }
         let tokens = spaced.split(separator: " ").map(String.init)
         var i = 0
@@ -441,7 +422,7 @@ public struct CowMark: View {
         func number() -> CGFloat { defer { i += 1 }; return i < tokens.count ? CGFloat(Double(tokens[i]) ?? 0) : 0 }
         func point() -> CGPoint { CGPoint(x: number(), y: number()) }
         while i < tokens.count {
-            if ["M", "L", "Q", "C", "Z"].contains(tokens[i]) {
+            if ["M", "L", "C", "Z"].contains(tokens[i]) {
                 command = tokens[i]
                 i += 1
                 if command == "Z" { path.closeSubpath() }
@@ -450,7 +431,6 @@ public struct CowMark: View {
             switch command {
             case "M": path.move(to: point()); command = "L"
             case "L": path.addLine(to: point())
-            case "Q": let c = point(); path.addQuadCurve(to: point(), control: c)
             case "C": let c1 = point(), c2 = point(); path.addCurve(to: point(), control1: c1, control2: c2)
             default: i += 1
             }
@@ -459,21 +439,12 @@ public struct CowMark: View {
     }
 
     public var body: some View {
-        let height = width * Self.box.height / Self.box.width
+        let width = height * Self.box.width / Self.box.height
         Canvas { ctx, canvas in
-            let s = canvas.width / Self.box.width
-            let master = Self.master(forPixelWidth: canvas.width * displayScale)
+            let s = canvas.height / Self.box.height
             ctx.scaleBy(x: s, y: s)
             ctx.translateBy(x: -Self.box.minX, y: -Self.box.minY)
-            let shading = GraphicsContext.Shading.color(color)
-            ctx.fill(master.cow, with: shading, style: FillStyle(eoFill: true))
-            if master.stroke > 0 {
-                ctx.stroke(master.cow, with: shading, style: StrokeStyle(lineWidth: master.stroke, lineJoin: .round))
-            }
-            ctx.fill(master.eyes, with: shading)
-            for bar in master.bars {
-                ctx.fill(Path(roundedRect: bar, cornerRadius: bar.width / 2), with: shading)
-            }
+            ctx.fill(Self.path, with: .color(color), style: FillStyle(eoFill: true))
         }
         .frame(width: width, height: height)
         .accessibilityHidden(true)

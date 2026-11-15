@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="design/brand/logo/cow/readme-header.svg" width="480" alt="The logo: a black-and-white cow with its mouth open and voice level bars coming out of it">
+  <img src="design/brand/logo/dog/readme-header.png" width="480" alt="The logo: a close-up of a black-and-white border collie's face on black, mouth open in a bark">
 </p>
 
 # Fairspoken

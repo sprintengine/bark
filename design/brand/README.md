@@ -4,7 +4,7 @@ October 2026. Brand, website prototype and macOS 26 Liquid Glass mockups for **F
 
 | | |
 |---|---|
-| **Mark** | A black-and-white Holstein cow's head in negative space: only the white patches, ears, eyes and nostrils are drawn, and the black of the cow is the black it sits on. The head turns a little to the right with its mouth open, and a row of rounded voice-level bars comes out of it. Monochrome, no name in it. Vector masters (full, plus simplified ones for small sizes) in [`logo/cow/`](logo/cow/); every app icon is generated from them by `_tools/gen-cow-icons.mjs`. It replaces "the Settle"; the notes on the Settle below are kept as history |
+| **Mark** | A black-and-white border collie's face on black, mouth open in a bark: a soft close-up photograph where the black fur melts into the background. A one-colour version traced from its white markings (the blaze, the muzzle, the open mouth and the catchlights) is used where only a single colour or vector paths will do. Sources in [`logo/dog/`](logo/dog/); every app icon is generated from them by `_tools/gen-dog-icons.mjs`. It replaces "the Settle"; the notes on the Settle below are kept as history |
 | **Palette** | Limestone, Bog Oak, Copybook Blue, and Margin Red for the signal only |
 | **Type** | Host Grotesk (signal), Newsreader italic (fair copy), Atkinson Hyperlegible Mono (data). All SIL OFL, self-hosted, **nothing to buy** |
 | **Website** | [`site/index.html`](site/index.html): raw WebGL2 hero, scroll story, light/dark, responsive, reduced motion |
