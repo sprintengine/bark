@@ -138,9 +138,11 @@ function permissionCard(kind: "microphone" | "accessibility" | "inputMonitoring"
   const state = permissions[kind];
   const [label, labelTone] = permissionLabel(state);
   const status = h("span", { class: `ob-status ob-status--${labelTone}` }, [state === "granted" ? svg(ICONS.check) : null, label]);
-  const action = state === "granted"
+  // macOS reports Accessibility only as on or off; its first ask is a prompt.
+  const opensSettings = state === "denied" && kind !== "accessibility";
+  const action = state === "granted" || state === "not-needed"
     ? null
-    : h("button", { class: "ob-btn ob-btn--sm", type: "button" }, [state === "denied" ? "Open Settings" : "Allow"]);
+    : h("button", { class: "ob-btn ob-btn--sm", type: "button" }, [opensSettings ? "Open Settings" : "Allow"]);
   action?.addEventListener("click", () => { void requestPermission(kind); });
   return h("li", { class: `ob-card ob-perm${state === "granted" ? " is-granted" : ""}` }, [
     tile(icon, tone),
@@ -355,7 +357,7 @@ function renderModel(): void {
       h("span", { class: "ob-radio", "aria-hidden": "true" }),
       h("span", { class: "ob-card-text" }, [
         h("strong", {}, [info.name, info.recommended ? h("span", { class: "ob-badge ob-badge--accent" }, ["Recommended"]) : null, info.language === "en" ? h("span", { class: "ob-badge" }, ["EN"]) : null]),
-        h("span", {}, [`${info.summary} · ${info.languages}`]),
+        h("span", {}, [info.language === "en" ? info.summary : `${info.summary} · ${info.languages}`]),
         h("span", { class: "ob-ratings" }, [ratingBar("Speed", info.speed), ratingBar("Accuracy", info.accuracy)]),
       ]),
       h("span", { class: "ob-card-end" }, [end]),
@@ -563,7 +565,7 @@ function renderDone(): void {
   const ready = micOk && (!mac || typeOk) && state === "ready";
   const list = h("ul", { class: "ob-card ob-checklist" }, [
     checkItem(micOk, "Microphone", micOk ? "Allowed" : "Not allowed yet", micOk ? undefined : { label: "Fix", step: "permissions" }),
-    mac ? checkItem(typeOk, "Typing into apps", typeOk ? "Accessibility is allowed" : "Without Accessibility, text is copied for you to paste", typeOk ? undefined : { label: "Fix", step: "permissions" }) : null,
+    mac ? checkItem(typeOk, "Typing into apps", typeOk ? "Accessibility is allowed" : "Accessibility is needed to type where your cursor is", typeOk ? undefined : { label: "Fix", step: "permissions" }) : null,
     checkItem(state === "ready" ? true : state === "downloading" ? "busy" : false, name,
       state === "ready" ? "Downloaded and ready" : state === "downloading" ? `Downloading · ${Math.round(download.percentage)}%` : state === "failed" ? "The download failed" : "Not downloaded yet",
       state === "ready" || state === "downloading" ? undefined : { label: state === "failed" ? "Retry" : "Download", step: "model" }),
