@@ -431,6 +431,8 @@ enum Fixture {
 /// `files.test/serve/…?path=<file>` answers with that file (with its length, for progress);
 /// anything else is 403.
 final class StubFileServer: URLProtocol {
+    private var timer: Timer?
+
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "files.test" }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
@@ -440,19 +442,27 @@ final class StubFileServer: URLProtocol {
             let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
                                            headerFields: ["Content-Length": "\(data.count)", "Content-Type": "application/zip"])!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            // In pieces, so progress is reported along the way.
+            // In pieces, one per tick on this loading thread's run loop, so the session reports progress
+            // between them. Sent all at once, the session may coalesce them into a single 100% update.
             var offset = 0
-            while offset < data.count {
+            let timer = Timer(timeInterval: 0.005, repeats: true) { [weak self] timer in
+                guard let self else { return timer.invalidate() }
                 let end = min(data.count, offset + 64 * 1024)
-                client?.urlProtocol(self, didLoad: data.subdata(in: offset..<end))
+                self.client?.urlProtocol(self, didLoad: data.subdata(in: offset..<end))
                 offset = end
+                if offset >= data.count {
+                    timer.invalidate()
+                    self.client?.urlProtocolDidFinishLoading(self)
+                }
             }
+            self.timer = timer
+            RunLoop.current.add(timer, forMode: .common)
         } else {
             let response = HTTPURLResponse(url: url, statusCode: 403, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "text/html"])!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: Data("<html>Forbidden</html>".utf8))
+            client?.urlProtocolDidFinishLoading(self)
         }
-        client?.urlProtocolDidFinishLoading(self)
     }
-    override func stopLoading() {}
+    override func stopLoading() { timer?.invalidate() }
 }
