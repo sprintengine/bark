@@ -50,6 +50,25 @@ final class DictationController {
         }
     }
 
+    /// A recording the speed test measures: transcribed with the model in use, then handed back
+    /// and forgotten. Never inserted, copied, kept in history or lifetime stats, kept on disk to
+    /// retry, or saved for post-training.
+    struct Measured: Equatable {
+        var text: String
+        /// The recording's length, from its samples.
+        var recordingSeconds: Double
+        /// From release to transcript.
+        var transcribeMs: Int
+        var model: String
+        var placement: ComputePlacement
+    }
+
+    enum MeasuredOutcome: Equatable {
+        case captured(Measured)
+        case failed(String)
+        case cancelled
+    }
+
     private(set) var phase: Phase = .idle {
         didSet {
             guard phase != oldValue else { return }
@@ -76,6 +95,17 @@ final class DictationController {
     /// Which of this app's windows the recording is for (Home, the setup guide), or nil when it
     /// is for another app.
     @ObservationIgnored private(set) var startedInWindow: NSUserInterfaceItemIdentifier?
+    /// While set, a recording started in the speed test's own window (`measuredWindow`: the
+    /// shortcut, Fn or its button) is measured rather than delivered, and its outcome comes here.
+    /// A recording started anywhere else (another app, the setup guide) is an ordinary dictation.
+    @ObservationIgnored var measure: ((MeasuredOutcome) -> Void)?
+    static let measuredWindow = NSUserInterfaceItemIdentifier("speed-test")
+    @ObservationIgnored private var measuredTask: Task<Void, Never>?
+    /// The current recording is a measured one.
+    private(set) var isMeasuring = false
+    @ObservationIgnored private var measuredHandler: ((MeasuredOutcome) -> Void)?
+    /// Bumped when a measured recording is cancelled, so its transcription, still running, is dropped.
+    @ObservationIgnored private var measuredRun = 0
     /// What started the current recording (a held key's release ends only its own recording).
     @ObservationIgnored private(set) var trigger: Trigger = .button
     @ObservationIgnored private var targetApp: NSRunningApplication?
@@ -169,6 +199,10 @@ final class DictationController {
         let front = NSWorkspace.shared.frontmostApplication
         targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
         startedInWindow = targetApp == nil ? NSApp.keyWindow?.identifier : nil
+        if targetApp == nil, startedInWindow == Self.measuredWindow, let measure {
+            startMeasured(session: newSession, settings: s, trigger: trigger, handler: measure)
+            return
+        }
         editWatcher?.prime(targetApp)
         let now = Date()
         let item = PendingDictation(id: "dictation-\(Int64(now.timeIntervalSince1970 * 1000))", createdAt: now,
@@ -202,6 +236,14 @@ final class DictationController {
 
     func cancel() {
         guard phase.isActive else { return }
+        if let handler = measuredHandler {
+            measuredHandler = nil
+            measuredRun += 1
+            measuredTask?.cancel()
+            measuredTask = nil
+            isMeasuring = false
+            handler(.cancelled)
+        }
         watchdog?.cancel()
         if capture.isRunning { capture.stop() }
         session?.cancel()
@@ -213,6 +255,10 @@ final class DictationController {
     }
 
     func stop() {
+        if measuredHandler != nil {
+            stopMeasured()
+            return
+        }
         guard phase.isListening, let session, let kept else { return }
         watchdog?.cancel()
         hotkeys?.setCancelEnabled(false)
@@ -287,6 +333,93 @@ final class DictationController {
                 Self.log.error("Transcription failed; recording kept to retry: \(kept.lastError ?? "", privacy: .public)")
                 self.pending.reload()
                 self.fail("Couldn't transcribe — saved to retry", hold: .seconds(5))
+            }
+        }
+    }
+
+    // MARK: Measured recordings (the speed test)
+
+    /// The same capture and session as a dictation, with nothing kept: no file to retry from, no
+    /// target app, no edit watching.
+    private func startMeasured(session newSession: any TranscriptionSession, settings s: AppSettings, trigger: Trigger,
+                               handler: @escaping (MeasuredOutcome) -> Void) {
+        do {
+            try capture.start(deviceName: s.audioDevice, maxSeconds: s.maxRecordingSeconds) { [newSession] chunk in
+                newSession.append(chunk)
+            }
+        } catch {
+            // The test says what went wrong; no pill as well.
+            newSession.cancel()
+            handler(.failed("Couldn't start the microphone: \(error.localizedDescription)"))
+            return
+        }
+        session = newSession
+        kept = nil
+        measuredHandler = handler
+        isMeasuring = true
+        self.trigger = trigger
+        resetTask?.cancel()
+        phase = .listening(since: Date())
+        hotkeys?.setCancelEnabled(true)
+        Sounds.play(.start, enabled: s.interactionSounds)
+        let limit = s.maxRecordingSeconds
+        watchdog = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(limit))
+            guard !Task.isCancelled else { return }
+            self?.stop()
+        }
+    }
+
+    /// Ends a measured recording: the same gate and transcription as a dictation, then the
+    /// transcript goes to the handler and nowhere else. No retries: a failure is reported.
+    private func stopMeasured() {
+        guard phase.isListening, let session, let handler = measuredHandler else { return }
+        watchdog?.cancel()
+        hotkeys?.setCancelEnabled(false)
+        let released = ContinuousClock.now
+        let samples = capture.stop()
+        let s = settings.settings
+        Sounds.play(.stop, enabled: s.interactionSounds)
+        let stats = AudioStats(samples: samples, sampleRate: AudioCapture.sampleRate)
+        let verdict = RecordingGate.evaluate(stats)
+        guard verdict == .accept else {
+            session.cancel()
+            self.session = nil
+            measuredHandler = nil
+            isMeasuring = false
+            phase = .idle
+            handler(.failed(verdict == .tooShort ? "That was too short to measure." : "No speech was heard. Check the microphone."))
+            return
+        }
+        phase = .transcribing
+        transcribingNote = nil
+        let placement = self.placement
+        let run = measuredRun
+        measuredTask = Task { [weak self] in
+            let result: Swift.Result<TranscriptionOutput, Error>
+            do {
+                if placement == .neuralEngine { try await self?.waitForEngine() }
+                // Cancelled while the model loaded: never start decoding.
+                guard !Task.isCancelled, self?.measuredRun == run else { return }
+                result = .success(try await session.finish(allSamples: samples))
+            } catch {
+                session.cancel()
+                result = .failure(error)
+            }
+            // Cancelled while it was transcribing: the test has moved on.
+            guard let self, self.measuredRun == run, self.measuredHandler != nil else { return }
+            self.measuredTask = nil
+            self.session = nil
+            self.measuredHandler = nil
+            self.isMeasuring = false
+            self.phase = .idle
+            switch result {
+            case .success(let output):
+                let ms = Int((ContinuousClock.now - released) / .milliseconds(1))
+                handler(.captured(Measured(text: output.text, recordingSeconds: stats.durationSeconds, transcribeMs: ms,
+                                           model: output.model, placement: output.placement)))
+            case .failure(let error):
+                handler(.failed(error.localizedDescription))
             }
         }
     }
@@ -413,9 +546,10 @@ final class DictationController {
     /// Screenshots: forgets the in-app result (a first use).
     func showcaseClearResult() { lastInAppResult = nil }
 
-    func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "", trigger: Trigger = .hotkey) {
+    func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "", trigger: Trigger = .hotkey, measuring: Bool = false) {
         resetTask?.cancel()
         self.trigger = trigger
+        isMeasuring = measuring
         self.phase = phase
         self.liveText = liveText
         if let inAppResult { lastInAppResult = inAppResult }

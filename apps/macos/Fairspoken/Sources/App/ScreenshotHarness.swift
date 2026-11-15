@@ -6,7 +6,8 @@ import SwiftUI
 
 /// `--screenshots <dir>`: renders the real windows (demo data)
 /// in light and dark, captures each window's own pixels and quits. `--screenshots <dir> --updates`
-/// captures the update UI instead: every update state, the toast and Settings › Updates. Capturing our *own*
+/// captures the update UI instead: every update state, the toast and Settings › Updates; `--speed-test` captures
+/// Home's speed-test card and every step of the test (sample runs, nothing recorded). Capturing our *own*
 /// windows needs no Screen Recording permission, so this works from the command line.
 @MainActor
 final class ScreenshotHarness {
@@ -47,6 +48,14 @@ final class ScreenshotHarness {
             // Let the engine finish warming so status chips read "Ready".
             for _ in 0..<150 where !model.models.engineState.isReady {
                 try? await Task.sleep(for: .milliseconds(100))
+            }
+            if AppInfo.arguments.contains("--speed-test") {
+                for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)] {
+                    NSApp.appearance = NSAppearance(named: appearance)
+                    await speedTestShots(suffix: name)
+                }
+                NSApp.terminate(nil)
+                return
             }
             for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)] {
                 NSApp.appearance = NSAppearance(named: appearance)
@@ -181,6 +190,77 @@ final class ScreenshotHarness {
         }
         model.models.presentedAsAvailable = []
         model.models.refresh()
+    }
+
+    /// Home's speed-test card (inviting, then with a result) and each step of the test: typing
+    /// part-way, speaking (ready, listening, transcribing), and the results of a clean run and of a
+    /// rough one. Sample runs: nothing records and nothing is saved.
+    private func speedTestShots(suffix: String) async {
+        let test = model.speedTest
+        let passage = SpeedTest.passages[0]
+        let typing = SpeedTest.TypingResult(seconds: 112, wpm: 44, accuracy: 96)
+        windows.showDashboard(.home)
+        windows.dashboard?.setContentSize(NSSize(width: 1180, height: 800))
+        model.dictation.showcase(.idle)
+        model.dictation.showcaseClearResult()
+
+        func shoot(_ name: String) async {
+            try? await Task.sleep(for: .milliseconds(1200))
+            await freshFrame()
+            if let window = windows.dashboard { await capture(window, as: "speed-test-\(name)-\(suffix)") }
+        }
+        func shootSheet(_ name: String, wait: Int = 1200) async {
+            try? await Task.sleep(for: .milliseconds(wait))
+            await captureSheet(as: "speed-test-\(name)-\(suffix)")
+        }
+
+        // Home before any test: the invitation, time saved against the typical pace.
+        test.showcaseSummary(SpeedTest.Summary())
+        model.history.showcaseTypingWPM(nil)
+        await shoot("home-invite")
+        // Home after one: the last result, time saved against the measured pace.
+        test.showcaseSummary(SpeedTestController.demoSummary)
+        model.history.showcaseTypingWPM(44)
+        await shoot("home-result")
+
+        // 1 Type: part-way, with a wrong key and a skipped space.
+        let typed = String(passage.prefix(172))
+            .replacingOccurrences(of: "evening fog", with: "eveninf fog")
+            .replacingOccurrences(of: "turned for", with: "turnedfor")
+        test.showcaseTyping(passage: passage, typed: typed, seconds: 41)
+        await shootSheet("1-typing", wait: 1600)
+
+        // 2 Speak: ready, listening (words so far), transcribing.
+        test.showcaseSpeaking(passage: passage, typing: typing)
+        await shootSheet("2-speak-ready")
+        model.dictation.showcase(.listening(since: Date().addingTimeInterval(-14)),
+                                 liveText: "The harbor lights came on one by one as the evening fog rolled in, and the small boats turned",
+                                 trigger: .button, measuring: true)
+        let feeder = feedLevels(into: model.dictation.meter)
+        await shootSheet("2-speak-listening")
+        feeder.cancel()
+        model.dictation.showcase(.transcribing, measuring: true)
+        await shootSheet("2-speak-transcribing")
+        model.dictation.showcase(.idle)
+
+        // 3 Results: a clean run (one word heard differently), a new best, its typing speed not yet chosen for Home.
+        model.history.showcaseTypingWPM(nil)
+        let clean = passage.replacingOccurrences(of: "notebook he had", with: "notebook he'd")
+        test.showcaseResults(passage: passage, typing: typing, transcript: clean, speakingSeconds: 32.6, newBest: true)
+        await shootSheet("3-results")
+        // A rough one: gated, then with its times shown anyway.
+        let words = passage.split(separator: " ")
+        let rough = (words.prefix(30) + ["and", "the", "harbour", "master", "stood"] + words.suffix(20)).joined(separator: " ")
+        test.showcaseResults(passage: passage, typing: typing, transcript: rough, speakingSeconds: 29.1)
+        await shootSheet("3-results-gated")
+        test.showcaseResults(passage: passage, typing: typing, transcript: rough, speakingSeconds: 29.1, gatedTimes: true)
+        await shootSheet("3-results-gated-times")
+        // A clean reading after typing that stopped for a while: not kept either.
+        let paused = SpeedTest.TypingResult(seconds: 196, wpm: 25, accuracy: 97, longestPause: 48)
+        test.showcaseResults(passage: passage, typing: paused, transcript: clean, speakingSeconds: 32.6)
+        await shootSheet("3-results-typing-paused")
+        test.isPresented = false
+        try? await Task.sleep(for: .milliseconds(600))
     }
 
     /// The sheet attached to the dashboard, captured on its own.
