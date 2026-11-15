@@ -384,10 +384,11 @@ private struct ResultsStep: View {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        if outcome.gated {
-                            gatedHeadline(outcome)
+                        if let reason = outcome.notKept {
+                            // Not a fair run: say why first; the times only on request.
+                            notKeptHeadline(reason, outcome)
                             if test.showsGatedTimes { comparison(outcome) }
-                            HeardComparison(comparison: outcome.comparison)
+                            if reason == .roughTranscript { HeardComparison(comparison: outcome.comparison) }
                         } else {
                             headline(outcome)
                             comparison(outcome)
@@ -399,23 +400,30 @@ private struct ResultsStep: View {
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 28)
                     .padding(.top, 4)
                     .padding(.bottom, 18)
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 Footer {
-                    if outcome.gated && !test.showsGatedTimes {
+                    if outcome.notKept != nil && !test.showsGatedTimes {
                         LinkButton("Show times anyway") { test.showGatedTimes() }
                     } else {
                         LinkButton("Try another passage") { test.newPassage() }
                     }
                 } trailing: {
-                    if outcome.gated {
+                    if let reason = outcome.notKept {
                         Button("Close") { dismiss() }.cardButton().keyboardShortcut(.cancelAction)
-                        Button("Read It Again") { test.speakAgain() }
-                            .buttonStyle(PrimaryButtonStyle(large: true))
-                            .keyboardShortcut(.defaultAction)
+                        Group {
+                            if reason == .roughTranscript {
+                                Button("Read It Again") { test.speakAgain() }
+                            } else {
+                                Button("Type It Again") { test.restartTyping() }
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle(large: true))
+                        .keyboardShortcut(.defaultAction)
                     } else {
                         Button("Done") { dismiss() }
                             .buttonStyle(PrimaryButtonStyle(large: true))
@@ -445,14 +453,27 @@ private struct ResultsStep: View {
         }
     }
 
-    private func gatedHeadline(_ o: SpeedTest.Outcome) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconTile("exclamationmark.bubble.fill", color: Crystal.Tile.orange, size: 32)
+    /// Why a run isn't kept, in place of the result.
+    private func notKeptHeadline(_ reason: SpeedTest.NotKept, _ o: SpeedTest.Outcome) -> some View {
+        let (symbol, title, detail): (String, String, String) = switch reason {
+        case .roughTranscript:
+            ("exclamationmark.bubble.fill", "Only \(o.comparison.hits) of \(o.comparison.total) words came through",
+             "A fast time on a rough transcript isn't a real result, so this run isn't kept. Read it again a little more clearly, or check the microphone in Settings.")
+        case .inaccurateTyping:
+            ("keyboard.fill", "Only \(o.typing.accuracy)% of the typing was accurate",
+             "Under \(SpeedTest.typingAccuracyGate)%, the time isn't a fair measure of your typing, so this run isn't kept. Type it again at a pace you can keep accurate.")
+        case .typingPaused:
+            ("pause.circle.fill", "Your typing paused for over \(Int(SpeedTest.typingPauseLimit)) s",
+             "A pause that long isn't typing speed, so this run isn't kept. Type the passage again in one go.")
+        case .unmeasured:
+            ("clock.badge.exclamationmark", "This run couldn't be timed",
+             "One of the two legs has no time, so this run isn't kept. Try again.")
+        }
+        return HStack(alignment: .top, spacing: 12) {
+            IconTile(symbol, color: Crystal.Tile.orange, size: 32)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Only \(o.comparison.hits) of \(o.comparison.total) words came through")
-                    .font(.system(size: 20, weight: .semibold)).foregroundStyle(Crystal.ink)
-                Text("A fast time on a rough transcript isn't a real result, so this run isn't kept. Read it again a little more clearly, or check the microphone in Settings.")
-                    .font(TypeScale.body).foregroundStyle(Crystal.ink2)
+                Text(title).font(.system(size: 20, weight: .semibold)).foregroundStyle(Crystal.ink)
+                Text(detail).font(TypeScale.body).foregroundStyle(Crystal.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -487,7 +508,7 @@ private struct ResultsStep: View {
         switch reason {
         case .roughTranscript: "Not kept: the transcript was too rough to count."
         case .inaccurateTyping: "Not kept: under \(SpeedTest.typingAccuracyGate)% of the typing was accurate."
-        case .typingPaused: "Not kept: the typing stopped for \(Int(o.typing.longestPause.rounded())) s, so its time isn't your typing speed."
+        case .typingPaused: "Not kept: the typing paused for over \(Int(SpeedTest.typingPauseLimit)) s, so its time isn't your typing speed."
         case .unmeasured: "Not kept: a leg had no time."
         }
     }

@@ -255,6 +255,10 @@ final class ScreenshotHarness {
         await shootSheet("3-results-gated")
         test.showcaseResults(passage: passage, typing: typing, transcript: rough, speakingSeconds: 29.1, gatedTimes: true)
         await shootSheet("3-results-gated-times")
+        // A clean reading after typing that stopped for a while: not kept either.
+        let paused = SpeedTest.TypingResult(seconds: 196, wpm: 25, accuracy: 97, longestPause: 48)
+        test.showcaseResults(passage: passage, typing: paused, transcript: clean, speakingSeconds: 32.6)
+        await shootSheet("3-results-typing-paused")
         test.isPresented = false
         try? await Task.sleep(for: .milliseconds(600))
     }
