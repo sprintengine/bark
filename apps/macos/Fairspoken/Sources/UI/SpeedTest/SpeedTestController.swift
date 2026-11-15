@@ -31,7 +31,7 @@ final class SpeedTestController {
     private(set) var outcome: SpeedTest.Outcome?
     /// The measured recording behind `outcome`.
     private(set) var measured: DictationController.Measured?
-    /// A gated run whose times the user asked to see anyway (still not kept).
+    /// A run that isn't kept, whose times the user asked to see anyway.
     private(set) var showsGatedTimes = false
     private(set) var isNewBest = false
     /// The user chose this run's typing speed for time saved on Home.
@@ -150,7 +150,7 @@ final class SpeedTestController {
         }
     }
 
-    /// A gated run: show its times anyway, marked as not kept.
+    /// A run that isn't kept: show its times anyway, marked as such.
     func showGatedTimes() { showsGatedTimes = true }
 
     /// Ends the test (Done, Cancel, or the sheet closing): any recording for it is thrown away.
