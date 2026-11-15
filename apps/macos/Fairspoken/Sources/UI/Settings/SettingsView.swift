@@ -107,7 +107,7 @@ private struct GeneralSettings: View {
             Section("Dictation") {
                 Toggle("Paste into the current app", isOn: binding(\.insertAtCursor))
                     .tint(Crystal.clientAccent)
-                    .help("Sends ⌘V to the frontmost app. Needs Accessibility. Never pastes into password fields.")
+                    .help("Sends ⌘V to the frontmost app. Needs Accessibility. Never pastes into password fields; with no text field focused, leaves the text on the clipboard.")
                 Toggle("Restore clipboard afterwards", isOn: binding(\.restoreClipboard))
                     .tint(Crystal.clientAccent)
                     .disabled(!store.settings.insertAtCursor)

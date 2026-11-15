@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Fairspoken,Fairspoken Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (117), FairspokenHost (78), FairspokenUpdates (19)
+scripts/test.sh                       # unit tests: FairspokenCore (126), FairspokenHost (78), FairspokenUpdates (19)
 scripts/install.sh                    # Release Fairspoken → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Fairspoken Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Fairspoken-<version>-macos-arm64.{zip,dmg}
@@ -200,6 +200,18 @@ took 144–292 ms on average, so the interval stretched to 0.65–1.7 s between 
 Engine at 19–20% and the extra CPU at 8–10% of one core. The inserted text matched the setting-off
 transcript word for word on every recording in every run.
 
+## Where the text goes
+
+With **Paste into the current app** on, a dictation is put on the clipboard and pasted with ⌘V; with **Restore
+clipboard afterwards** on, the previous clipboard comes back shortly after. Before pasting, the app asks
+Accessibility what has focus in the frontmost app (`PasteTarget` in FairspokenCore). When there is
+clearly no text field (a button, a list, an image, the Finder desktop, an app with no window), it
+does not paste or restore: the dictation stays on the clipboard and the pill says "Copied — no text
+field. Press ⌘V to paste." for about 4 s. Anything unclear (apps that report little to
+Accessibility, such as terminals and web-view apps) is pasted as before. If a different app is in
+front than when recording started, the text is pasted but the old clipboard is not restored, so the
+dictation can still be pasted again.
+
 ## Post-training recordings
 
 **Post-training › Save recordings for post-training** (`trainingCapture`, off by default) keeps each
@@ -358,7 +370,7 @@ Fairspoken/                      Fairspoken
   Sources/Audio/                 AVAudioEngine capture → 16 kHz mono Float32, device selection, level meter
   Sources/Engine/                ModelLibrary, local/remote sessions, HostStatus (network device reachability)
   Sources/Dictation/             DictationController state machine
-  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore), hotkeys + Fn tap, sounds
+  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, copy-only with no text field), hotkeys + Fn tap, sounds
   Sources/Storage/               settings.json / transcript-history.json / usage-stats.json (Rust schemas), Keychain
   Sources/UI/                    Home, Models, Settings, Onboarding, Pill
 FairspokenServer/                Fairspoken Server

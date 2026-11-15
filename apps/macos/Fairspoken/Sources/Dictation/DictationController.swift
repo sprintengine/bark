@@ -232,7 +232,12 @@ final class DictationController {
                 self.session = nil
                 self.phase = .done(result)
                 Self.log.info("Dictation \(stats.durationSeconds, format: .fixed(precision: 1)) s → \(total) ms (model \(output.modelMs) ms)")
-                self.scheduleReset(after: .milliseconds(1600))
+                // "It's on the clipboard, press ⌘V" needs time to read; "Inserted" does not.
+                if case .copied = delivery {
+                    self.scheduleReset(after: .seconds(4))
+                } else {
+                    self.scheduleReset(after: .milliseconds(1600))
+                }
             } catch {
                 // The engine never became ready: stop the session's live decoding too.
                 session.cancel()
@@ -262,7 +267,8 @@ final class DictationController {
             TextInserter.copy(text)
             return .shownInApp
         }
-        switch await TextInserter.deliver(text, paste: s.insertAtCursor, restoreClipboard: s.restoreClipboard) {
+        switch await TextInserter.deliver(text, paste: s.insertAtCursor, restoreClipboard: s.restoreClipboard,
+                                          expectedApp: target?.processIdentifier) {
         case .pasted: return .pasted(app: target?.localizedName)
         case .copied(let reason): return .copied(reason)
         }
