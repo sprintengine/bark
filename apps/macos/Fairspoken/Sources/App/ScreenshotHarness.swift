@@ -85,6 +85,10 @@ final class ScreenshotHarness {
             if let window = windows.dashboard { await capture(window, as: "\(section.rawValue)-\(suffix)") }
         }
         await modelLinkShots(suffix: suffix)
+        // Home's lower half: the recent dictations, the speech engine and the speed test.
+        windows.showDashboard(.home)
+        try? await Task.sleep(for: .milliseconds(1200))
+        await captureScrolledToBottom(as: "home-lower-\(suffix)")
         // Home while listening: the level and the words so far in the dictate bar.
         windows.showDashboard(.home)
         model.dictation.showcase(.listening(since: Date().addingTimeInterval(-7)),
@@ -218,10 +222,12 @@ final class ScreenshotHarness {
         test.showcaseSummary(SpeedTest.Summary())
         model.history.showcaseTypingWPM(nil)
         await shoot("home-invite")
+        await captureScrolledToBottom(as: "speed-test-home-invite-lower-\(suffix)")
         // Home after one: the last result, time saved against the measured pace.
         test.showcaseSummary(SpeedTestController.demoSummary)
         model.history.showcaseTypingWPM(44)
         await shoot("home-result")
+        await captureScrolledToBottom(as: "speed-test-home-result-lower-\(suffix)")
 
         // 1 Type: part-way, with a wrong key and a skipped space.
         let typed = String(passage.prefix(172))
@@ -471,6 +477,24 @@ final class ScreenshotHarness {
 
     /// When the session's windows are occluded (screen locked, display asleep) AppKit stops
     /// driving SwiftUI frame updates; a fresh hosting controller always renders once.
+    /// The dashboard with its page scrolled to the bottom (the lower cards on Home), then back.
+    private func captureScrolledToBottom(as name: String) async {
+        guard let window = windows.dashboard, let content = window.contentView else { return }
+        func scrollViews(in view: NSView) -> [NSScrollView] {
+            (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews(in:))
+        }
+        // The page's scroll view is the tallest one.
+        guard let scroll = scrollViews(in: content).max(by: { $0.frame.height < $1.frame.height }),
+              let document = scroll.documentView else { return }
+        let bottom = max(0, document.frame.height - scroll.contentView.bounds.height)
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: document.isFlipped ? bottom : 0))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        try? await Task.sleep(for: .milliseconds(700))
+        await capture(window, as: name)
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: document.isFlipped ? 0 : bottom))
+        scroll.reflectScrolledClipView(scroll.contentView)
+    }
+
     private func freshFrame() async {
         if windows.dashboard != nil {
             windows.rebuildDashboardContent()

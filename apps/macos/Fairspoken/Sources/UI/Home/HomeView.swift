@@ -84,6 +84,7 @@ struct HomeView: View {
 /// whether dictation is ready. Black in both themes, as the app icon is.
 private struct HomeBanner: View {
     @Environment(AppModel.self) private var model
+    @State private var width: CGFloat = 900
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Frost.radius, style: .continuous)
@@ -123,10 +124,13 @@ private struct HomeBanner: View {
                 }
                 .padding(.top, 16)
             }
+            // The words stop short of the dog's face.
+            .frame(maxWidth: max(320, width - 250), alignment: .leading)
             .padding(.horizontal, 30)
             .padding(.vertical, 26)
         }
         .frame(minHeight: 210)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .clipShape(shape)
         .overlay(shape.strokeBorder(.white.opacity(0.08)))
         .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
@@ -140,11 +144,10 @@ private struct HomeBanner: View {
             Text(push ? "Hold" : "Press")
             ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
             Text("in any app and talk. \(AppInfo.displayName) types it where your cursor is.")
+                .fixedSize(horizontal: false, vertical: true)
         }
         .font(.system(size: 14))
         .foregroundStyle(.white.opacity(0.78))
-        .lineLimit(1)
-        .minimumScaleFactor(0.85)
     }
 
     static func greeting(at date: Date = .now) -> String {
@@ -325,12 +328,13 @@ private struct DictationCard: View {
                 Text("or hold")
                 Keycap(label: "fn")
             }
+            // Wraps beside the keys rather than truncating, as in October.
             Text("in any app, or click the mic.")
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 2)
         }
         .font(.system(size: 14))
         .foregroundStyle(Crystal.ink2)
-        .lineLimit(1)
-        .minimumScaleFactor(0.85)
     }
 
     @ViewBuilder private var resultArea: some View {
@@ -393,7 +397,7 @@ private struct DictationCard: View {
 /// listening, with rings that spread with the voice.
 private struct MicButton: View {
     var dictation: DictationController
-    var size: CGFloat = 116
+    var size: CGFloat = 104
     var action: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var scheme
@@ -401,32 +405,11 @@ private struct MicButton: View {
     var body: some View {
         let listening = dictation.phase.isListening
         let busy = dictation.phase == .transcribing
-        let ring = size + 92
+        // The button's footprint includes its resting rings; the spreading rings while listening
+        // draw past it, behind the card's text.
+        let ring = size + 64
+        let canvas = size + 120
         ZStack {
-            TimelineView(.animation(minimumInterval: 1 / 30, paused: !listening || reduceMotion)) { ctx in
-                let level = CGFloat(listening ? dictation.meter.snapshot().level : 0)
-                Canvas { gc, sz in
-                    _ = ctx.date
-                    let t = ctx.date.timeIntervalSinceReferenceDate
-                    let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
-                    func circle(_ r: CGFloat) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)) }
-                    if listening && !reduceMotion {
-                        for i in 0..<3 {
-                            let phase = (t * 0.6 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
-                            let r = size / 2 + CGFloat(phase) * (22 + level * 26)
-                            gc.stroke(circle(r), with: .color(Crystal.live.opacity((1 - phase) * (0.25 + Double(level) * 0.5))), lineWidth: 2)
-                        }
-                    } else {
-                        let tint = listening ? Crystal.live : Crystal.clientAccent
-                        for (i, extra) in [16.0, 34.0].enumerated() {
-                            gc.stroke(circle(size / 2 + extra), with: .color(tint.opacity(0.26 - Double(i) * 0.1)), lineWidth: 1)
-                        }
-                    }
-                }
-            }
-            .frame(width: ring, height: ring)
-            .allowsHitTesting(false)
-
             Button(action: action) {
                 ZStack {
                     if busy {
@@ -456,6 +439,31 @@ private struct MicButton: View {
             .accessibilityLabel(listening ? "Stop dictation" : "Start dictation")
         }
         .frame(width: ring, height: ring)
+        .background {
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: !listening || reduceMotion)) { ctx in
+                let level = CGFloat(listening ? dictation.meter.snapshot().level : 0)
+                Canvas { gc, sz in
+                    _ = ctx.date
+                    let t = ctx.date.timeIntervalSinceReferenceDate
+                    let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
+                    func circle(_ r: CGFloat) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)) }
+                    if listening && !reduceMotion {
+                        for i in 0..<3 {
+                            let phase = (t * 0.6 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
+                            let r = size / 2 + CGFloat(phase) * (20 + level * 36)
+                            gc.stroke(circle(r), with: .color(Crystal.live.opacity((1 - phase) * (0.25 + Double(level) * 0.5))), lineWidth: 2)
+                        }
+                    } else {
+                        let tint = listening ? Crystal.live : Crystal.clientAccent
+                        for (i, extra) in [14.0, 30.0].enumerated() {
+                            gc.stroke(circle(size / 2 + extra), with: .color(tint.opacity(0.26 - Double(i) * 0.1)), lineWidth: 1)
+                        }
+                    }
+                }
+            }
+            .frame(width: canvas, height: canvas)
+            .allowsHitTesting(false)
+        }
         .animation(Motion.unlessReduced(Motion.deliberate, reduceMotion), value: listening)
     }
 }
@@ -573,30 +581,20 @@ private struct StatsRow: View {
         let week = usage.words(lastDays: 7)
         let lastWeek = usage.words(lastDays: 14) - week
         let streak = usage.streak()
-        let tiles = Group {
-            StatTile(title: "Today", symbol: "sun.max", value: Format.number(today.words), unit: "words",
-                     footnote: "\(today.dictations) dictation\(today.dictations == 1 ? "" : "s")")
-            WeekTile(usage: usage, words: week, previous: lastWeek)
-            StatTile(title: "Release → text", symbol: "bolt", value: model.history.typicalLatencyMs.map { "\($0)" } ?? "–",
-                     unit: "ms", footnote: "median of recent dictations")
-            StatTile(title: "Streak", symbol: "flame", value: "\(streak)", unit: streak == 1 ? "day" : "days",
-                     footnote: "days in a row with a dictation")
-        }
+        let todayTile = StatTile(title: "Today", symbol: "sun.max", value: Format.number(today.words), unit: "words",
+                                 footnote: "\(today.dictations) dictation\(today.dictations == 1 ? "" : "s")")
+        let weekTile = WeekTile(usage: usage, words: week, previous: lastWeek)
+        let latencyTile = StatTile(title: "Release → text", symbol: "bolt", value: model.history.typicalLatencyMs.map { "\($0)" } ?? "–",
+                                   unit: "ms", footnote: "median of recent dictations")
+        let streakTile = StatTile(title: "Streak", symbol: "flame", value: "\(streak)", unit: streak == 1 ? "day" : "days",
+                                  footnote: "days in a row with a dictation")
         if wide {
-            HStack(spacing: 18) { tiles }.fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 18) { todayTile; weekTile; latencyTile; streakTile }
+                .fixedSize(horizontal: false, vertical: true)
         } else {
             Grid(horizontalSpacing: 18, verticalSpacing: 18) {
-                GridRow {
-                    StatTile(title: "Today", symbol: "sun.max", value: Format.number(today.words), unit: "words",
-                             footnote: "\(today.dictations) dictation\(today.dictations == 1 ? "" : "s")")
-                    WeekTile(usage: usage, words: week, previous: lastWeek)
-                }
-                GridRow {
-                    StatTile(title: "Release → text", symbol: "bolt", value: model.history.typicalLatencyMs.map { "\($0)" } ?? "–",
-                             unit: "ms", footnote: "median of recent dictations")
-                    StatTile(title: "Streak", symbol: "flame", value: "\(streak)", unit: streak == 1 ? "day" : "days",
-                             footnote: "days in a row with a dictation")
-                }
+                GridRow { todayTile; weekTile }
+                GridRow { latencyTile; streakTile }
             }
         }
     }
@@ -636,34 +634,29 @@ private struct WeekTile: View {
         Card(cornerRadius: Frost.radius, padding: 18, fillHeight: true) {
             VStack(alignment: .leading, spacing: 6) {
                 Eyebrow(text: "This week", symbol: "calendar")
-                HStack(alignment: .bottom, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(Format.number(words)).font(.mvNumber(32, weight: .bold)).foregroundStyle(Crystal.ink)
-                                .lineLimit(1).minimumScaleFactor(0.6)
-                            Text("words").font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink2)
-                        }
-                        if previous > 0 {
-                            let change = Double(words - previous) / Double(previous) * 100
-                            Label("\(Int(abs(change).rounded()))% vs last week", systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(change >= 0 ? Crystal.ok : Crystal.ink2)
-                                .lineLimit(1)
-                        } else {
-                            Text("last 7 days").font(.system(size: 11)).foregroundStyle(Crystal.ink2)
-                        }
-                    }
-                    .layoutPriority(1)
+                HStack(alignment: .bottom, spacing: 8) {
+                    Text(Format.number(words)).font(.mvNumber(32, weight: .bold)).foregroundStyle(Crystal.ink)
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                        .layoutPriority(1)
                     Spacer(minLength: 0)
                     Chart(Array(series.enumerated()), id: \.offset) { i, day in
-                        BarMark(x: .value("Day", day.date, unit: .day), y: .value("Words", day.bucket.words), width: 6)
+                        BarMark(x: .value("Day", day.date, unit: .day), y: .value("Words", day.bucket.words), width: 5)
                             .foregroundStyle(i == series.count - 1 ? Crystal.clientAccent : Crystal.clientAccent.opacity(0.32))
                             .clipShape(Capsule())
                     }
                     .chartXAxis(.hidden)
                     .chartYAxis(.hidden)
-                    .frame(width: 66, height: 44)
+                    .frame(width: 54, height: 36)
                     .accessibilityLabel("Words per day this week")
+                }
+                if previous > 0 {
+                    let change = Double(words - previous) / Double(previous) * 100
+                    Label("\(Int(abs(change).rounded()))% vs last week", systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(change >= 0 ? Crystal.ok : Crystal.ink2)
+                        .lineLimit(1)
+                } else {
+                    Text("words in the last 7 days").font(.system(size: 11)).foregroundStyle(Crystal.ink2)
                 }
             }
         }
