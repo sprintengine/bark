@@ -272,7 +272,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
         with:
-          toolchain: stable
+          toolchain: ${{ runner.os == 'Windows' && '1.99.1' || 'stable' }} # 1.100.0 breaks the ort-sys build script on Windows
           targets: ${{ matrix.target }}
 
       - name: Cache Rust build outputs
