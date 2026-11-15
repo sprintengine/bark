@@ -197,6 +197,9 @@ final class ModelLibrary {
 
     func clearDownloadError(_ id: String) { downloadErrors[id] = nil }
 
+    /// Screenshot mode: shows `id` in `state` (a download in progress, say) without doing it.
+    func showcase(_ id: String, _ state: ItemState) { items[id] = state }
+
     /// Screenshot mode: shows a model as not downloaded, whatever is on disk.
     @ObservationIgnored var presentedAsAvailable: Set<String> = []
 

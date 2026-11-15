@@ -100,7 +100,25 @@ final class AppModel {
         }
     }
 
-    /// The model card whose "Download from Link…" field is open, and what it holds.
+    /// The model whose detail sheet is open in the Models library.
+    var modelDetailID: String?
+
+    /// Makes `id` the dictation model: saved in settings, then downloaded if needed and loaded.
+    /// With a network device chosen it is still loaded, ready for when dictation is local again.
+    func useModel(_ id: String) {
+        guard SpeechModelCatalog.model(id: id) != nil else { return }
+        settings.update { $0.model = id }
+        models.prepare(id)
+    }
+
+    /// Stars or unstars a model in the Models library (favourites are listed first).
+    func toggleFavourite(_ id: String) {
+        settings.update { s in
+            if let i = s.favoriteModels.firstIndex(of: id) { s.favoriteModels.remove(at: i) } else { s.favoriteModels.append(id) }
+        }
+    }
+
+    /// The model whose "Download from Link…" field is open, and what it holds.
     var linkEditorModel: String?
     var linkDraft = ""
 

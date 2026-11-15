@@ -212,15 +212,26 @@ The client runs two model families on the Neural Engine, one model loaded at a t
 - **Figures:** see `docs/model-benchmarks.md` for how speed and accuracy were measured.
 - The server (Fairspoken Server) still serves Parakeet only and doesn't link WhisperKit.
 
+**Models library** (Fairspoken › Models): one table of every model, built from reusable solid
+content components in `FairspokenUI` (`ContentCard`, `Hairline`, `ScoreBar`, `Badge`,
+`SortHeader`, `ContentSearchField`, `ProgressStopButton`; metrics in `ContentMetrics`). Each row has
+a star (favourites list first; `favoriteModels`), the name with EN / NEW / Recommended / In use
+badges, the engine, speed and accuracy bars, size, and Download, a progress ring that stops the
+download, Use (… › Delete…, with confirmation) or In use. Search, engine, language, Downloaded and
+On this Mac filters, and sorting by name, speed, accuracy or size, are `ModelCatalogueQuery`.
+Clicking a row opens a detail sheet: description, figures and where they come from, languages,
+download, memory, licence, source repository, Download from Link… (Parakeet) and **Use this model**.
+
 `--selftest <wav> --model large-v3-turbo` runs any catalogue model through the same engine as
 dictation (downloading it first if needed).
 
 ## Model download links
 
-For networks that can't reach the standard model download: each card on Fairspoken › **Models** and
-Fairspoken Server › **Models** has **Download from Link…** while the model isn't downloaded. Give it a
-link to an archive of the model (or Choose File… on this Mac or a mounted share); it is saved for that
-model and the download starts, with progress and any error on the card. A card with a saved link shows
+For networks that can't reach the standard model download: a Parakeet model's detail sheet on
+Fairspoken › **Models** and its card on Fairspoken Server › **Models** have **Download from Link…**
+while the model isn't downloaded. Give it a link to an archive of the model (or Choose File… on this
+Mac or a mounted share); it is saved for that model and the download starts, with progress on the
+row and any error in the sheet. A model with a saved link shows
 "Downloads from host/path" and **Use Standard Download**, which removes it. Every download of that
 model (Models, first-run loading, the server's Download and `POST /v1/models/download`) uses the link.
 
@@ -398,7 +409,8 @@ Keychain, and the JSON keeps empty strings. Keys the app doesn't model are prese
 
 ## Screenshots
 
-`docs/screenshots/` (Fairspoken, light and dark): `home`, `home-listening`, `models`, `training`, `settings`,
+`docs/screenshots/` (Fairspoken, light and dark): `home`, `home-listening`, `models`, `models-library` (a
+download in progress and a favourite), `models-detail`, `models-link-open`, `models-link-saved`, `training`, `settings`,
 `settings-transcription` (Network device), `onboarding-welcome`, `onboarding-permissions`, `pill`.
 
 `docs/screenshots/server-app/` (Fairspoken Server, light and dark, demo simulator): `activity`
