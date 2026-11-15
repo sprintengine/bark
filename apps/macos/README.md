@@ -26,7 +26,7 @@ scripts/install.sh                    # Release Fairspoken → ~/Applications, t
 scripts/install.sh --app server       # the same for Fairspoken Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Fairspoken-<version>-macos-arm64.{zip,dmg}
 scripts/release.sh --app server       # → build/release/Fairspoken-Server-<version>-macos-arm64.{zip,dmg}
-scripts/screenshots.sh                # docs/screenshots/ (client) and docs/screenshots/server-app/ (server)
+scripts/screenshots.sh                # docs/screenshots/ (client) and docs/screenshots/server-app/ (server), not committed
 open "build/Build/Products/Debug/Fairspoken Server.app"
 ```
 
@@ -462,6 +462,8 @@ Client data lives in `~/Library/Application Support/<bundle id>/`. On first laun
 Keychain, and the JSON keeps empty strings. Keys the app doesn't model are preserved on save.
 
 ## Screenshots
+
+`scripts/screenshots.sh` writes these locally. Git ignores them, so they never reach the repository.
 
 `docs/screenshots/` (Fairspoken, light and dark): `home`, `home-listening`, `home-all` (See all),
 `home-first-use` (before the first dictation), `models`, `models-library` (a download in progress and a
