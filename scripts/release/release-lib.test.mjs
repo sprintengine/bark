@@ -84,8 +84,8 @@ test('the build number is the UTC minute, twelve digits, and only grows', () => 
 
 test('the releases repository comes from the stable desktop feed endpoint and nowhere else', () => {
   assert.equal(
-    releasesRepoFromEndpoint('https://github.com/sprintengine/fairspoken/releases/download/update-feeds/desktop-stable.json'),
-    'sprintengine/fairspoken',
+    releasesRepoFromEndpoint('https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-stable.json'),
+    'sprintengine/speakeasy',
   )
   assert.equal(releasesRepoFromEndpoint('https://github.com/acme/multi-voice.app/releases/download/update-feeds/desktop-stable.json'), 'acme/multi-voice.app')
   for (const wrong of [

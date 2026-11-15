@@ -33,7 +33,7 @@ test('the feed names and URLs are the contract', () => {
   ])
   assert.equal(
     feedUrl({ repo: REPO, name: 'appcast-fairspoken.xml' }),
-    'https://github.com/sprintengine/fairspoken/releases/download/update-feeds/appcast-fairspoken.xml',
+    'https://github.com/sprintengine/speakeasy/releases/download/update-feeds/appcast-fairspoken.xml',
   )
 })
 
@@ -55,12 +55,12 @@ test('desktop feeds: newest stable and newest nightly, with all three platforms 
   const stable = JSON.parse(files['desktop-stable.json'])
   assert.deepEqual(Object.keys(stable), ['version', 'notes', 'pub_date', 'platforms'])
   assert.equal(stable.version, '0.4.0')
-  assert.equal(stable.notes, 'https://github.com/sprintengine/fairspoken/releases/tag/v0.4.0')
+  assert.equal(stable.notes, 'https://github.com/sprintengine/speakeasy/releases/tag/v0.4.0')
   assert.equal(stable.pub_date, '2026-10-01T09:00:00.000Z')
   assert.deepEqual(Object.keys(stable.platforms), ['windows-x86_64', 'linux-x86_64', 'linux-x86_64-deb'])
   assert.equal(
     stable.platforms['linux-x86_64-deb'].url,
-    'https://github.com/sprintengine/fairspoken/releases/download/v0.4.0/fairspoken-0.4.0-linux-x86_64.deb',
+    'https://github.com/sprintengine/speakeasy/releases/download/v0.4.0/fairspoken-0.4.0-linux-x86_64.deb',
   )
   assert.ok(stable.platforms['linux-x86_64-deb'].signature.length > 40)
   const nightly = JSON.parse(files['desktop-nightly.json'])
@@ -75,7 +75,7 @@ test('host feeds: the contract shape, the four platforms, and the channel spelle
   assert.deepEqual(Object.keys(host), ['version', 'channel', 'pub_date', 'notes', 'platforms'])
   assert.equal(host.version, '0.4.1-nightly.20261004.71')
   assert.equal(host.channel, 'nightly')
-  assert.equal(host.notes, 'https://github.com/sprintengine/fairspoken/releases/tag/v0.4.1-nightly.20261004.71')
+  assert.equal(host.notes, 'https://github.com/sprintengine/speakeasy/releases/tag/v0.4.1-nightly.20261004.71')
   assert.deepEqual(Object.keys(host.platforms), ['linux-x86_64', 'linux-aarch64', 'windows-x86_64', 'darwin-aarch64'])
   for (const [platform, entry] of Object.entries(host.platforms)) {
     assert.deepEqual(Object.keys(entry), ['url', 'sha256', 'signature', 'format'])
@@ -115,7 +115,7 @@ test('appcasts: the newest three stable and the kept nightlies, newest build fir
   assert.ok(server.every((item) => item.url.includes('/Fairspoken-Server-')))
   const xml = files['appcast-fairspoken.xml']
   assert.match(xml, /^<\?xml version="1\.0" encoding="utf-8"\?>\n<rss version="2\.0" xmlns:sparkle="http:\/\/www\.andymatuschak\.org\/xml-namespaces\/sparkle"/)
-  assert.match(xml, /<sparkle:releaseNotesLink>https:\/\/github\.com\/sprintengine\/fairspoken\/releases\/tag\/v0\.4\.0<\/sparkle:releaseNotesLink>/)
+  assert.match(xml, /<sparkle:releaseNotesLink>https:\/\/github\.com\/sprintengine\/speakeasy\/releases\/tag\/v0\.4\.0<\/sparkle:releaseNotesLink>/)
   assert.match(xml, /<pubDate>Thu, 01 Oct 2026 09:00:00 GMT<\/pubDate>/)
   // Stable items carry no channel element at all.
   const stableItem = xml.split('<item>').find((chunk) => chunk.includes('<sparkle:shortVersionString>0.4.0<'))
