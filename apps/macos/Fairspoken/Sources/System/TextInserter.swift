@@ -22,6 +22,7 @@ enum TextInserter {
     private static let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
 
     static let noTextTargetReason = "Copied — no text field. Press ⌘V to paste."
+    static let switchedDuringCheckReason = "Copied — press ⌘V to paste"
 
     /// `expectedApp` is the app that was frontmost when recording started. If another app is in
     /// front now, the text is still pasted but the old clipboard is not put back, so the
@@ -46,6 +47,11 @@ enum TextInserter {
 
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let focus = await probeFocus(of: front)
+        // The probe described an app that is no longer in front: don't paste blind.
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier != front {
+            write(text, to: pasteboard, transient: false)
+            return .copied(reason: switchedDuringCheckReason)
+        }
         let bundleID = front.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
         if PasteTarget.decide(focus, appBundleID: bundleID) == .copyOnly {
             write(text, to: pasteboard, transient: false)
