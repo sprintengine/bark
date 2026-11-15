@@ -144,7 +144,8 @@ public actor LocalSpeechRouter: SpeechEngine {
     }
 
     public func transcribe(_ samples16k: [Float], options: TranscriptionRequestOptions) async throws -> TranscriptionOutput {
-        guard let active else { throw SpeechEngineError.notLoaded }
+        // While a switch is under way, `active` may be a superseded model about to be unloaded.
+        guard inFlight == nil, let active else { throw SpeechEngineError.notLoaded }
         return try await active.transcribe(samples16k, options: options)
     }
 }
