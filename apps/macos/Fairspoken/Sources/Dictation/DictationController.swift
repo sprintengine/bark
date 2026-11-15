@@ -234,6 +234,8 @@ final class DictationController {
                 Self.log.info("Dictation \(stats.durationSeconds, format: .fixed(precision: 1)) s → \(total) ms (model \(output.modelMs) ms)")
                 self.scheduleReset(after: .milliseconds(1600))
             } catch {
+                // The engine never became ready: stop the session's live decoding too.
+                session.cancel()
                 self.session = nil
                 Self.log.error("Transcription failed: \(error.localizedDescription, privacy: .public)")
                 self.fail(error.localizedDescription)
