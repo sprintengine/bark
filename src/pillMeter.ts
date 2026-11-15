@@ -1,5 +1,5 @@
 /* ── Voice-reactive level meter ─────────────────────────────────
-   The pill's five wave bars are driven by real capture levels streamed from the
+   The pill's wave bars are driven by real capture levels streamed from the
    backend as `audio-level` events; they sit flat through silence instead of
    pulsing on a loop. */
 
@@ -12,7 +12,8 @@ const METER_GATE_RMS = 0.004;
 // voice at full scale; louder speech simply clamps.
 const METER_FULL_RMS = 0.026;
 const METER_FLOOR_SCALE = 0.12;
-const METER_BAR_WEIGHTS = [0.62, 0.95, 1, 0.78, 0.88];
+// One weight per bar in index.html: tall in the middle, quieter at the ends.
+const METER_BAR_WEIGHTS = [0.42, 0.66, 0.88, 1, 0.8, 0.95, 0.72, 0.58, 0.4];
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 let meterTarget = 0;
@@ -53,7 +54,7 @@ function meterFrame(): void {
     const shimmer = !reducedMotionQuery.matches && meterDisplay > 0.03;
     waveBars.forEach((bar, index) => {
       const wobble = shimmer ? 0.89 + 0.11 * Math.sin(time / 90 + index * 1.7) : 1;
-      const scale = METER_FLOOR_SCALE + meterDisplay * METER_BAR_WEIGHTS[index] * wobble * (1 - METER_FLOOR_SCALE);
+      const scale = METER_FLOOR_SCALE + meterDisplay * (METER_BAR_WEIGHTS[index] ?? 0.8) * wobble * (1 - METER_FLOOR_SCALE);
       bar.style.transform = `scaleY(${Math.min(1, Math.max(METER_FLOOR_SCALE, scale)).toFixed(3)})`;
     });
     if (keepRunning() || meterDisplay > 0.02) {

@@ -32,6 +32,16 @@ pub struct TranscriptHistoryItem {
     /// What super mode did, with its disagreements; absent when it was off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub super_mode: Option<crate::super_mode::SuperModeOutcome>,
+    /// The app the dictation went into (its display name, e.g. "Mail"), for
+    /// Home's recent list. Absent where it isn't known: before this field
+    /// existed, and on platforms that don't report the frontmost app.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_name: Option<String>,
+    /// The local speech model that transcribed it (a model id such as
+    /// `parakeet-tdt-0.6b-v3`), so Models can show the speed measured for
+    /// that model only. Absent for host and cloud dictations and older items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 /// Where the wait between releasing the key and seeing text went.
@@ -60,6 +70,8 @@ pub struct NewTranscriptHistoryItem {
     pub timings: Option<DictationTimings>,
     pub format: Option<FormatDecision>,
     pub super_mode: Option<crate::super_mode::SuperModeOutcome>,
+    pub app_name: Option<String>,
+    pub model: Option<String>,
 }
 
 pub struct TranscriptHistoryService {
@@ -105,6 +117,11 @@ impl TranscriptHistoryService {
             timings: item.timings,
             format: item.format,
             super_mode: item.super_mode,
+            app_name: item
+                .app_name
+                .map(|name| name.trim().to_string())
+                .filter(|name| !name.is_empty()),
+            model: item.model,
         };
         self.items.insert(0, stored.clone());
         self.items.truncate(MAX_TRANSCRIPTS);
@@ -222,6 +239,8 @@ mod tests {
             timings: None,
             format: None,
             super_mode: None,
+            app_name: None,
+            model: None,
         }
     }
 

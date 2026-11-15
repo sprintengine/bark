@@ -19,16 +19,16 @@ const modelPrepare = required<HTMLButtonElement>("modelPrepare");
 let host: { location(): string; reportError(error: unknown): void };
 
 const MODEL_MEMORY_FOOTPRINTS: Record<SttModel, string> = {
-  "parakeet-tdt-0.6b-v3": "RAM ~2.5G",
-  "parakeet-ultra": "RAM ~2.5G",
-  "parakeet-tdt-0.6b-v2": "RAM ~2.5G · English",
-  tiny: "RAM ~0.7G",
-  base: "RAM ~1.2G",
-  small: "RAM ~2.5G",
-  medium: "RAM ~8G",
-  "large-v2": "RAM ~16G",
-  "large-v3": "RAM ~16G",
-  "large-v3-turbo": "RAM ~8G",
+  "parakeet-tdt-0.6b-v3": "About 2.5 GB RAM",
+  "parakeet-ultra": "About 2.5 GB RAM",
+  "parakeet-tdt-0.6b-v2": "About 2.5 GB RAM · English",
+  tiny: "About 0.7 GB RAM",
+  base: "About 1.2 GB RAM",
+  small: "About 2.5 GB RAM",
+  medium: "About 8 GB RAM",
+  "large-v2": "About 16 GB RAM",
+  "large-v3": "About 16 GB RAM",
+  "large-v3-turbo": "About 8 GB RAM",
 };
 
 function setModelDownloadStatus(status: string, percentage: number): void {

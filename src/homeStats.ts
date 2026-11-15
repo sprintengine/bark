@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { mountMonthlyUsage, type MonthlyBucket } from "./monthlyUsage";
+import { appsUsed, renderRecentDictations } from "./homeRecent";
 
 // Renders the Home screen from the persistent usage_stats aggregate. Numbers
 // here are real: time saved compares typing the dictated words at 40 wpm
@@ -44,6 +45,8 @@ const statTimeSavedSub = byId("statTimeSavedSub");
 const statTotalWords = byId("statTotalWords");
 const statSpokenTime = byId("statSpokenTime");
 const statThisWeek = byId("statThisWeek");
+const statApps = byId("statApps");
+const statAppsMeta = byId("statAppsMeta");
 const statWeekDelta = byId("statWeekDelta");
 const statStreak = byId("statStreak");
 const statBestStreak = byId("statBestStreak");
@@ -88,6 +91,8 @@ function renderHeadlineDuration(node: HTMLElement, text: string): void {
 }
 
 const usdFormat = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+// The cloud rate is fractions of a cent; the same currency style, more digits.
+const rateFormat = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 3 });
 
 function formatMoney(usd: number): string {
   if (usd > 0 && usd < 0.005) return `<${usdFormat.format(0.01)}`;
@@ -123,8 +128,14 @@ function renderChart(week: WeeklyBucket[]): void {
   );
 }
 
+const monthlyUsage = byId("monthlyUsage");
+
 function renderStats(summary: UsageStatsSummary): void {
   renderMonthlyUsage(summary);
+  // Months of zeros say nothing a first-run welcome doesn't.
+  monthlyUsage.hidden = !summary.hasData;
+  // A first run leads with setup; the tests come once there is something to compare.
+  document.body.classList.toggle("is-first-run", !summary.hasData);
   if (!summary.hasData) {
     homeEmpty.hidden = false;
     homeStats.hidden = true;
@@ -139,15 +150,16 @@ function renderStats(summary: UsageStatsSummary): void {
     `vs typing at ${typingWpm} wpm`;
 
   statTotalWords.textContent = summary.totalWords.toLocaleString();
-  statSpokenTime.textContent = formatDuration(summary.totalRecordingSeconds);
-  statThisWeek.textContent = summary.thisWeekWords.toLocaleString();
+  // Written as the headline writes durations: "5h 57m".
+  statSpokenTime.textContent = formatDuration(summary.totalRecordingSeconds).replace(/ ([hm])\b/g, "$1");
+  statThisWeek.textContent = `${summary.thisWeekWords.toLocaleString()} words`;
   statWeekDelta.textContent = weekDeltaLabel(summary.thisWeekWords, summary.lastWeekWords);
   statStreak.textContent = String(summary.currentStreak);
-  statBestStreak.textContent = `best ${summary.bestStreak}`;
+  statBestStreak.textContent = `· best ${summary.bestStreak}`;
   statWpm.textContent = String(summary.speakingWpm);
   statMoneySaved.textContent = formatMoney(summary.moneySavedUsd);
   statMoneySavedMeta.textContent =
-    `vs cloud at $${summary.cloudRateUsdPerMinute.toFixed(3)}/min`;
+    `vs cloud at ${rateFormat.format(summary.cloudRateUsdPerMinute)} a minute`;
 
   renderZeroEdit(summary);
   renderChart(summary.week);
@@ -168,8 +180,8 @@ function renderZeroEdit(summary: UsageStatsSummary): void {
   const raw = summary.rawZeroEditRate30d;
   statZeroEditMeta.textContent =
     polished !== null && polished !== undefined && raw !== null && raw !== undefined
-      ? `polished ${Math.round(polished * 100)}% · raw ${Math.round(raw * 100)}% (30 days)`
-      : "last 30 days";
+      ? `· polished ${Math.round(polished * 100)}%, raw ${Math.round(raw * 100)}%`
+      : "· last 30 days";
 }
 
 interface DictationTimings {
@@ -180,7 +192,11 @@ interface DictationTimings {
 }
 
 interface HistoryEntry {
+  id: string;
+  createdAt: number;
+  text: string;
   durationSeconds: number;
+  appName?: string | null;
   timings?: DictationTimings | null;
 }
 
@@ -209,12 +225,15 @@ async function refreshPerformance(): Promise<void> {
   const section = document.getElementById("performanceSection");
   if (!section) return;
   let timed: TimedDictation[] = [];
+  let history: HistoryEntry[] = [];
   try {
-    const history = await invoke<HistoryEntry[]>("get_transcript_history");
-    timed = history.filter((item): item is TimedDictation => Boolean(item.timings));
+    history = await invoke<HistoryEntry[]>("get_transcript_history");
+    timed = history.filter((item): item is HistoryEntry & TimedDictation => Boolean(item.timings));
   } catch {
     /* outside the app: keep the section hidden */
   }
+  renderRecent(history);
+  renderApps(history);
   section.hidden = timed.length === 0;
   if (timed.length === 0) return;
 
@@ -240,6 +259,20 @@ async function refreshPerformance(): Promise<void> {
   const polished = timed.filter((item) => item.timings.polishMs > 0);
   setText("perfPolish", last.timings.polishMs > 0 ? formatMs(last.timings.polishMs) : "off");
   setText("perfPolishMeta", polished.length > 0 ? typical((t) => t.polishMs, polished) : "");
+}
+
+function renderRecent(history: HistoryEntry[]): void {
+  const section = byId("recentSection");
+  section.hidden = history.length === 0;
+  renderRecentDictations(byId("recentList"), history);
+}
+
+// Apps the recent dictations went into. Older dictations carry no app, so
+// the count says which window it covers.
+function renderApps(history: HistoryEntry[]): void {
+  const { count, named } = appsUsed(history);
+  statApps.textContent = named === 0 ? "–" : String(count);
+  statAppsMeta.textContent = named === 0 ? "recorded from now on" : "across recent dictations";
 }
 
 async function refresh(): Promise<void> {

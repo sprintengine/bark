@@ -41,8 +41,8 @@
 
   /* Recording pill (real index.html), bottom-centre like on screen. */
   /* Frames are oversized by PAD so the real drop shadows are not clipped;
-     the capsule/popover keep their shipped sizes (186×46 and 400pt windows). */
-  #pill { position: absolute; left: calc(50% - 133px); bottom: -26px; width: 266px; height: 126px; border: 0; background: transparent; }
+     the capsule/popover keep their shipped sizes (244×46 recording and 400pt windows). */
+  #pill { position: absolute; left: calc(50% - 168px); bottom: -26px; width: 336px; height: 126px; border: 0; background: transparent; }
 </style>
 </head>
 <body>
@@ -159,10 +159,10 @@
     const doc = frame.contentDocument;
     await until(() => doc.getElementById("recordBtn"));
     doc.body.dataset.pill = "recording";
-    doc.querySelector(".window").style.padding = "0 46px 47px"; // 186×46 window + shadow room
+    doc.querySelector(".window").style.padding = "0 52px 47px"; // 244×46 window + shadow room
     doc.getElementById("statusLabel").textContent = "Recording";
     doc.getElementById("timer").textContent = "0:14";
-    const levels = [0.42, 0.78, 1, 0.64, 0.86];
+    const levels = [0.3, 0.55, 0.82, 1, 0.68, 0.9, 0.6, 0.42, 0.25];
     doc.querySelectorAll(".wave span").forEach((bar, i) => { bar.style.transform = `scaleY(${levels[i]})`; });
   }
 

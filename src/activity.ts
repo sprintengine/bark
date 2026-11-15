@@ -64,7 +64,7 @@ function emptyState(): HTMLElement {
 }
 
 function summaryText(events: AppEvent[]): string {
-  if (events.length === 0) return "All clear";
+  if (events.length === 0) return "";
   const errors = events.filter((event) => event.level === "error").length;
   const warnings = events.filter((event) => event.level === "warning").length;
   const parts: string[] = [];

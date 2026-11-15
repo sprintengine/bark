@@ -1,14 +1,15 @@
-/* Mini pill window — bottom-center capsule in the Crystal look: a brushed
-   silver capsule in light mode, graphite in dark (it follows the app's
-   appearance through appearance.ts).
+/* Mini pill window — bottom-center capsule in the Crystal look: a white
+   capsule in light mode, graphite in dark (it follows the app's appearance
+   through appearance.ts). While recording it carries a live dot, a level
+   meter, the timer and the shortcut that stops it.
    Self-contained: this window loads only this sheet. The fill stays opaque on
    purpose (2026-06-09): the pill window is transparent but nothing behind it
    is blurred, so translucency reads as smudge at this size. The sheen is a
    still neutral gradient, so the capsule reads as a raised glass object. */
 
 :root {
-  --pill-fill-top:    #fbfcfd;
-  --pill-fill-bottom: #e6e9ec;
+  --pill-fill-top:    #ffffff;
+  --pill-fill-bottom: #eef0f2;
   --pill-idle-top:    #f1f3f5;
   --pill-idle-bottom: #dfe3e7;
   --text-primary:     #15191d;
@@ -23,7 +24,8 @@
   --pill-edge:        rgba(16, 24, 32, 0.12);
   --pill-highlight:   rgba(255, 255, 255, 0.95);
   --hairline:         rgba(16, 24, 32, 0.1);
-  --shadow:           0 1px 2px rgba(16, 24, 32, 0.16), 0 6px 14px rgba(16, 24, 32, 0.16);
+  --shadow:           0 1px 2px rgba(16, 24, 32, 0.14), 0 4px 12px -2px rgba(16, 24, 32, 0.2);
+  --key-fill:         rgba(16, 24, 32, 0.06);
 
   --capsule-h:        32px;
   --margin-x:         6px;
@@ -31,8 +33,8 @@
 }
 
 [data-mode="dark"] {
-  --pill-fill-top:    #2c3036;
-  --pill-fill-bottom: #1a1d21;
+  --pill-fill-top:    #2a2e33;
+  --pill-fill-bottom: #1c1f23;
   --pill-idle-top:    #34383e;
   --pill-idle-bottom: #24272b;
   --text-primary:     #e8ecef;
@@ -47,7 +49,8 @@
   --pill-edge:        rgba(255, 255, 255, 0.12);
   --pill-highlight:   rgba(255, 255, 255, 0.14);
   --hairline:         rgba(255, 255, 255, 0.08);
-  --shadow:           0 1px 2px rgba(0, 0, 0, 0.42), 0 6px 14px rgba(0, 0, 0, 0.4);
+  --shadow:           0 1px 2px rgba(0, 0, 0, 0.42), 0 4px 12px -2px rgba(0, 0, 0, 0.5);
+  --key-fill:         rgba(255, 255, 255, 0.1);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -61,6 +64,7 @@ html, body {
   background: transparent;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   font-size: 12px;
+  letter-spacing: -0.01em;
   line-height: 1.3;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -206,12 +210,30 @@ body[data-pill="transcribing"] .status-dot { background: var(--text-secondary); 
 }
 
 .pill-hint {
-  font: inherit;
-  color: var(--text-muted);
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
+  font: 600 11px/18px ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  color: var(--text-secondary);
+  background: var(--key-fill);
+  border-radius: 5px;
   padding: 0 6px;
 }
+
+/* Recording: the hint names what the shortcut does now. A hairline sets it
+   apart from the meter and the timer. */
+body[data-pill="recording"] .pill { gap: 9px; padding: 0 8px 0 12px; }
+body[data-pill="recording"] .pill-hint {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: 2px; padding: 0 0 0 10px;
+  background: none; border-left: 1px solid var(--hairline); border-radius: 0;
+  color: var(--text-secondary);
+}
+body[data-pill="recording"] .pill-hint { color: var(--text-primary); }
+body[data-pill="recording"] .pill-hint::before {
+  content: "Stop";
+  font: 500 11px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  letter-spacing: 0;
+  color: var(--text-secondary);
+}
+body[data-record-mode="push-to-talk"][data-pill="recording"] .pill-hint::before { content: "Release"; }
 
 /* Visibility matrix: every state shows the dot plus its own content. */
 body[data-pill="hover"] .pill-label,
@@ -222,7 +244,6 @@ body[data-pill="starting"] .timer,
 body[data-pill="starting"] .pill-hint,
 body[data-pill="recording"] .brand,
 body[data-pill="recording"] .pill-label,
-body[data-pill="recording"] .pill-hint,
 body[data-pill="transcribing"] .brand,
 body[data-pill="transcribing"] .wave,
 body[data-pill="transcribing"] .timer,
@@ -250,11 +271,11 @@ body[data-pill="error"] .pill-hint {
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 20px;
+  height: 18px;
 }
 
 .wave span {
-  width: 2.5px;
+  width: 3px;
   border-radius: 1.5px;
   background: var(--text-secondary);
   transform: scaleY(0.12);
@@ -262,16 +283,15 @@ body[data-pill="error"] .pill-hint {
   will-change: transform;
 }
 
-/* While recording the level reads in the live red, quieter at the edges. */
-body[data-pill="recording"] .wave span { background: var(--live); opacity: 0.85; }
-body[data-pill="recording"] .wave span:nth-child(1),
-body[data-pill="recording"] .wave span:nth-child(5) { opacity: 0.55; }
+/* While recording the level reads in ink, quieter at the edges; the dot
+   beside it carries the live red. */
+body[data-pill="recording"] .wave span { background: var(--text-primary); opacity: 0.85; }
+body[data-pill="recording"] .wave span:first-child,
+body[data-pill="recording"] .wave span:last-child { opacity: 0.45; }
+body[data-pill="recording"] .wave span:nth-child(2),
+body[data-pill="recording"] .wave span:nth-child(8) { opacity: 0.65; }
 
-.wave span:nth-child(1) { height: 9px; }
-.wave span:nth-child(2) { height: 16px; }
-.wave span:nth-child(3) { height: 20px; }
-.wave span:nth-child(4) { height: 12px; }
-.wave span:nth-child(5) { height: 17px; }
+.wave span { height: 18px; }
 
 /* ── AI polish undo — trailing action in the polished state ──── */
 body[data-pill="polished"] .brand,
@@ -358,3 +378,6 @@ body[data-pill="error"] .pill { padding-right: 36px; }
 @media (prefers-reduced-motion: reduce) {
   body[data-pill="transcribing"] .pill::after { animation: none; }
 }
+
+/* Hover: the gear sits at the trailing end, so the content keeps clear of it. */
+body[data-pill="hover"] .pill { gap: 7px; padding: 0 40px 0 12px; justify-content: flex-start; }

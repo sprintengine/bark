@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import "./dashboardShell";
@@ -21,7 +22,7 @@ import "./crystal.css";
 // The Settings screen's own controls are driven independently by settings.ts,
 // the Home screen's stats by homeStats.ts, and the Notes library by notes.ts.
 
-const SCREENS = ["home", "notes", "dictionary", "activity", "models", "settings", "profile"] as const;
+const SCREENS = ["home", "notes", "dictionary", "activity", "models", "settings"] as const;
 type Screen = (typeof SCREENS)[number];
 
 const TITLES: Record<Screen, string> = {
@@ -31,7 +32,6 @@ const TITLES: Record<Screen, string> = {
   activity: "Activity",
   settings: "Settings",
   models: "Models",
-  profile: "Your profile",
 };
 
 // A quiet line under the title, where the screen has one worth saying.
@@ -51,6 +51,7 @@ const screens = Array.from(document.querySelectorAll<HTMLElement>(".screen"));
 const screenTitle = document.getElementById("screenTitle");
 const screenSubtitle = document.getElementById("screenSubtitle");
 const notesSearch = document.getElementById("notesSearch");
+const homeActions = document.getElementById("homeActions");
 
 // The speed test is a sub-route of Home, not a nav screen: it renders into its
 // own #screen-speedtest section and is opened from the Home screen.
@@ -99,6 +100,7 @@ function go(screen: Screen): void {
   if (notesSearch) {
     notesSearch.hidden = screen !== "notes";
   }
+  if (homeActions) homeActions.hidden = screen !== "home";
   const saveStatus = document.getElementById("settingsSaveStatus");
   if (saveStatus) saveStatus.hidden = screen !== "settings";
   document.dispatchEvent(new CustomEvent("home-screen-changed", { detail: { screen } }));
@@ -121,6 +123,7 @@ function openSubRoute(sectionId: string, title: string): void {
   }
   setHeading(title);
   if (notesSearch) notesSearch.hidden = true;
+  if (homeActions) homeActions.hidden = true;
   const saveStatus = document.getElementById("settingsSaveStatus");
   if (saveStatus) saveStatus.hidden = true;
   document.dispatchEvent(new CustomEvent("home-screen-changed", { detail: { screen: sectionId } }));
@@ -169,6 +172,12 @@ for (const opener of document.querySelectorAll<HTMLElement>('[data-open="speedte
 
 for (const opener of document.querySelectorAll<HTMLElement>('[data-open="voicetest"]')) {
   opener.addEventListener("click", openVoiceTest);
+}
+
+// The setup guide is its own window (onboarding.rs); Settings and the empty
+// Home reopen it.
+for (const opener of document.querySelectorAll<HTMLElement>('[data-open="onboarding"]')) {
+  opener.addEventListener("click", () => { void invoke("open_onboarding_window").catch(() => {}); });
 }
 
 // The pill's gear opens this window and asks it to deep-link to a screen.

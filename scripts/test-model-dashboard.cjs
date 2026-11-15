@@ -45,24 +45,49 @@ let browser;
   };
  });
 
- const variantValue = family => page.locator(`#variant-${family}`).getAttribute('data-value');
- const chooseVariant = async (family, value) => {
-  await page.locator(`#variant-${family}`).click();
-  await page.locator(`#variant-list-${family} [role="option"]`).filter({ hasText: new RegExp(`^${value}\\b`) }).click();
- };
+ const row = id => page.locator(`[id="model-${id}"]`);
+ const expandedRow = id => row(id).locator('.model-name-btn').getAttribute('aria-expanded');
 
  await page.goto((process.env.FAIRSPOKEN_UI_URL || process.env.MULTIVOICE_UI_URL || 'http://localhost:1420') + '/home.html');
  await page.locator('[data-screen="models"]').click();
- await page.locator('#variant-whisper').waitFor();
- if(await page.locator('#family-parakeet').count()!==1 || await page.locator('#family-whisper').count()!==1)throw Error('families');
+ await row('tiny').waitFor();
+ if(await row('parakeet-tdt-0.6b-v3').count()!==1 || await row('qwen3.5-0.8b').count()!==1)throw Error('one row per model');
  if(await page.locator('#searchModelsButton').count())throw Error('search button');
  if(!await page.locator('#modelSearchBox .model-search-hint').count())throw Error('search glyph');
- await chooseVariant('whisper', 'small');
- assert.equal(await variantValue('whisper'), 'small');
+ if(!(await row('parakeet-tdt-0.6b-v3').innerText()).includes('In use'))throw Error('in use');
+ if(!(await row('parakeet-tdt-0.6b-v3').innerText()).includes('Recommended'))throw Error('recommended badge');
+ if(!(await row('parakeet-tdt-0.6b-v2').innerText()).includes('EN'))throw Error('language badge');
+
+ // Favourites persist and lead the default order.
+ await row('small').locator('.model-star').click();
+ assert.equal(await row('small').locator('.model-star').getAttribute('aria-pressed'),'true');
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('fairspoken.favoriteModels'))),['small']);
+ const order = await page.locator('#modelRows .model-row').evaluateAll(rows=>rows.map(r=>r.id));
+ assert.equal(order[1],'model-small','a favourite follows the model in use');
+
+ // Filters and sort.
+ await page.locator('#modelKindFilter [data-value="polish"]').click();
+ assert.equal(await row('tiny').count(),0,'kind filter hides speech');
+ await page.locator('#modelKindFilter [data-value="all"]').click();
+ await page.locator('#modelDownloadedFilter').click();
+ assert.equal(await row('large-v3').count(),0,'downloaded filter');
+ await page.locator('#modelDownloadedFilter').click();
+ await page.locator('#modelLanguageFilter').selectOption('en');
+ assert.equal(await row('parakeet-tdt-0.6b-v2').count(),1); assert.equal(await row('tiny').count(),0,'language filter');
+ await page.locator('#modelLanguageFilter').selectOption('all');
+ await page.locator('.model-sort-btn[data-sort="size"]').click();
+ assert.equal((await page.locator('#modelRows .model-row').first().getAttribute('id')),'model-tiny','size sort');
+ await page.locator('.model-sort-btn[data-sort="size"]').click();
+
+ // A row opens to its details and stays open, focused, across a settings update.
+ await row('small').locator('.model-name-btn').click();
+ assert.equal(await expandedRow('small'),'true');
  await page.evaluate(()=>window.smokeEmit('settings-updated',window.smokeSettings));
  await page.waitForTimeout(100);
- assert.equal(await variantValue('whisper'), 'small');
- if(!await page.locator('#variant-whisper').evaluate(e=>e===document.activeElement))throw Error('focus lost');
+ assert.equal(await expandedRow('small'),'true');
+ if(!await row('small').locator('.model-name-btn').evaluate(e=>e===document.activeElement))throw Error('focus lost');
+ if(!await page.locator('#model-detail-small').getByRole('button',{name:'Download from link…'}).count())throw Error('link button in details');
+
  await page.locator('#modelSearch').fill('slow'); await page.waitForTimeout(400);
  await page.locator('#modelSearch').fill('fast'); await page.waitForTimeout(850);
  if(!(await page.locator('#modelSearchResults').innerText()).includes('openai/whisper-tiny'))throw Error('stale search');
@@ -73,14 +98,13 @@ let browser;
  await page.locator('#modelSearch').fill('whisper'); await page.waitForTimeout(80);
  if(!(await page.locator('#modelSearchListbox').innerText()).includes('Whisper'))throw Error('local filter');
  if(!await page.locator('#modelSearchListbox .publisher-icon').count())throw Error('mini icon');
+ if(await row('parakeet-tdt-0.6b-v3').count())throw Error('query filters the table');
  await page.waitForTimeout(400);
- await page.locator('#modelSearchResults').getByRole('button',{name:'Choose variant'}).click();
- await page.waitForTimeout(500);
  await page.locator('#modelSearch').fill('official');
  await page.locator('#modelSearchResults').getByText('openai/whisper-tiny', {exact:true}).waitFor();
- await page.locator('#modelSearchResults').getByRole('button',{name:'Choose variant'}).click();
- assert.equal(await variantValue('whisper'), 'tiny');
- await page.locator('#family-whisper').getByRole('button',{name:'Use',exact:true}).click();
+ await page.locator('#modelSearchResults').getByRole('button',{name:'Show in library'}).click();
+ assert.equal(await expandedRow('tiny'),'true');
+ await row('tiny').getByRole('button',{name:'Use',exact:true}).click();
  await page.waitForFunction(()=>window.smokeSettings.model==='tiny');
  assert.equal(await page.locator('#modelSelect').inputValue(),'tiny','settings retains library selection');
  await page.locator('#postProcess').dispatchEvent('change');
@@ -88,11 +112,11 @@ let browser;
  assert.equal(await page.evaluate(()=>window.smokeSettings.model),'tiny','an unrelated settings save cannot reset the speech model');
  await page.locator('#modelSearch').fill('parakeet');
  await page.locator('#modelSearchResults').getByText('nvidia/parakeet-tdt-0.6b-v2',{exact:true}).waitFor();
- await page.locator('#modelSearchResults').getByRole('button',{name:'Choose variant'}).click();
- assert.equal(await variantValue('parakeet'), 'parakeet-tdt-0.6b-v2');
+ await page.locator('#modelSearchResults').getByRole('button',{name:'Show in library'}).click();
+ assert.equal(await expandedRow('parakeet-tdt-0.6b-v2'),'true');
  await page.locator('#modelSearch').fill('fail');
  await page.waitForFunction(()=>document.getElementById('modelSearchStatus').textContent.includes('offline'));
  if(process.env.MODEL_SCREENSHOT_PATH) await page.screenshot({path:process.env.MODEL_SCREENSHOT_PATH});
- console.log('PASS families, variant/focus persistence, stale search, compatible-only hub rows, local filter icons, error states, and settings model preservation');
+ console.log('PASS one row per model, badges, favourites, filters and sort, details and focus persistence, stale search, compatible-only hub rows, local filter icons, error states, and settings model preservation');
  await browser.close();
 })().catch(async error => { console.error(error); if(browser) await browser.close(); process.exitCode=1; });
