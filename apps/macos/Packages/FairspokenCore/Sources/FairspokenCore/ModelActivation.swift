@@ -25,6 +25,10 @@ public struct ModelActivation: Equatable, Sendable {
 
     public init() {}
 
+    /// Whether a choice made now has to wait for the dictation in progress. Only when a model is
+    /// already loaded for it: with none loaded, that dictation is itself waiting for this model.
+    public static func mustWait(dictating: Bool, engineReady: Bool) -> Bool { dictating && engineReady }
+
     /// The user (or launch) chose `id`.
     public mutating func request(_ id: String, installed: Bool, downloading: Bool, dictationActive: Bool) -> Step {
         waitingForDictation = nil
