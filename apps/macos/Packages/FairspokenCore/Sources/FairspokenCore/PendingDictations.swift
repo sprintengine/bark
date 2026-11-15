@@ -40,13 +40,24 @@ public struct PendingDictation: Codable, Equatable, Identifiable, Sendable {
 
 /// The folder of pending dictations. Every call reads or writes the files directly, so any
 /// number of copies can share a folder and a restart loses nothing.
+///
+/// Only this folder is ever touched: a recording kept for post-training lives in its own folder
+/// (`TrainingDataStore`) and is handed over with `handOff`, never deleted from here. Audio is
+/// deleted for good only after its transcript was delivered or it was never a dictation
+/// (cancelled, too short, silent); anything else the user or the app discards goes to the Trash.
 public struct PendingDictationStore: Sendable {
     public static let sampleRate = 16_000
+    /// Recordings on their way to the post-training folder (`handOff`).
+    static let handOffFolder = ".handoff"
 
     public let directory: URL
+    /// Moves a file to the Trash (`FileManager.trashItem`); tests swap it.
+    let moveToTrash: @Sendable (URL) throws -> Void
 
-    public init(directory: URL) {
+    public init(directory: URL,
+                moveToTrash: @escaping @Sendable (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) {
         self.directory = directory
+        self.moveToTrash = moveToTrash
     }
 
     public func audioURL(_ id: String) -> URL { directory.appendingPathComponent("\(id).wav") }
@@ -87,10 +98,40 @@ public struct PendingDictationStore: Sendable {
         try? save(item)
     }
 
-    /// Deletes the audio and its metadata (after delivery, or when the user discards it).
+    /// Deletes the audio and its metadata for good: after delivery, for a recording that was
+    /// never a dictation, or when the user confirmed it after the Trash couldn't be used.
     public func remove(_ id: String) {
         try? FileManager.default.removeItem(at: audioURL(id))
         try? FileManager.default.removeItem(at: metadataURL(id))
+    }
+
+    /// Moves the audio to the Trash, then drops its metadata. Throws, with nothing changed, when
+    /// the Trash can't be used.
+    public func trash(_ id: String) throws {
+        if FileManager.default.fileExists(atPath: audioURL(id).path) { try moveToTrash(audioURL(id)) }
+        try? FileManager.default.removeItem(at: metadataURL(id))
+    }
+
+    /// Takes a delivered dictation's audio out of the pending list for the post-training folder:
+    /// a rename within this folder, so it is instant and the audio is never written twice. The
+    /// caller moves the returned file on (or deletes it if that fails). Nil when there is no audio.
+    public func handOff(_ id: String) -> URL? {
+        let folder = directory.appendingPathComponent(Self.handOffFolder, isDirectory: true)
+        let target = folder.appendingPathComponent("\(id).wav")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            if FileManager.default.fileExists(atPath: target.path) { try FileManager.default.removeItem(at: target) }
+            try FileManager.default.moveItem(at: audioURL(id), to: target)
+            return target
+        } catch {
+            return nil
+        }
+    }
+
+    /// At launch: audio a previous run was handing to the post-training folder when it quit. Its
+    /// transcript was delivered and its post-training entry was never written, so it is dropped.
+    public func clearHandOffs() {
+        try? FileManager.default.removeItem(at: directory.appendingPathComponent(Self.handOffFolder, isDirectory: true))
     }
 
     /// Every pending dictation that has audio, oldest first.

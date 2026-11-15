@@ -5,7 +5,7 @@ Swift packages:
 
 | App | Bundle id (Release / Debug) | What it is |
 |---|---|---|
-| **Fairspoken** (`Fairspoken.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (FluidAudio + Parakeet CoreML), a Liquid Glass dashboard (Home, Models, Settings), a floating recording pill, and optional transcription on your own host |
+| **Fairspoken** (`Fairspoken.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a dashboard with a frosted sidebar and solid content (Home, Models, Post-training, Settings), a setup guide, a floating recording pill, and optional transcription on your own host |
 | **Fairspoken Server** (`Fairspoken Server.app`, scheme `FairspokenServer`) | `ie.fairspoken.server` / `.dev` | A transcription server for a practice or a team: the host protocol of `src-tauri/src/host/PROTOCOL.md` on Parakeet and the Neural Engine, with a live view of who is dictating, models, configuration and the address clients need |
 
 Fairspoken (Mac), the Windows and Linux desktop app and the web dashboard all talk to Fairspoken
@@ -21,12 +21,12 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Fairspoken,Fairspoken Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (46), FairspokenHost (42), FairspokenUpdates (18)
+scripts/test.sh                       # unit tests: FairspokenCore (166), FairspokenHost (78), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Fairspoken → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Fairspoken Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Fairspoken-<version>-macos-arm64.{zip,dmg}
 scripts/release.sh --app server       # → build/release/Fairspoken-Server-<version>-macos-arm64.{zip,dmg}
-scripts/screenshots.sh                # docs/screenshots/ (client) and docs/screenshots/server-app/ (server)
+scripts/screenshots.sh                # docs/screenshots/ (client) and docs/screenshots/server-app/ (server), not committed
 open "build/Build/Products/Debug/Fairspoken Server.app"
 ```
 
@@ -166,17 +166,123 @@ real HTTP server, queue and workers over a stub engine, for protocol work withou
 
 ## Fairspoken (dictation client)
 
-Settings › Transcription › **My host** holds the host URL, token (Keychain) and timeout, a Test
+Settings › Transcription › **Network device** holds the host URL, token (Keychain) and timeout, a Test
 connection button and a status line such as "Using host: practice-mini.local:48173 · connected"
 (one `GET /v1/health` when Settings or Home opens, or on Test; no background polling). Monitoring a
 host is Fairspoken Server's job (or the web dashboard at the host's `/`); the client has no Server view.
 
+### Text while speaking
+
+Settings › General › **Show text while speaking** (`showTextWhileSpeaking`, on by default, a Mac-only
+key) grows the recording pill to show the newest line or two of what you have said, under the level
+bars; with Reduce Motion it changes without animating. It works with on-device transcription
+(`LiveTranscriptionSession` in FairspokenCore): about every 0.45 s the audio not yet in a finished
+segment is decoded again by the loaded Parakeet model, and once that reaches 12 s it is cut at the
+quietest 20 ms between 7 and 12 s and decoded once, so no decode exceeds the model's 15 s window.
+Silence after a decode is skipped, and the interval stretches so the Neural Engine is never busy more
+than a fifth of the time. The text inserted still comes from one pass over the whole recording, exactly
+as with the setting off, so accuracy is unchanged. With a remote host the pill shows no text (the host
+protocol has no partial results).
+
+Decoding a growing tail was chosen over FluidAudio's streaming managers: its sliding-window manager
+emits text only once per window (the first words after 3–5 s, then every 4–11 s) and duplicates or
+splits words where windows meet, and its true streaming models are separate downloads.
+
+Measured on the M4 with Parakeet TDT v3 (recordings played in real time in 100 ms frames;
+`FAIRSPOKEN_LIVE_TEXT_CLIPS=a.wav,b.wav swift test --filter LiveText` in `Packages/FairspokenSpeech`):
+
+| Recording | First words | Updates | Decode, mean (longest) | Neural Engine busy | Extra CPU | Release → text, live vs off |
+|---|---|---|---|---|---|---|
+| 3 s | 0.52 s | every ~0.5 s | 49–56 ms (70 ms) | 9–11% | 7–8% of one core | 52–56 ms vs 50–53 ms |
+| 11 s | 0.53–0.55 s | every ~0.55 s | 71–79 ms (122 ms) | 13–14% | 12–15% of one core | 106–116 ms vs 98–154 ms |
+| 86 s | 0.52–0.53 s | every ~0.6 s | 92–120 ms (402 ms) | 17–20% | 17–19% of one core | 493–613 ms vs 375–503 ms |
+
+In a third run on a busy machine (other builds running; setting-off release → text 154–923 ms) decodes
+took 144–292 ms on average, so the interval stretched to 0.65–1.7 s between updates, holding the Neural
+Engine at 19–20% and the extra CPU at 8–10% of one core. The inserted text matched the setting-off
+transcript word for word on every recording in every run.
+
+## Where the text goes
+
+With **Paste into the current app** on, a dictation is put on the clipboard and pasted with ⌘V; with **Restore
+clipboard afterwards** on, the previous clipboard comes back shortly after. Before pasting, the app asks
+Accessibility what has focus in the frontmost app (`PasteTarget` in FairspokenCore). When there is
+clearly no text field (a button, a list, an image, the Finder desktop, an app with no window), it
+does not paste or restore: the dictation stays on the clipboard and the pill says "Copied — no text
+field. Press ⌘V to paste." for about 4 s. Anything unclear (apps that report little to
+Accessibility, such as terminals and web-view apps) is pasted as before. If a different app is in
+front than when recording started, the text is pasted but the old clipboard is not restored, so the
+dictation can still be pasted again.
+
+## Post-training recordings
+
+**Post-training › Save recordings for post-training** (`trainingCapture`, off by default) keeps each
+dictation's audio (16 kHz mono 16-bit WAV) and text, in the Tauri app's layout and format
+(`docs/training-data.md` at the repo root), so `training/` tools read either. They go to
+`~/Library/Application Support/<bundle id>/training-data/` unless you choose a folder
+(`trainingDataFolder`; the app makes `Fairspoken Training Data` inside the one you pick). A chosen folder
+is never created at save time: when its drive isn't connected, dictation carries on and nothing is
+kept. Recordings stay until deleted on that screen; deleting asks first and moves them to the
+Trash (permanent deletion only after a second confirmation, on a drive without a Trash). Only the
+folders `index.jsonl` names are ever touched. The Post-train button stays disabled until the
+training step ships.
+
+## Speech models and engines
+
+The client runs two model families on the Neural Engine, one model loaded at a time
+(`LocalSpeechRouter` in `FairspokenWhisper`):
+
+| Engine | Models | Where the files live |
+|---|---|---|
+| FluidAudio 0.17.5 | Parakeet TDT 0.6B v3 (default), Parakeet Ultra, Parakeet TDT 0.6B v2 | FluidAudio's shared cache, `~/Library/Application Support/FluidAudio/Models/` |
+| WhisperKit 1.1.1 | Whisper tiny, base, small, medium (each also `.en`), large-v2, large-v3, large-v3-turbo; Distil-Whisper large-v3 | `~/Library/Application Support/Fairspoken/Models/WhisperKit/`, in the Hugging Face layout (`models/argmaxinc/whisperkit-coreml/<variant>/`, tokenizers in `models/openai/whisper-<size>/`) |
+
+- **Catalogue** (`SpeechModelCatalog` in `FairspokenCore`): id, name, family, vendor, engine, kind
+  (speech; cleanup models and remote endpoints will be rows of the same table), languages and an
+  English-only flag, download size, memory, local or remote, licence, source, and the measured
+  word error rate and speed behind the 1–5 bars (`ScoreScale`). Whisper ids are the Tauri app's
+  (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`), so one settings.json
+  means one model in both apps; `.en` and `distil-large-v3` are Mac-only, and the Tauri app falls
+  back to its default for them. An id neither app knows falls back to Parakeet v3.
+- **Variants** are the repository's folder names; the compressed ones are used where offered
+  (`openai_whisper-small_216MB`, `openai_whisper-large-v3_947MB`,
+  `openai_whisper-large-v3-v20240930_626MB` for large-v3-turbo, …).
+- **Whisper downloads** fetch the Core ML bundles and the tokenizer, then compile once for the
+  Neural Engine ("Optimising for this device…"); a marker file says the download finished, so an
+  interrupted one is never taken for installed and resumes on the next try. Cancelling stops the
+  transfer. Deleting removes that model's folder, only ever inside the models folder after
+  resolving `..` and symbolic links (`ModelStorage`).
+- **Decoding:** greedy, without timestamps, in the dictation language (`language`; `auto` detects
+  it; `.en` models always English), with Whisper's usual temperature retries when the text looks
+  like a loop; recordings over 30 s are cut at pauses. Vocabulary is passed as Whisper's prompt
+  (at most 100 tokens). Download links (below) are Parakeet-only for now.
+- **Figures:** see `docs/model-benchmarks.md` for how speed and accuracy were measured.
+- The server (Fairspoken Server) still serves Parakeet only and doesn't link WhisperKit.
+
+**Models library** (Fairspoken › Models): one table of every model, built from reusable solid
+content components in `FairspokenUI` (`ContentCard`, `Hairline`, `ScoreBar`, `Badge`,
+`SortHeader`, `ContentSearchField`, `ProgressStopButton`; metrics in `ContentMetrics`). Each row has
+a star (favourites list first; `favoriteModels`), the name with EN / NEW / Recommended / In use
+badges, the engine, speed and accuracy bars, size, and Download, a progress ring that stops the
+download, Use (… › Delete…, with confirmation) or In use. Search, engine, language, Downloaded and
+On this Mac filters, and sorting by name, speed, accuracy or size, are `ModelCatalogueQuery`.
+Clicking a row opens a detail sheet: description, figures and where they come from, languages,
+download, memory, licence, source repository, Download from Link… (Parakeet) and **Use this model**.
+Every way of choosing a model (the library, the sheet, Settings, onboarding, launch) goes through
+`ModelLibrary.use` (`ModelActivation`): a model that isn't downloaded is downloaded on its row first
+(cancellable) and then used, and a choice made while a dictation is recording or transcribing is
+loaded once it ends.
+
+`--selftest <wav> --model large-v3-turbo` runs any catalogue model through the same engine as
+dictation (downloading it first if needed).
+
 ## Model download links
 
-For networks that can't reach the standard model download: each card on Fairspoken › **Models** and
-Fairspoken Server › **Models** has **Download from Link…** while the model isn't downloaded. Give it a
-link to an archive of the model (or Choose File… on this Mac or a mounted share); it is saved for that
-model and the download starts, with progress and any error on the card. A card with a saved link shows
+For networks that can't reach the standard model download: a Parakeet model's detail sheet on
+Fairspoken › **Models** and its card on Fairspoken Server › **Models** have **Download from Link…**
+while the model isn't downloaded. Give it a link to an archive of the model (or Choose File… on this
+Mac or a mounted share); it is saved for that model and the download starts, with progress on the
+row and any error in the sheet. A model with a saved link shows
 "Downloads from host/path" and **Use Standard Download**, which removes it. Every download of that
 model (Models, first-run loading, the server's Download and `POST /v1/models/download`) uses the link.
 
@@ -222,8 +328,8 @@ in the app's own UI rather than Sparkle's windows.
   items; stable only the default channel. Sparkle never downgrades, so a nightly switched to Stable
   stays put until the next stable release (Settings says so).
 - **Feeds** (one appcast per app, both channels in it, on the rolling `update-feeds` release):
-  - Fairspoken: `https://github.com/sprintengine/fairspoken/releases/download/update-feeds/appcast-fairspoken.xml`
-  - Fairspoken Server: `https://github.com/sprintengine/fairspoken/releases/download/update-feeds/appcast-fairspoken-server.xml`
+  - Fairspoken: `https://github.com/sprintengine/speakeasy/releases/download/update-feeds/appcast-fairspoken.xml`
+  - Fairspoken Server: `https://github.com/sprintengine/speakeasy/releases/download/update-feeds/appcast-fairspoken-server.xml`
 - **Versions:** Sparkle compares `CFBundleVersion` = `CURRENT_PROJECT_VERSION`, which releases set to the
   UTC build timestamp `YYYYMMDDHHMM` (`xcodebuild … CURRENT_PROJECT_VERSION=202610051200`). Local builds
   keep `1`. Updates must be EdDSA-signed with the key whose public half is `SUPublicEDKey` in both
@@ -274,7 +380,11 @@ Fairspoken:
 | Accessibility | To send ⌘V into the frontmost app and to detect secure/password fields. Without it, text is copied only | System Settings › Privacy & Security › Accessibility: switch on **Fairspoken** |
 | Input Monitoring | Only for "hold fn to dictate" (a listen-only event tap) | System Settings › Privacy & Security › Input Monitoring |
 
-Onboarding shows live status for each permission and deep-links to the right pane. For hold-fn, also set
+The setup guide (shown at first launch, whenever the microphone isn't allowed, and from Settings ›
+General › Setup guide or the menu bar) walks through: permissions with live status, a microphone test,
+choosing a model from the catalogue (it downloads in the background), the shortcut, a place to try it,
+and a live checklist of what is set up, with a fix for anything that isn't. It always reopens at its
+first step, and closing or hiding it stops its microphone test. For hold-fn, also set
 System Settings › Keyboard › "Press 🌐 key to" › **Do Nothing**. If the Tauri app is running, quit it or
 change one app's shortcut, because both default to ⌘⇧1.
 
@@ -302,8 +412,9 @@ address may bring up macOS's Local Network prompt the first time another device 
 - **Brand:** `FairspokenUI` holds the palette (`Color.fs*` from `design/brand/README.md`: Copybook Blue,
   Margin Red for the signal only, Limestone/Night, status colours) and the mark (`FairspokenMark`, the
   logo's own paths). The server follows the brand's Liquid Glass rules: glass only on the control layer
-  (sidebar, toolbar, constellation nodes); cards, tables and charts are opaque. The client keeps its
-  teal look (`Brand`, `BrandMark`) until it is re-skinned. The server icon is the brand's dark icon
+  (sidebar, toolbar, constellation nodes); cards, tables and charts are opaque. The client puts its
+  sidebar on the window's frost and its content on solid cards (`design/crystal/README.md` › Fairspoken
+  for Mac). The server icon is the brand's dark icon
   composite (`scripts/make-server-icon.sh`); no taglines anywhere.
 - **Wire identifiers** (per `PROTOCOL.md`): the `x-fairspoken-*` headers, the
   `application/vnd.fairspoken.pcm-stream` content type, `FAIRSPOKEN_HOST_*` and the client id `fairspoken-macos`.
@@ -316,9 +427,9 @@ Config/                          Base/Debug/Release (client), Server*.xcconfig, 
 Fairspoken/                      Fairspoken
   Sources/App/                   main, AppDelegate, AppModel (composition root), windows, status item, screenshots, self-test
   Sources/Audio/                 AVAudioEngine capture → 16 kHz mono Float32, device selection, level meter
-  Sources/Engine/                ModelLibrary, local/remote sessions, HostStatus ("My host" reachability)
+  Sources/Engine/                ModelLibrary, local/remote sessions, HostStatus (network device reachability)
   Sources/Dictation/             DictationController state machine, PendingDictations (kept audio, retries)
-  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore), hotkeys + Fn tap, sounds
+  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, copy-only with no text field), hotkeys + Fn tap, sounds
   Sources/Storage/               settings.json / transcript-history.json / usage-stats.json (Rust schemas), Keychain
   Sources/UI/                    Home, Models, Settings, Onboarding, Pill
 FairspokenServer/                Fairspoken Server
@@ -329,8 +440,10 @@ FairspokenServer/                Fairspoken Server
 Packages/
   FairspokenCore/                platform-neutral core + tests: frame codec, URL policy, protocol types, SSE parser,
                                  host events/stats/live-state reducer, polling differ, simulator, settings/history models
-  FairspokenSpeech/              the only FluidAudio code (pinned 0.17.5): model registry, the client's engine,
-                                 the server's worker pool (shared weights, one decoder per worker)
+  FairspokenSpeech/              FairspokenSpeech: the only FluidAudio code (pinned 0.17.5): model registry, the client's engine,
+                                 the server's worker pool (shared weights, one decoder per worker);
+                                 FairspokenWhisper (client only): the only WhisperKit code (pinned 1.1.1), the
+                                 Whisper model store, `SpeechModels` and the client's `LocalSpeechRouter`
   FairspokenHost/                the server runtime + tests: HTTP/1.1 on Network.framework, routing and auth, queue,
                                  workers, metrics, SSE fan-out, config file; `fairspoken-host-dev` (stub engine)
   FairspokenUI/                  shared SwiftUI: palette, cards, chips, tags, brand mark, formatting
@@ -351,19 +464,37 @@ Client data lives in `~/Library/Application Support/<bundle id>/`. On first laun
 Keychain, and the JSON keeps empty strings. Keys the app doesn't model are preserved on save.
 
 A dictation is never lost to a failed transcription. Its audio is written to
-`Pending Dictations/<id>.wav` (16 kHz mono PCM16, mode 0600, excluded from backups) as it is captured,
-and deleted as soon as its transcript has been delivered. If the host fails (unreachable, an error, a
-timeout, a stream cut mid-way), the whole recording is sent again with `POST /v1/transcriptions` (after
-1 s, then 3 s), then transcribed on this Mac if the model is installed. If that fails too, the audio
-stays: Home lists it under "Not transcribed yet" with Retry, Export Audio and Delete, and the app
-retries it at launch, when the host answers again, and then at growing intervals (30 s up to every
-30 min). A transcript that arrives later goes to Recent (and the clipboard, for Retry), never into
-whatever app is in front by then.
+`Pending Dictations/<id>.wav` (16 kHz mono PCM16, mode 0600, excluded from backups) as it is captured.
+If the host fails (unreachable, an error, a timeout, a stream cut mid-way), the whole recording is sent
+again with `POST /v1/transcriptions` (after 1 s, then 3 s), then transcribed on this Mac if the chosen
+model is installed (chosen through the same rule as any model switch, so it never replaces the one a
+dictation is using). A local dictation whose model fails to load is kept the same way. If every attempt
+fails, the audio stays: Home lists it first, under "Not transcribed yet", with Retry, Export Audio and
+Move to Trash, the menu bar counts it, and the app retries it at launch, when the host answers again,
+and then at growing intervals (30 s up to every 30 min), for as long as it takes. The pill says what it
+is doing ("Retrying the host (1 of 2)", "Transcribing on this Mac", "Couldn't transcribe — saved to
+retry", "Recovered a dictation"). A transcript that arrives later goes to Recent (and the clipboard, for
+Retry), never into whatever app is in front by then; one that needed a retry is copied, not pasted, if
+the user has switched apps.
+
+The audio is deleted once its transcript is delivered, or at once when it was never a dictation
+(cancelled, too short, silent, or "no speech" from the first attempt). With **Save recordings for
+post-training** on, the delivered recording moves from `Pending Dictations/` into the post-training
+folder instead of being written there again (through the shared index lock, like any recording kept
+there). Nothing here ever touches that folder otherwise. A kept dictation that later turns out to hold
+no speech goes to the Trash rather than away, and so does one the user deletes; if the Trash can't be
+used, nothing is deleted without asking.
 
 ## Screenshots
 
-`docs/screenshots/` (Fairspoken, light and dark): `home`, `home-listening`, `models`, `settings`,
-`settings-transcription` (My host), `onboarding-welcome`, `onboarding-permissions`, `pill`.
+`scripts/screenshots.sh` writes these locally. Git ignores them, so they never reach the repository.
+
+`docs/screenshots/` (Fairspoken, light and dark): `home`, `home-listening`, `home-all` (See all),
+`home-first-use` (before the first dictation), `models`, `models-library` (a download in progress and a
+favourite), `models-detail`, `models-link-open`, `models-link-saved`, `training`, `settings`,
+`settings-transcription`, `settings-host` (Network device), `settings-vocabulary`, every step of the setup
+guide (`onboarding-1-welcome` … `onboarding-7-finish`), and `pill` (every pill state, with and without text
+while speaking, with the keys that stop and cancel).
 
 `docs/screenshots/server-app/` (Fairspoken Server, light and dark, demo simulator): `activity`
 (the live constellation with requests in flight), `clients`, `models`, `connect`, `configuration`.

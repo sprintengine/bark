@@ -32,13 +32,18 @@ nonisolated final class AudioCapture: @unchecked Sendable {
     private var sink: (@Sendable ([Float]) -> Void)?
     private var converter: AVAudioConverter?
     private var running = false
+    /// Who started the capture last (a dictation or the setup guide's test).
+    private var ownership = CaptureOwnership()
     private let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: AudioCapture.sampleRate, channels: 1, interleaved: false)!
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "audio")
 
     var isRunning: Bool { lock.withLock { running } }
 
-    /// Starts capture. `sink` receives each converted 16 kHz chunk (remote streaming).
-    func start(deviceName: String, maxSeconds: Int, sink: (@Sendable ([Float]) -> Void)?) throws {
+    /// Starts capture. `sink` receives each converted 16 kHz chunk (remote streaming). Returns
+    /// the caller's ownership token: a later start takes the capture over (`stop(owner:)`).
+    @discardableResult
+    func start(deviceName: String, maxSeconds: Int, sink: (@Sendable ([Float]) -> Void)?) throws -> Int {
+        let token = lock.withLock { ownership.begin() }
         lock.withLock {
             samples.removeAll(keepingCapacity: true)
             samples.reserveCapacity(Int(Self.sampleRate) * 30)
@@ -64,6 +69,14 @@ nonisolated final class AudioCapture: @unchecked Sendable {
         engine.prepare()
         try engine.start()
         lock.withLock { running = true }
+        return token
+    }
+
+    /// Stops the capture only if `token` still owns it, so a test that a dictation took over
+    /// never stops the dictation's recording.
+    func stop(owner token: Int) {
+        guard lock.withLock({ ownership.owns(token) }) else { return }
+        stop()
     }
 
     /// Stops and returns everything captured (16 kHz mono).

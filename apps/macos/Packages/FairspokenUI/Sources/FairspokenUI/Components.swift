@@ -1,35 +1,166 @@
 import FairspokenCore
 import SwiftUI
 
-/// A Liquid Glass panel. Content cards share one `GlassEffectContainer` per screen so
-/// they sample the same backdrop (glass can't sample glass) and render efficiently.
-public struct GlassCard<Content: View>: View {
-    var cornerRadius: CGFloat = 20
-    var padding: CGFloat = 20
-    var tint: Color? = nil
-    var fillHeight = false
+/// A solid content card: opaque fill, 12 pt corners, a hairline edge, a 1 pt highlight along the
+/// top and a tight, soft shadow. Cards stand on `Crystal.canvas`; they are never glass, so they
+/// can hold rows, fields and controls directly. `tint` washes the card faintly (a highlighted
+/// choice); `fillHeight` stretches it to its row's height.
+public struct Card<Content: View>: View {
+    var cornerRadius: CGFloat
+    var padding: CGFloat
+    var tint: Color?
+    var fillHeight: Bool
     @ViewBuilder var content: Content
 
-    public init(cornerRadius: CGFloat = 20, padding: CGFloat = 20, tint: Color? = nil, fillHeight: Bool = false, @ViewBuilder content: () -> Content) {
+    public init(cornerRadius: CGFloat = CardMetrics.radius, padding: CGFloat = 16, tint: Color? = nil, fillHeight: Bool = false,
+                @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
         self.padding = padding
         self.tint = tint
         self.fillHeight = fillHeight
         self.content = content()
     }
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public var body: some View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: fillHeight ? .infinity : nil, alignment: .topLeading)
-            .glassEffect(glass, in: .rect(cornerRadius: cornerRadius))
+            .cardSurface(cornerRadius: cornerRadius, tint: tint)
+    }
+}
+
+/// Transitional name: Models still says `GlassCard`; it is a solid `Card` now.
+public typealias GlassCard = Card
+
+public enum CardMetrics {
+    /// One radius for every content card.
+    public static let radius: CGFloat = 12
+    /// The gap between cards (and between the content column and the window's frost).
+    public static let gap: CGFloat = 4
+}
+
+extension View {
+    /// The card material on any shape-sized view: `Crystal.card`, hairline edge, top highlight,
+    /// tight shadow. `selected` draws an accent edge instead of the hairline.
+    public func cardSurface(cornerRadius: CGFloat = CardMetrics.radius, tint: Color? = nil, selected: Color? = nil) -> some View {
+        modifier(CardSurface(cornerRadius: cornerRadius, tint: tint, selected: selected))
+    }
+}
+
+private struct CardSurface: ViewModifier {
+    var cornerRadius: CGFloat
+    var tint: Color?
+    var selected: Color?
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content
+            .background {
+                shape.fill(Crystal.card)
+                    .overlay { if let tint { shape.fill(tint.opacity(scheme == .dark ? 0.10 : 0.06)) } }
+                    .shadow(color: .black.opacity(scheme == .dark ? 0.30 : 0.05), radius: 1, y: 0.5)
+                    .shadow(color: .black.opacity(scheme == .dark ? 0.22 : 0.045), radius: 6, y: 2)
+            }
+            .overlay {
+                shape.strokeBorder(selected ?? Crystal.hairline, lineWidth: selected == nil ? 1 : 1.5)
+                // The inner top highlight: a 1 pt line that fades out down the sides.
+                shape.inset(by: 1).stroke(LinearGradient(colors: [Crystal.cardHighlight, .clear],
+                                                         startPoint: .top, endPoint: .init(x: 0.5, y: 0.12)), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+    }
+}
+
+/// A coloured rounded-square tile holding a white SF Symbol: sidebar sections, permissions,
+/// settings groups.
+public struct IconTile: View {
+    var symbol: String
+    var color: Color
+    var size: CGFloat
+    public init(_ symbol: String, color: Color, size: CGFloat = 22) {
+        self.symbol = symbol
+        self.color = color
+        self.size = size
     }
 
-    private var glass: Glass {
-        var g: Glass = .regular
-        if let tint { g = g.tint(tint) }
-        return reduceTransparency ? .identity : g
+    public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.52, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background {
+                shape.fill(LinearGradient(colors: [color.mix(with: .white, by: 0.12), color],
+                                          startPoint: .top, endPoint: .bottom))
+            }
+            .overlay(shape.strokeBorder(Color.black.opacity(0.08), lineWidth: 0.5))
+            .accessibilityHidden(true)
+    }
+}
+
+/// The one primary action of a screen: an accent capsule with white text. Drawn with an explicit
+/// fill, so it keeps its colour in a window that isn't key.
+public struct PrimaryButtonStyle: ButtonStyle {
+    var tint: Color
+    var large: Bool
+    public init(tint: Color = Crystal.clientAccent, large: Bool = false) {
+        self.tint = tint
+        self.large = large
+    }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        PrimaryButtonBody(configuration: configuration, tint: tint, large: large)
+    }
+
+    private struct PrimaryButtonBody: View {
+        var configuration: ButtonStyleConfiguration
+        var tint: Color
+        var large: Bool
+        @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @State private var hovered = false
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isEnabled ? Crystal.onAccent : Crystal.ink3.opacity(0.7))
+                .padding(.horizontal, large ? 18 : 12)
+                .frame(minHeight: large ? 32 : 26)
+                .background {
+                    if isEnabled {
+                        Capsule().fill(tint.mix(with: .black, by: configuration.isPressed ? 0.18 : hovered ? 0.08 : 0))
+                            .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+                            .shadow(color: tint.opacity(0.25), radius: 2, y: 1)
+                    } else {
+                        // Unavailable reads as neutral and flat: no edge, so it never looks like a
+                        // secondary button.
+                        Capsule().fill(Crystal.well)
+                    }
+                }
+                .contentShape(.capsule)
+                .onHover { hovered = $0 }
+                .animation(reduceMotion ? nil : Motion.fast, value: configuration.isPressed)
+        }
+    }
+}
+
+/// The heading over a group of cards: 13 pt semibold, with an optional trailing control.
+public struct SectionHeading<Trailing: View>: View {
+    var title: String
+    @ViewBuilder var trailing: Trailing
+    public init(_ title: String, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+        self.title = title
+        self.trailing = trailing()
+    }
+
+    public var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            trailing
+        }
     }
 }
 
@@ -43,25 +174,31 @@ public struct Eyebrow: View {
             if let symbol { Image(systemName: symbol).imageScale(.small) }
             Text(text.uppercased())
         }
-        .font(.caption.weight(.semibold))
-        .tracking(0.6)
+        .font(.system(size: 11, weight: .semibold))
+        .tracking(0.5)
         .foregroundStyle(Crystal.ink2)
     }
 }
 
-/// A keyboard key cap: `⌘` `⇧` `1`.
+/// A keyboard key cap: `⌘` `⇧` `1`. `large` for the shortcut on its own (onboarding).
 public struct Keycap: View {
     var label: String
-    public init(label: String) { self.label = label }
+    var large: Bool
+    public init(label: String, large: Bool = false) { self.label = label; self.large = large }
     public var body: some View {
+        let radius: CGFloat = large ? 8 : 5
         Text(label)
-            .font(.system(.callout, design: .rounded).weight(.semibold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .frame(minWidth: 26)
+            .font(.system(size: large ? 20 : 11, weight: .medium, design: .rounded))
+            .padding(.horizontal, large ? 12 : 5)
+            .frame(minWidth: large ? 44 : 20, minHeight: large ? 40 : 18)
             .foregroundStyle(Crystal.ink)
-            .background(Crystal.well, in: .rect(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Crystal.hairline))
+            .background(Crystal.well, in: .rect(cornerRadius: radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Crystal.hairline))
+            .overlay(alignment: .bottom) {
+                // The key's lower lip.
+                RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Crystal.hairline)
+                    .frame(height: 1).padding(.horizontal, radius / 2).allowsHitTesting(false)
+            }
             .accessibilityLabel(label)
     }
 }
@@ -69,10 +206,11 @@ public struct Keycap: View {
 /// Splits a KeyboardShortcuts description like "⇧⌘1" into individual caps.
 public struct ShortcutCaps: View {
     var description: String
-    public init(description: String) { self.description = description }
+    var large: Bool
+    public init(description: String, large: Bool = false) { self.description = description; self.large = large }
     public var body: some View {
-        HStack(spacing: 4) {
-            ForEach(Array(Self.split(description).enumerated()), id: \.offset) { _, part in Keycap(label: part) }
+        HStack(spacing: large ? 6 : 3) {
+            ForEach(Array(Self.split(description).enumerated()), id: \.offset) { _, part in Keycap(label: part, large: large) }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Shortcut \(description)")
@@ -114,26 +252,39 @@ public struct StatusDot: View {
     }
 }
 
-/// Capsule chip, glass by default.
+/// Capsule chip. Glass where it floats over a backdrop (Fairspoken Server's window); `flat` on a
+/// solid card, where glass would sit on an opaque surface.
 public struct Chip: View {
     var text: String
     var symbol: String? = nil
     var tint: Color? = nil
     var dot: Color? = nil
-    public init(text: String, symbol: String? = nil, tint: Color? = nil, dot: Color? = nil) {
-        self.text = text; self.symbol = symbol; self.tint = tint; self.dot = dot
+    var flat: Bool
+    public init(text: String, symbol: String? = nil, tint: Color? = nil, dot: Color? = nil, flat: Bool = false) {
+        self.text = text; self.symbol = symbol; self.tint = tint; self.dot = dot; self.flat = flat
     }
 
     public var body: some View {
-        HStack(spacing: 6) {
+        let label = HStack(spacing: 6) {
             if let dot { StatusDot(color: dot) }
             if let symbol { Image(systemName: symbol).imageScale(.small).foregroundStyle(tint ?? Crystal.ink2) }
             Text(text).lineLimit(1)
         }
-        .font(.callout.weight(.medium))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .glassEffect(.regular, in: .capsule)
+        if flat {
+            label
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Crystal.ink)
+                .padding(.horizontal, 10)
+                .frame(height: 24)
+                .background(Crystal.well, in: .capsule)
+                .overlay(Capsule().strokeBorder(Crystal.hairline))
+        } else {
+            label
+                .font(.callout.weight(.medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .glassEffect(.regular, in: .capsule)
+        }
     }
 }
 
@@ -149,10 +300,10 @@ public struct Tag: View {
             if let symbol { Image(systemName: symbol).imageScale(.small) }
             Text(text).lineLimit(1)
         }
-        .font(.caption.weight(.semibold))
+        .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(color)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2.5)
         .background(color.opacity(0.12), in: .capsule)
     }
 }

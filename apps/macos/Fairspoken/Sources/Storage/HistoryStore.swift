@@ -44,6 +44,12 @@ final class HistoryStore {
         save()
     }
 
+    /// Screenshots: shows no dictations (Home's first-use card), or the demo set again. Never saved.
+    func showcaseEmpty(_ empty: Bool) {
+        guard !persists else { return }
+        if empty { items = []; usage = UsageStats() } else { seedDemo() }
+    }
+
     /// Latency the user feels: release → text, median of recent dictations.
     var typicalLatencyMs: Int? {
         let values = items.prefix(20).compactMap { $0.timings?.totalMs }.filter { $0 > 0 }.sorted()

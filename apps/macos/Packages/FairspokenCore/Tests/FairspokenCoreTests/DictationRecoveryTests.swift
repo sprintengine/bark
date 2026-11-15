@@ -45,17 +45,39 @@ final class Delivered: Sendable {
     func add(_ output: TranscriptionOutput) { texts.withLock { $0.append(output.text) } }
 }
 
+/// Stands in for the Trash: moves files into a temporary folder (or refuses, like a volume
+/// without a Trash), recording what it was given.
+final class TrashBin: Sendable {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("trash-\(UUID().uuidString)", isDirectory: true)
+    private let state = Mutex<(refuses: Bool, received: [String])>((false, []))
+
+    var refuses: Bool {
+        get { state.withLock { $0.refuses } }
+        set { state.withLock { $0.refuses = newValue } }
+    }
+    var received: [String] { state.withLock { $0.received } }
+
+    func move(_ url: URL) throws {
+        if refuses { throw CocoaError(.fileWriteNoPermission) }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: url, to: folder.appendingPathComponent(url.lastPathComponent))
+        state.withLock { $0.received.append(url.lastPathComponent) }
+    }
+}
+
 @Suite("Dictations are never lost")
 struct DictationRecoveryTests {
     static let ok = #"{"text":"Patient reports chest tightness.","durationSeconds":3.0,"backend":"parakeet","model":"parakeet-tdt-0.6b-v3"}"#
+    static let silent = #"{"text":"  ","durationSeconds":3.0,"backend":"parakeet","model":"parakeet-tdt-0.6b-v3"}"#
     static let shortTail = #"{"error":"Invalid audio data provided. Must be at least 300ms of 16kHz audio."}"#
 
     let store: PendingDictationStore
     let recovery: DictationRecovery
+    let trash = TrashBin()
 
     init() {
         store = PendingDictationStore(directory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("pending-\(UUID().uuidString)", isDirectory: true))
+            .appendingPathComponent("pending-\(UUID().uuidString)", isDirectory: true), moveToTrash: { [trash] in try trash.move($0) })
         recovery = DictationRecovery(store: store, sleep: { _ in })
     }
 
@@ -202,6 +224,77 @@ struct DictationRecoveryTests {
         #expect(outcome == .noSpeech)
         #expect(transport.requests.isEmpty)
         #expect(store.all().isEmpty)
+    }
+
+    @Test func aKeptDictationThatTurnsOutSilentGoesToTheTrashNotAway() async throws {
+        _ = try record()
+        let transport = ScriptedTransport([.json(200, Self.silent)])
+        let outcome = await recovery.run("dictation-1", live: nil, routes: client(transport), policy: .later(timeoutSeconds: 60),
+                                         deliver: { _ in Issue.record("nothing to deliver") })
+        #expect(outcome == .noSpeech)
+        // Kept because something failed, so an empty answer later isn't trusted with the audio.
+        #expect(trash.received == ["dictation-1.wav"])
+        #expect(FileManager.default.fileExists(atPath: trash.folder.appendingPathComponent("dictation-1.wav").path))
+        #expect(store.all().isEmpty)
+    }
+
+    @Test func aKeptDictationStaysWhenTheTrashCantTakeIt() async throws {
+        _ = try record()
+        trash.refuses = true
+        var routes = client(ScriptedTransport([.json(200, Self.silent)]))
+        routes.local = { _ in
+            Issue.record("a silent answer is not a failure to fall back from")
+            return TranscriptionOutput(text: "x", modelMs: 0, model: "m", placement: .neuralEngine)
+        }
+        let outcome = await recovery.run("dictation-1", live: nil, routes: routes, policy: .later(timeoutSeconds: 60), deliver: { _ in })
+        guard case .kept(let kept) = outcome else { Issue.record("expected the dictation to be kept, got \(outcome)"); return }
+        #expect(kept.lastError == "No speech was heard, and the recording couldn't be moved to the Trash")
+        #expect(FileManager.default.fileExists(atPath: store.audioURL("dictation-1").path))
+    }
+
+    @Test func deletingMovesToTheTrashAndNothingIsLostWhenItCant() throws {
+        _ = try record()
+        trash.refuses = true
+        #expect(throws: CocoaError.self) { try store.trash("dictation-1") }
+        #expect(store.all().map(\.id) == ["dictation-1"])
+        trash.refuses = false
+        try store.trash("dictation-1")
+        #expect(trash.received == ["dictation-1.wav"])
+        #expect(store.all().isEmpty)
+        #expect(store.item("dictation-1") == nil)
+    }
+
+    @Test func aDeliveredRecordingMovesToThePostTrainingFolderInsteadOfBeingWrittenTwice() throws {
+        let samples = try record()
+        let before = try store.wav("dictation-1")
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("training-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let training = TrainingDataStore(root: root)
+
+        let file = try #require(store.handOff("dictation-1"))
+        // Out of the pending list at once, so the delivery that follows can't delete it.
+        #expect(store.all().isEmpty)
+        let entry = TrainingEntry(createdAt: 1, durationSeconds: 3, speechModel: "parakeet-ultra", appCategory: "email",
+                                  rawText: "Patient reports chest tightness.", finalText: "Patient reports chest tightness.")
+        try training.record(entry, movingAudioFrom: file)
+        store.remove("dictation-1")
+
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+        let kept = try Data(contentsOf: training.audioURL(for: entry.id))
+        #expect(kept == before)
+        #expect(try WAVFile.decode(kept).samples == PCM.int16(from: samples))
+        #expect(training.entries().map(\.id) == [entry.id])
+        // The same 16 kHz mono 16-bit layout post-training writes itself.
+        #expect(kept == TrainingDataStore.wav(samples))
+    }
+
+    @Test func anInterruptedHandOffIsClearedAtLaunchAndNeverTakenForADictation() throws {
+        _ = try record()
+        _ = try #require(store.handOff("dictation-1"))
+        #expect(store.recoverInterrupted().isEmpty)
+        store.clearHandOffs()
+        #expect(!FileManager.default.fileExists(atPath: store.directory.appendingPathComponent(".handoff").path))
     }
 
     @Test func aFailedFallbackSaysWhatBothAnswered() async throws {

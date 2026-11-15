@@ -43,7 +43,7 @@ use std::time::{Duration, Instant};
 
 /// Where every update feed lives (contract §2).
 pub(super) const DEFAULT_FEED_BASE_URL: &str =
-    "https://github.com/sprintengine/fairspoken/releases/download/update-feeds/";
+    "https://github.com/sprintengine/speakeasy/releases/download/update-feeds/";
 /// The minisign public key the release archives are signed with: the same
 /// value as `plugins.updater.pubkey` in `src-tauri/tauri.conf.json` (base64 of
 /// a minisign public key file). A unit test keeps the two in step.
@@ -1588,7 +1588,7 @@ mod tests {
               "version": "{version}",
               "channel": "{channel}",
               "pub_date": "2026-10-05T12:00:00Z",
-              "notes": "https://github.com/sprintengine/fairspoken/releases/tag/v{version}",
+              "notes": "https://github.com/sprintengine/speakeasy/releases/tag/v{version}",
               "platforms": {{
                 "linux-x86_64": {{ "url": "https://example.test/h-linux-x64.tar.gz", "sha256": "{sha}", "signature": "c2ln", "format": "tar.gz" }},
                 "windows-x86_64": {{ "url": "https://example.test/h-windows-x64.zip", "sha256": "{sha}", "signature": "c2ln", "format": "zip" }},

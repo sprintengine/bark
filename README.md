@@ -15,12 +15,13 @@ without it.
 ## Features
 
 - **Local transcription** with Parakeet TDT 0.6B v3 (ONNX Runtime, in-process).
-  The Models screen groups Parakeet and Whisper variants, with v3 recommended
-  by default and English-only Parakeet v2 also available. Search Hugging Face
-  for other speech models; results indicate which have a supported local format.
-  Whisper (whisper.cpp) is also included; choose its variant in Models.
+  The Models screen lists every Parakeet and Whisper model in one library,
+  with v3 recommended by default and English-only Parakeet v2 also available.
+  Search Hugging Face for other speech models; results indicate which have a
+  supported local format. Whisper (whisper.cpp) is also included.
 - **Insert anywhere**: text goes straight into the focused app (Accessibility
-  insert → ⌘V → AppleScript fallback), with your clipboard as a backup.
+  insert → ⌘V → AppleScript fallback), with your clipboard as a backup. When it
+  can't be inserted, the pill says it is on the clipboard to paste yourself.
 - **Dictionary and snippets**: custom corrections and trigger phrases
   ("my email" → your address), applied after transcription.
 - **History and notes**: recent transcripts, copy-again, and a notes view.
@@ -30,10 +31,16 @@ without it.
   (filler-word and self-correction cleanup with one-click "Undo AI edit"), and
   app-aware tone. Polish and context awareness are off unless you turn them on.
 
+### First run and models
+
+A setup window walks through permissions, a microphone check, a speech model
+and a first dictation. Models is a library of every speech and polish model,
+with ratings, sizes and one-click downloads.
+
 ## Install
 
 Pre-built releases are published on the
-[Releases page](https://github.com/sprintengine/fairspoken/releases).
+[Releases page](https://github.com/sprintengine/speakeasy/releases).
 macOS is the primary platform. Each release carries:
 
 - **macOS** (Apple Silicon, macOS 26): the native app,

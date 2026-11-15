@@ -574,11 +574,11 @@ mod tests {
 
     #[test]
     fn the_nightly_feed_sits_beside_the_stable_feed() {
-        let stable = "https://github.com/sprintengine/fairspoken/releases/download/update-feeds/desktop-stable.json";
+        let stable = "https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-stable.json";
         assert_eq!(feed_url(stable, Channel::Stable).as_deref(), Some(stable));
         assert_eq!(
             feed_url(stable, Channel::Nightly).as_deref(),
-            Some("https://github.com/sprintengine/fairspoken/releases/download/update-feeds/desktop-nightly.json")
+            Some("https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-nightly.json")
         );
         assert_eq!(feed_url("https://example.com/latest.json", Channel::Nightly), None);
         assert_eq!(feed_url("desktop-stable.json", Channel::Nightly), None);
@@ -590,7 +590,7 @@ mod tests {
         let endpoint = config["plugins"]["updater"]["endpoints"][0].as_str().unwrap();
         assert_eq!(
             endpoint,
-            "https://github.com/sprintengine/fairspoken/releases/download/update-feeds/desktop-stable.json"
+            "https://github.com/sprintengine/speakeasy/releases/download/update-feeds/desktop-stable.json"
         );
     }
 

@@ -1,4 +1,5 @@
 import FairspokenSpeech
+import FairspokenWhisper
 import FairspokenUpdates
 import AppKit
 import FairspokenCore
@@ -8,33 +9,41 @@ import Observation
 @Observable
 final class AppModel {
     enum Section: String, CaseIterable, Identifiable {
-        case home, models, settings
+        case home, models, training, settings
         var id: String { rawValue }
         var title: String {
             switch self {
             case .home: "Home"
             case .models: "Models"
+            case .training: "Post-training"
             case .settings: "Settings"
             }
         }
         var symbol: String {
             switch self {
-            case .home: "waveform"
-            case .models: "square.stack.3d.up"
-            case .settings: "gearshape"
+            case .home: "house.fill"
+            case .models: "square.stack.3d.up.fill"
+            case .training: "waveform.badge.mic"
+            case .settings: "gearshape.fill"
             }
         }
     }
 
-    var section: Section = .home
+    var section: Section = .home {
+        didSet { if section != .home { homeShowsAllDictations = false } }
+    }
+    /// Home's "See all": every kept dictation, searchable, instead of the overview.
+    var homeShowsAllDictations = false
     var settingsTab: SettingsView.Tab = .general
 
     let settings: SettingsStore
     let history: HistoryStore
+    let training: TrainingLibrary
     let pending: PendingDictations
     let permissions: Permissions
     let models: ModelLibrary
     let dictation: DictationController
+    let micTest: MicTest
     let hostStatus: HostStatus
     let hostFinder: HostFinder
     let updates: UpdateController
@@ -48,11 +57,17 @@ final class AppModel {
         // Before anything can download.
         ParakeetModels.setLinks(settings.settings.modelLinks)
         history = HistoryStore()
+        training = TrainingLibrary(settings: settings)
         permissions = Permissions()
         models = ModelLibrary()
-        pending = PendingDictations(settings: settings, models: models, history: history)
-        dictation = DictationController(settings: settings, models: models, history: history, permissions: permissions, pending: pending)
+        pending = PendingDictations(settings: settings, models: models, history: history, training: training)
+        dictation = DictationController(settings: settings, models: models, history: history, permissions: permissions,
+                                        pending: pending)
+        micTest = MicTest(capture: dictation.capture)
         hostStatus = HostStatus(settings: settings)
+        // A model that failed to load leaves the previous one in use; the saved choice follows it.
+        models.onFallback = { [weak settings] id in settings?.update { $0.model = id } }
+        models.isDictating = { [weak dictation] in dictation?.phase.isActive ?? false }
         hostFinder = HostFinder(settings: settings, hostStatus: hostStatus)
         var updateConfig = UpdateController.Configuration(appName: AppInfo.displayName, version: AppInfo.version, build: AppInfo.build)
         #if DEBUG
@@ -65,6 +80,8 @@ final class AppModel {
         // Carry an imported Tauri shortcut over once (KeyboardShortcuts owns it afterwards).
         if settings.importedFromTauri { HotkeyController.adoptAccelerator(settings.settings.recordingShortcut) }
 
+        // Every recording takes the microphone from the setup guide's test.
+        dictation.onWillStart = { [weak self] in self?.micTest.stop() }
         hotkeys.onPress = { [weak self] in self?.dictation.hotkeyPressed() }
         hotkeys.onRelease = { [weak self] in self?.dictation.hotkeyReleased() }
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
@@ -82,8 +99,8 @@ final class AppModel {
 
     /// Launch-time work: warm the engine so the first dictation is instant, start Fn if enabled.
     func startServices() {
-        if settings.settings.transcriptionLocation != .remoteHost || FluidAudioEngine.isInstalled(settings.settings.model) {
-            models.prepare(settings.settings.model)
+        if settings.settings.transcriptionLocation != .remoteHost || SpeechModels.isInstalled(settings.settings.model) {
+            models.use(settings.settings.model)
         }
         applyFnSetting()
         pending.start()
@@ -105,7 +122,27 @@ final class AppModel {
         }
     }
 
-    /// The model card whose "Download from Link…" field is open, and what it holds.
+    /// The model whose detail sheet is open in the Models library.
+    var modelDetailID: String?
+
+    /// Makes `id` the dictation model: saved in settings, then downloaded if needed (a tracked,
+    /// cancellable library download) and loaded once no dictation is running
+    /// (`ModelLibrary.use`). With a network device chosen it is still loaded, ready for when
+    /// dictation is local again.
+    func useModel(_ id: String) {
+        guard SpeechModelCatalog.model(id: id) != nil else { return }
+        settings.update { $0.model = id }
+        models.use(id)
+    }
+
+    /// Stars or unstars a model in the Models library (favourites are listed first).
+    func toggleFavourite(_ id: String) {
+        settings.update { s in
+            if let i = s.favoriteModels.firstIndex(of: id) { s.favoriteModels.remove(at: i) } else { s.favoriteModels.append(id) }
+        }
+    }
+
+    /// The model whose "Download from Link…" field is open, and what it holds.
     var linkEditorModel: String?
     var linkDraft = ""
 
@@ -124,7 +161,7 @@ final class AppModel {
         linkEditorModel = nil
         models.clearDownloadError(id)
         if id == models.activeModelID, case .failed = models.engineState, settings.settings.transcriptionLocation == .local {
-            models.prepare(id)
+            models.use(id)
         } else {
             models.download(id)
         }
@@ -154,12 +191,49 @@ final class AppModel {
         UserDefaults.standard.set(true, forKey: "onboardingCompleted")
     }
 
+    /// Where the chosen speech model is, as the setup guide and Home show it: its tracked library
+    /// download (progress, failure), then loading on the engine.
+    var modelProgress: SetupGuide.ModelProgress {
+        let chosen = SpeechModelCatalog.resolve(settings.settings.model).id
+        let engine: SetupGuide.EngineStatus = switch models.engineState {
+        case .idle: .idle
+        case .downloading(let f): .downloading(f)
+        case .unpacking, .compiling, .loading, .warming: .busy
+        case .ready: .ready
+        case .failed(let message): .failed(message)
+        }
+        let item: SetupGuide.ItemStatus = switch models.state(of: chosen) {
+        case .available: .available
+        case .downloading(let f): .downloading(f)
+        case .unpacking, .compiling: .preparing
+        case .installed: .installed
+        }
+        return SetupGuide.modelProgress(remote: settings.settings.transcriptionLocation == .remoteHost, chosenID: chosen,
+                                        activeID: models.activeModelID, activeName: models.activeModel.shortName,
+                                        engine: engine, chosenItem: item, downloadError: models.downloadErrors[chosen])
+    }
+
+    static func permission(_ status: Permissions.Status) -> SetupGuide.Permission {
+        switch status {
+        case .granted: .granted
+        case .denied: .denied
+        case .notDetermined: .notDetermined
+        }
+    }
+
+    /// What is set up right now: the microphone, the model, typing into apps (and, in the guide,
+    /// whether the microphone test heard anything).
+    func setupChecklist(micHeard: Bool? = nil) -> [SetupGuide.ChecklistItem] {
+        SetupGuide.checklist(microphone: Self.permission(permissions.microphone), accessibility: permissions.accessibility.isGranted,
+                             model: modelProgress, micHeard: micHeard)
+    }
+
     /// Engine summary used across the UI.
     var engineSummary: (title: String, detail: String, placement: ComputePlacement) {
         if settings.settings.transcriptionLocation == .remoteHost {
             let host = URL(string: settings.settings.remoteUrl)?.host() ?? "your host"
             return ("Your transcription host", host, .remoteHost)
         }
-        return (models.activeModel.name, "Apple Neural Engine · on this Mac", .neuralEngine)
+        return (models.activeModel.name, "\(models.activeModel.engine.runtime) · Neural Engine · on this device", .neuralEngine)
     }
 }

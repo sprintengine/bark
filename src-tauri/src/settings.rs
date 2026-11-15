@@ -251,10 +251,13 @@ pub struct Settings {
     /// can be exported to fine-tune speech or polish models.
     #[serde(default)]
     pub training_capture: bool,
-    /// Days kept dictations live before they are deleted; 0 keeps them until
-    /// the user deletes them.
-    #[serde(default = "default_training_retention_days")]
-    pub training_retention_days: u16,
+    /// Days this app's kept dictations live before they are deleted, while
+    /// capture is on; 0 (the default) keeps them until the user deletes them.
+    /// Stored as `trainingKeepDays`: the earlier `trainingRetentionDays`
+    /// defaulted to 30, so a saved 30 there may not have been the user's
+    /// choice, and it is deliberately no longer read.
+    #[serde(default = "default_training_keep_days")]
+    pub training_keep_days: u16,
     /// "Detect format with AI for unknown apps": when no rule knows the
     /// destination, ask the polish provider once per site or app which
     /// format it wants (`format_classifier`). Sends the app name, window
@@ -380,7 +383,7 @@ impl Default for Settings {
             learned_vocabulary_hints: Vec::new(),
             learn_from_edits: default_learn_from_edits(),
             training_capture: false,
-            training_retention_days: default_training_retention_days(),
+            training_keep_days: default_training_keep_days(),
             format_ai_detection: false,
             super_mode: SuperModeSetting::Off,
             super_mode_model: default_super_mode_model(),
@@ -528,9 +531,7 @@ fn normalize(settings: Settings) -> Settings {
         polish_tones: normalize_polish_tones(settings.polish_tones),
         vocabulary_hints,
         learned_vocabulary_hints,
-        training_retention_days: normalize_training_retention_days(
-            settings.training_retention_days,
-        ),
+        training_keep_days: normalize_training_keep_days(settings.training_keep_days),
         enabled_packs: normalize_enabled_packs(settings.enabled_packs),
         polish_local_model_path: settings.polish_local_model_path.trim().to_string(),
         model_links: normalize_model_links(settings.model_links),
@@ -581,18 +582,19 @@ fn default_learn_from_edits() -> bool {
     true
 }
 
-/// Retention choices offered in Settings: 30 days, 90 days, or until deleted.
-const TRAINING_RETENTION_DAYS: &[u16] = &[0, 30, 90];
+/// Retention choices offered in Settings: until deleted, 30 days or 90 days.
+const TRAINING_KEEP_DAYS: &[u16] = &[0, 30, 90];
 
-fn default_training_retention_days() -> u16 {
-    30
+/// Kept dictations stay until the user deletes them unless they choose otherwise.
+fn default_training_keep_days() -> u16 {
+    0
 }
 
-fn normalize_training_retention_days(days: u16) -> u16 {
-    if TRAINING_RETENTION_DAYS.contains(&days) {
+fn normalize_training_keep_days(days: u16) -> u16 {
+    if TRAINING_KEEP_DAYS.contains(&days) {
         days
     } else {
-        default_training_retention_days()
+        default_training_keep_days()
     }
 }
 
@@ -1009,6 +1011,17 @@ mod tests {
     }
 
     #[test]
+    fn training_retention_defaults_to_keeping_everything() {
+        // The old key defaulted to 30 days, so a saved value there is not
+        // taken as the user's choice.
+        let legacy: Settings = serde_json::from_value(serde_json::json!({ "trainingRetentionDays": 30 })).unwrap();
+        assert_eq!(normalize(legacy).training_keep_days, 0);
+        let chosen: Settings = serde_json::from_value(serde_json::json!({ "trainingKeepDays": 90 })).unwrap();
+        assert_eq!(normalize(chosen).training_keep_days, 90);
+        assert_eq!(Settings::default().training_keep_days, 0);
+    }
+
+    #[test]
     fn dictionary_written_before_learning_loads_as_manual_entries() {
         // A dictionary saved before learned entries existed: corrections have
         // no origin or models, and there is no learned-hints list.
@@ -1036,7 +1049,7 @@ mod tests {
         assert!(correction.models.is_empty());
         assert!(settings.learn_from_edits);
         assert!(!settings.training_capture);
-        assert_eq!(settings.training_retention_days, 30);
+        assert_eq!(settings.training_keep_days, 0);
     }
 
     #[test]
@@ -1051,11 +1064,11 @@ mod tests {
                 models: vec!["parakeet-tdt-0.6b-v3".into(), " ".into()],
                 ..TranscriptCorrection::default()
             }],
-            training_retention_days: 45,
+            training_keep_days: 45,
             ..Settings::default()
         });
         assert_eq!(settings.learned_vocabulary_hints, ["Niamh"]);
-        assert_eq!(settings.training_retention_days, 30);
+        assert_eq!(settings.training_keep_days, 0);
 
         let json = serde_json::to_value(&settings).unwrap();
         assert_eq!(json["transcriptCorrections"][0]["origin"], "learned");

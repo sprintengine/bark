@@ -1,11 +1,12 @@
 import FairspokenSpeech
+import FairspokenWhisper
 import AVFoundation
 import Foundation
 import FairspokenCore
 
 /// Headless end-to-end check of the real pipeline without the microphone or TCC:
 ///
-///   Fairspoken --selftest <file.wav> [--model parakeet-ultra] [--host URL --token T]
+///   Fairspoken --selftest <file.wav> [--model parakeet-ultra | large-v3-turbo | …] [--host URL --token T]
 ///
 /// 1. Loads the model on the Neural Engine (timing), transcribes the file through the same
 ///    `LocalBatchSession` + post-processor the hotkey path uses.
@@ -77,8 +78,8 @@ enum SelfTest {
         let gate = RecordingGate.evaluate(AudioStats(samples: samples, sampleRate: 16_000))
         say("gate: \(gate)")
 
-        // Local, Neural Engine.
-        let engine = FluidAudioEngine()
+        // Local, Neural Engine, on the engine the model needs (FluidAudio or WhisperKit).
+        let engine = LocalSpeechRouter()
         let t0 = ContinuousClock.now
         do {
             try await engine.load(model) { stage in

@@ -32,9 +32,24 @@ struct SettingsTests {
     }
 
     @Test func unknownModelFallsBackToDefault() throws {
-        let s = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"model":"large-v3-turbo"}"#.utf8))
+        let s = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"model":"whisper-large-v9-mystery"}"#.utf8))
         #expect(s.model == SpeechModelCatalog.defaultModelID)
         #expect(s.language == "en")
+    }
+
+    /// The Tauri app's Whisper ids are catalogue ids here, so one settings.json means one model.
+    @Test func tauriWhisperIdsAreKept() throws {
+        for id in ["tiny", "base", "small", "medium", "large-v2", "large-v3", "large-v3-turbo"] {
+            let s = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"model":"\#(id)"}"#.utf8))
+            #expect(s.model == id)
+        }
+    }
+
+    @Test func favouriteModelsRoundTripAndDropUnknownIds() throws {
+        let s = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"favoriteModels":["large-v3","nope","large-v3"]}"#.utf8))
+        #expect(s.favoriteModels == ["large-v3"])
+        let raw = try JSONDecoder().decode(JSONValue.self, from: JSONMerge.encode(s, over: [:])).objectValue ?? [:]
+        #expect(raw["favoriteModels"] == .array([.string("large-v3")]))
     }
 
     @Test func saveKeepsKeysTheMacAppDoesNotModel() throws {
@@ -46,6 +61,21 @@ struct SettingsTests {
         #expect(out["language"] == .string("ga"))
         #expect(out["recordingShortcutMode"] == .string("push-to-talk"))
         #expect(out["transcriptionLocation"] == .string("remote-host"))
+    }
+
+    @Test func showTextWhileSpeakingDefaultsOnAndRoundTrips() throws {
+        let tauri = try JSONDecoder().decode(AppSettings.self, from: Data(Self.tauriJSON.utf8))
+        #expect(tauri.showTextWhileSpeaking)  // absent from the Tauri file: on
+        let raw = try JSONDecoder().decode(JSONValue.self, from: Data(Self.tauriJSON.utf8)).objectValue ?? [:]
+        var s = tauri
+        s.showTextWhileSpeaking = false
+        let data = try JSONMerge.encode(s, over: raw)
+        let out = try JSONDecoder().decode(JSONValue.self, from: data).objectValue ?? [:]
+        #expect(out["showTextWhileSpeaking"] == .bool(false))
+        #expect(out["someFutureRustField"] == .object(["x": .number(1)]))
+        #expect(try JSONDecoder().decode(AppSettings.self, from: data).showTextWhileSpeaking == false)
+        let wrongType = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"showTextWhileSpeaking":"yes"}"#.utf8))
+        #expect(wrongType.showTextWhileSpeaking)
     }
 
     @Test func acceleratorStringsRoundTrip() {

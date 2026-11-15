@@ -5,3 +5,5 @@ Config/Local.xcconfig
 Packages/*/.build/
 Packages/*/.swiftpm/
 *.xcuserstate
+# Screenshots from scripts/screenshots.sh stay local
+docs/screenshots/

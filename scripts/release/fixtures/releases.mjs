@@ -28,7 +28,7 @@ import {
   SPARKLE_APPS,
 } from '../release-lib.mjs'
 
-export const FIXTURE_REPO = 'sprintengine/fairspoken'
+export const FIXTURE_REPO = 'sprintengine/speakeasy'
 export const FIXTURE_SLUG = 'fairspoken'
 export const FIXTURE_MAC_NAME = 'Fairspoken'
 

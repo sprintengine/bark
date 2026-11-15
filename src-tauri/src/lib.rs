@@ -33,6 +33,7 @@ mod macos_input;
 mod models;
 mod note_debug;
 mod notes;
+mod onboarding;
 mod phonetic_index;
 mod polish;
 mod polish_adapters;
@@ -932,9 +933,14 @@ async fn connect_transcription_host(
 fn pill_window_bounds(state: &str) -> Option<(f64, f64)> {
     match state {
         "idle" => Some((68.0, 24.0)),
-        "hover" => Some((186.0, 46.0)),
-        "starting" | "recording" | "transcribing" => Some((186.0, 46.0)),
+        // The name, the shortcut and the settings gear side by side.
+        "hover" => Some((208.0, 46.0)),
+        "starting" | "transcribing" => Some((186.0, 46.0)),
+        // Room for the level meter, the timer and the "Stop" shortcut hint.
+        "recording" => Some((244.0, 46.0)),
         "copied" => Some((128.0, 46.0)),
+        // "Copied — press ⌘V to paste" and the other delivery notices.
+        "notice" => Some((248.0, 46.0)),
         "polished" => Some((204.0, 46.0)),
         "error" => Some((280.0, 46.0)),
         _ => None,
@@ -1498,6 +1504,29 @@ const MAX_DURATION_WATCHDOG_GRACE: Duration = Duration::from_secs(2);
 struct RecordingAutoStoppedEvent {
     committed: bool,
     message: String,
+    /// Where the text went, when it was committed.
+    delivery: Option<DictationDelivery>,
+}
+
+/// Where a finished dictation went, so the pill can say what the user has to do.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum DictationDelivery {
+    /// Inserted at the cursor (and also left on the clipboard).
+    Inserted,
+    /// On the clipboard, as asked: insert at cursor is off, or the preview took it.
+    Copied,
+    /// Insertion was wanted but did not happen: the text is on the clipboard to paste by hand.
+    InsertFailed,
+    /// The clipboard write failed: the text is only in History and Notes.
+    NotCopied,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DictationOutcome {
+    transcript: String,
+    delivery: DictationDelivery,
 }
 
 /// Backend enforcement of the recording cap. The frontend stops recordings on
@@ -1529,15 +1558,17 @@ fn start_max_duration_watchdog(app: AppHandle, generation: u64, max_recording_se
                 "Max recording duration reached; committing the dictation from the backend",
             );
             let event = match perform_stop_and_transcribe(&app, &services) {
-                Ok(_) => RecordingAutoStoppedEvent {
+                Ok(outcome) => RecordingAutoStoppedEvent {
                     committed: true,
                     message: "Recording hit the maximum duration and was transcribed".to_string(),
+                    delivery: Some(outcome.delivery),
                 },
                 Err(err) => RecordingAutoStoppedEvent {
                     committed: false,
                     message: format!(
                         "Recording hit the maximum duration but could not be transcribed: {err}"
                     ),
+                    delivery: None,
                 },
             };
             let _ = app.emit("recording-auto-stopped", event);
@@ -1546,7 +1577,7 @@ fn start_max_duration_watchdog(app: AppHandle, generation: u64, max_recording_se
 }
 
 #[tauri::command]
-async fn stop_and_transcribe(app: AppHandle) -> Result<String, String> {
+async fn stop_and_transcribe(app: AppHandle) -> Result<DictationOutcome, String> {
     tauri::async_runtime::spawn_blocking(move || {
         perform_stop_and_transcribe(&app, &app.state::<AppServices>())
     })
@@ -1556,7 +1587,10 @@ async fn stop_and_transcribe(app: AppHandle) -> Result<String, String> {
 
 /// The full dictation commit pipeline. Free of the command layer so both the
 /// `stop_and_transcribe` command and the max-duration watchdog can run it.
-fn perform_stop_and_transcribe(app: &AppHandle, services: &AppServices) -> Result<String, String> {
+fn perform_stop_and_transcribe(
+    app: &AppHandle,
+    services: &AppServices,
+) -> Result<DictationOutcome, String> {
     let _operation = services
         .operation
         .try_lock()
@@ -1823,6 +1857,9 @@ fn perform_stop_and_transcribe(app: &AppHandle, services: &AppServices) -> Resul
             total_ms: released_at.elapsed().as_millis() as u64,
         }),
         format: format_record,
+        app_name: frontmost_app.as_ref().map(|app| app.name.clone()),
+        model: (settings.transcription_location == TranscriptionLocation::Local)
+            .then(|| settings.model.model_id().to_string()),
     };
 
     #[cfg(target_os = "macos")]
@@ -1862,11 +1899,11 @@ fn perform_stop_and_transcribe(app: &AppHandle, services: &AppServices) -> Resul
             .as_ref()
             .map_or("other", |target| app_categories::categorize(&target.bundle_id).id()),
     );
-    services.clipboard.write_text(&clipboard_text)?;
-
-    #[cfg(target_os = "macos")]
-    {
-        if will_insert_at_cursor && !cursor_preview::is_claimed(cursor_session) {
+    // A clipboard failure must not lose the dictation: it skips insertion (a paste would
+    // insert whatever was on the clipboard before) and the stores below still keep it.
+    let delivery = match services.clipboard.write_text(&clipboard_text) {
+        #[cfg(target_os = "macos")]
+        Ok(()) if will_insert_at_cursor && !cursor_preview::is_claimed(cursor_session) => {
             // The target field as read at release, so the edit watcher knows
             // what surrounded the dictation. If the user has switched apps
             // since, it is read again now.
@@ -1892,25 +1929,35 @@ fn perform_stop_and_transcribe(app: &AppHandle, services: &AppServices) -> Resul
                         capture_id: capture_id.clone(),
                     },
                 );
+                DictationDelivery::Inserted
+            } else {
+                DictationDelivery::InsertFailed
             }
-        } else {
+        }
+        Ok(()) => {
+            #[cfg(target_os = "macos")]
+            let message = if cursor_preview::is_claimed(cursor_session) {
+                "Insert skipped because the preview was claimed for editing; transcript is on the clipboard"
+            } else {
+                "Transcript copied to clipboard"
+            };
+            #[cfg(not(target_os = "macos"))]
+            let message = "Transcript copied to clipboard";
+            emit_backend_event(app, "info", message);
+            DictationDelivery::Copied
+        }
+        Err(err) => {
             emit_backend_event(
                 app,
-                "info",
-                if cursor_preview::is_claimed(cursor_session) {
-                    "Insert skipped because the preview was claimed for editing; transcript is on the clipboard"
-                        .to_string()
-                } else {
-                    "Transcript copied to clipboard".to_string()
-                },
+                "warning",
+                format!("Could not copy the transcript ({err}); it is saved in History and Notes"),
             );
+            DictationDelivery::NotCopied
         }
-    }
-    #[cfg(not(target_os = "macos"))]
-    emit_backend_event(app, "info", "Transcript copied to clipboard");
+    };
 
-    // The stores below are written only once the text is delivered, and are
-    // best-effort: the dictation already succeeded and is on the clipboard.
+    // The stores below are written only once the text is delivered (or could not be), so
+    // they never delay it, and are best-effort: the dictation already succeeded.
     let stored_item = services
         .transcript_history
         .lock()
@@ -2007,7 +2054,10 @@ fn perform_stop_and_transcribe(app: &AppHandle, services: &AppServices) -> Resul
         }
         hide_cursor_session(&cursor_app, cursor_session);
     });
-    Ok(transcript)
+    Ok(DictationOutcome {
+        transcript,
+        delivery,
+    })
 }
 
 /// Delivers the freshly copied transcript into whichever app the user is
@@ -2179,7 +2229,33 @@ fn transcript_clipboard_text(transcript: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::transcript_clipboard_text;
+    use super::{pill_window_bounds, transcript_clipboard_text, DictationDelivery, DictationOutcome};
+
+    #[test]
+    fn dictation_outcome_names_the_delivery_for_the_pill() {
+        let outcome = |delivery| {
+            serde_json::to_value(DictationOutcome {
+                transcript: "Hello.".to_string(),
+                delivery,
+            })
+            .unwrap()
+        };
+        assert_eq!(
+            outcome(DictationDelivery::InsertFailed),
+            serde_json::json!({"transcript": "Hello.", "delivery": "insertFailed"})
+        );
+        assert_eq!(outcome(DictationDelivery::NotCopied)["delivery"], "notCopied");
+        assert_eq!(outcome(DictationDelivery::Inserted)["delivery"], "inserted");
+        assert_eq!(outcome(DictationDelivery::Copied)["delivery"], "copied");
+    }
+
+    #[test]
+    fn notice_pill_is_wider_than_the_copied_flash() {
+        let (copied, _) = pill_window_bounds("copied").unwrap();
+        let (notice, height) = pill_window_bounds("notice").unwrap();
+        assert!(notice > copied);
+        assert_eq!(height, 46.0);
+    }
 
     #[test]
     fn transcript_clipboard_text_adds_single_trailing_space() {
@@ -3014,7 +3090,7 @@ pub fn run() {
     app_dirs::migrate_legacy_dirs();
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            let _ = open_home_window(app.clone(), None);
+            onboarding::open_start_window(app);
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
@@ -3026,6 +3102,16 @@ pub fn run() {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
+                }
+            }
+            // Closing onboarding before the end is "later": it opens again at
+            // the next start, and Home opens now so the app is not windowless.
+            if window.label() == onboarding::WINDOW_LABEL {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    onboarding::defer_for_session();
+                    let _ = open_home_window(window.app_handle().clone(), None);
                 }
             }
         })
@@ -3079,7 +3165,7 @@ pub fn run() {
                     .unwrap_or_default(),
             );
             updates::start(handle.clone());
-            let _ = open_home_window(handle.clone(), None);
+            onboarding::open_start_window(handle);
             #[cfg(target_os = "macos")]
             {
                 let services = app.state::<AppServices>();
@@ -3159,13 +3245,18 @@ pub fn run() {
             training_capture::get_training_data_summary,
             training_capture::export_training_data,
             training_capture::delete_training_data,
+            onboarding::get_onboarding_state,
+            onboarding::complete_onboarding,
+            onboarding::open_onboarding_window,
+            onboarding::get_permission_status,
+            onboarding::request_permission,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| match event {
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Reopen { .. } => {
-                let _ = open_home_window(app.clone(), None);
+                onboarding::open_start_window(app);
             }
             tauri::RunEvent::Exit => {
                 let services = app.state::<AppServices>();
@@ -3269,6 +3360,7 @@ mod capability_tests {
             include_str!("../capabilities/home.json"),
             include_str!("../capabilities/transcript-shelf.json"),
             include_str!("../capabilities/cursor-preview.json"),
+            include_str!("../capabilities/onboarding.json"),
         ]
         .iter()
         .map(|raw| serde_json::from_str(raw).unwrap())
@@ -3322,6 +3414,7 @@ mod capability_tests {
                 "home" => &["core:window:allow-start-dragging", "opener:allow-open-url"],
                 "transcript-shelf" => &["core:window:allow-start-dragging"],
                 "cursor-preview" => &[],
+                "onboarding" => &["core:window:allow-start-dragging"],
                 other => panic!("unexpected window {other}"),
             };
             assert_eq!(extra, expected, "{window}");

@@ -3,9 +3,11 @@ import AVFoundation
 import FairspokenCore
 import Observation
 import OSLog
+import Synchronization
 
 /// The dictation state machine: hotkey/button → capture → (gate) → transcribe → post-process
-/// → deliver (paste into the frontmost app, or show in our own window) → history.
+/// → deliver (paste into the frontmost app, or show in our own window) → history
+/// (→ kept for post-training, when that is on).
 ///
 /// The recording is written to disk as it is captured and deleted only once its transcript is
 /// delivered (`PendingDictations`). If the host fails, the whole recording is sent again, then
@@ -49,8 +51,14 @@ final class DictationController {
     }
 
     private(set) var phase: Phase = .idle {
-        didSet { if phase != oldValue { onPhaseChange?(phase) } }
+        didSet {
+            guard phase != oldValue else { return }
+            if !phase.isActive { liveText = "" }
+            onPhaseChange?(phase)
+        }
     }
+    /// The words so far while listening (local transcription with "Show text while speaking").
+    private(set) var liveText = ""
     /// Latest transcript produced while our own window was frontmost ("Try dictation").
     private(set) var lastInAppResult: Result?
     /// What `.transcribing` is doing when it isn't the first attempt ("Retrying the host (1 of 2)").
@@ -58,13 +66,21 @@ final class DictationController {
 
     @ObservationIgnored var onPhaseChange: ((Phase) -> Void)?
     @ObservationIgnored var onNeedsOnboarding: (() -> Void)?
+    /// Called as any recording starts (shortcut, fn, the menu bar, a button), before it takes the
+    /// microphone: the setup guide's test steps aside.
+    @ObservationIgnored var onWillStart: (() -> Void)?
     @ObservationIgnored let capture = AudioCapture()
     @ObservationIgnored private var session: (any TranscriptionSession)?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private var resetTask: Task<Void, Never>?
-    @ObservationIgnored private var trigger: Trigger = .button
+    /// Which of this app's windows the recording is for (Home, the setup guide), or nil when it
+    /// is for another app.
+    @ObservationIgnored private(set) var startedInWindow: NSUserInterfaceItemIdentifier?
+    /// What started the current recording (the pill says how to end it).
+    private(set) var trigger: Trigger = .button
     @ObservationIgnored private var targetApp: NSRunningApplication?
     @ObservationIgnored private var placement: ComputePlacement = .neuralEngine
+    @ObservationIgnored private var liveGeneration = 0
     /// The recording being captured, and the writer putting it on disk.
     @ObservationIgnored private var kept: (item: PendingDictation, writer: PendingAudioWriter?)?
     @ObservationIgnored private let postProcessor: any TranscriptPostProcessor = BasicPostProcessor()
@@ -78,6 +94,8 @@ final class DictationController {
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "dictation")
 
     var meter: LevelMeter { capture.meter }
+    /// Hold or toggle, for the pill's key hints.
+    var shortcutMode: RecordingShortcutMode { settings.settings.recordingShortcutMode }
 
     init(settings: SettingsStore, models: ModelLibrary, history: HistoryStore, permissions: Permissions, pending: PendingDictations) {
         self.settings = settings
@@ -111,6 +129,7 @@ final class DictationController {
 
     func start(_ trigger: Trigger) {
         guard !phase.isActive else { return }
+        onWillStart?()
         permissions.refresh()
         switch permissions.microphone {
         case .granted: break
@@ -140,13 +159,14 @@ final class DictationController {
                 return
             }
         } else {
-            if !models.engineState.isReady && !models.engineState.isBusy { models.prepare(s.model) }
-            newSession = LocalBatchSession(engine: models.engine, options: options)
+            if !models.engineState.isReady && !models.engineState.isBusy { models.use(s.model) }
+            newSession = s.showTextWhileSpeaking ? liveSession(options: options) : LocalBatchSession(engine: models.engine, options: options)
             placement = .neuralEngine
         }
 
         let front = NSWorkspace.shared.frontmostApplication
         targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
+        startedInWindow = targetApp == nil ? NSApp.keyWindow?.identifier : nil
         let now = Date()
         let item = PendingDictation(id: "dictation-\(Int64(now.timeIntervalSince1970 * 1000))", createdAt: now,
                                     appName: targetApp?.localizedName, appBundleId: targetApp?.bundleIdentifier)
@@ -220,24 +240,35 @@ final class DictationController {
         phase = .transcribing
         transcribingNote = nil
         let item = kept.item
-        let targetPID = targetApp?.processIdentifier
+        let target = targetApp
         let placement = self.placement
-        let models = self.models
         // After the live attempt: the whole recording to the host again, then this Mac.
         let routes = placement == .remoteHost ? pending.routes(for: s) : TranscriptionRoutes()
         let recovery = pending.recovery
+        // Set once the live attempt has failed: the transcript then comes from a retry, later.
+        let retried = RetryFlag()
         let progress: @Sendable (DictationRecovery.Progress) -> Void = { [weak self] progress in
+            retried.set()
             Task { @MainActor [weak self] in self?.show(progress) }
         }
         let deliver: @Sendable (TranscriptionOutput) async -> Void = { [weak self] output in
-            await self?.complete(output, item: item, targetPID: targetPID, settings: s, durationSeconds: stats.durationSeconds,
-                                 released: released)
+            await self?.complete(output, item: item, target: target, samples: samples, settings: s,
+                                 durationSeconds: stats.durationSeconds, released: released,
+                                 retried: retried.isSet)
+        }
+        let live: @Sendable () async throws -> TranscriptionOutput = { [weak self] in
+            do {
+                if placement == .neuralEngine { try await self?.waitForEngine() }
+                return try await session.finish(allSamples: samples)
+            } catch {
+                // The engine never became ready: stop the session's live decoding too.
+                session.cancel()
+                throw error
+            }
         }
         Task { [weak self] in
-            let outcome = await recovery.run(item.id, live: {
-                if placement == .neuralEngine { try await models.waitUntilReady(timeout: .seconds(180)) }
-                return try await session.finish(allSamples: samples)
-            }, routes: routes, policy: .live(timeoutSeconds: s.remoteTimeoutSeconds), progress: progress, deliver: deliver)
+            let outcome = await recovery.run(item.id, live: live, routes: routes, policy: .live(timeoutSeconds: s.remoteTimeoutSeconds),
+                                             progress: progress, deliver: deliver)
             guard let self else { return }
             self.session = nil
             self.transcribingNote = nil
@@ -254,17 +285,19 @@ final class DictationController {
         }
     }
 
-    /// The transcript is in: post-process, deliver, record in history, show the result.
-    private func complete(_ output: TranscriptionOutput, item: PendingDictation, targetPID: pid_t?, settings s: AppSettings,
-                          durationSeconds: Double, released: ContinuousClock.Instant) async {
+    /// The transcript is in: post-process, deliver, record in history (and for post-training),
+    /// show the result.
+    private func complete(_ output: TranscriptionOutput, item: PendingDictation, target: NSRunningApplication?, samples: [Float],
+                          settings s: AppSettings, durationSeconds: Double, released: ContinuousClock.Instant, retried: Bool) async {
         let transcribed = ContinuousClock.now
+        transcribingNote = nil
         let text = await postProcessor.process(
             output.text, context: PostProcessContext(appBundleID: item.appBundleId, vocabulary: s.vocabularyHints))
         guard !text.isEmpty else {
             fail("No speech detected")
             return
         }
-        let delivery = await deliver(text, settings: s, targetPID: targetPID, appName: item.appName)
+        let delivery = await deliver(text, settings: s, target: target, retried: retried)
         let total = Int((ContinuousClock.now - released) / .milliseconds(1))
         let transcribeMs = Int((transcribed - released) / .milliseconds(1))
         let now = Date()
@@ -275,11 +308,19 @@ final class DictationController {
             timings: DictationTimings(transcribeMs: transcribeMs, speechModelMs: output.modelMs, totalMs: total),
             model: output.model, appName: item.appName, appBundleId: item.appBundleId)
         history.add(entry)
+        // The recording already on disk moves to the post-training folder; nothing is written twice.
+        pending.keepForTraining(item.id, samples: samples, rawText: output.text, finalText: text, model: output.model,
+                                appBundleID: item.appBundleId)
         let result = Result(text: text, words: WordCounter.count(text), delivery: delivery, latencyMs: total, placement: output.placement)
         if delivery == .shownInApp { lastInAppResult = result }
         phase = .done(result)
         Self.log.info("Dictation \(durationSeconds, format: .fixed(precision: 1)) s → \(total) ms (model \(output.modelMs) ms)")
-        scheduleReset(after: .milliseconds(1600))
+        // "It's on the clipboard, press ⌘V" needs time to read; "Inserted" does not.
+        if case .copied = delivery {
+            scheduleReset(after: .seconds(4))
+        } else {
+            scheduleReset(after: .milliseconds(1600))
+        }
     }
 
     private func show(_ progress: DictationRecovery.Progress) {
@@ -299,21 +340,42 @@ final class DictationController {
 
     // MARK: Helpers
 
-    private func deliver(_ text: String, settings s: AppSettings, targetPID: pid_t?, appName: String?) async -> Delivery {
+    private func liveSession(options: TranscriptionRequestOptions) -> any TranscriptionSession {
+        liveGeneration += 1
+        let generation = liveGeneration
+        return LiveTranscriptionSession(engine: models.engine, options: options) { [weak self] text in
+            Task { @MainActor in
+                guard let self, self.liveGeneration == generation, self.phase.isActive else { return }
+                self.liveText = text
+            }
+        }
+    }
+
+    private func deliver(_ text: String, settings s: AppSettings, target: NSRunningApplication?, retried: Bool) async -> Delivery {
         // Our own window is frontmost (dashboard "Try dictation", onboarding): show it there.
-        guard let targetPID, !(NSApp.isActive && NSApp.keyWindow != nil) else {
+        if target == nil || (NSApp.isActive && NSApp.keyWindow != nil) {
             TextInserter.copy(text)
             return .shownInApp
         }
-        // The user moved on while it was transcribed (a slow host, a retry): never type into
-        // whatever is in front now.
-        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == targetPID else {
+        // A retry can take many seconds: if the user has moved on to another app by then, never
+        // type into it. (A first attempt is pasted, keeping the text on the clipboard, as before.)
+        if retried, NSWorkspace.shared.frontmostApplication?.processIdentifier != target?.processIdentifier {
             TextInserter.copy(text)
             return .copied("Copied — you'd switched apps")
         }
-        switch await TextInserter.deliver(text, paste: s.insertAtCursor, restoreClipboard: s.restoreClipboard) {
-        case .pasted: return .pasted(app: appName)
+        switch await TextInserter.deliver(text, paste: s.insertAtCursor, restoreClipboard: s.restoreClipboard,
+                                          expectedApp: target?.processIdentifier) {
+        case .pasted: return .pasted(app: target?.localizedName)
         case .copied(let reason): return .copied(reason)
+        }
+    }
+
+    private func waitForEngine() async throws {
+        let deadline = ContinuousClock.now + .seconds(180)
+        while !models.engineState.isReady {
+            if case .failed(let message) = models.engineState { throw NSError(domain: "engine", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
+            if ContinuousClock.now > deadline { throw NSError(domain: "engine", code: 2, userInfo: [NSLocalizedDescriptionKey: "The speech model is still loading"]) }
+            try await Task.sleep(for: .milliseconds(50))
         }
     }
 
@@ -335,9 +397,21 @@ final class DictationController {
 
     // MARK: Demo/screenshot support
 
-    func showcase(_ phase: Phase, inAppResult: Result? = nil) {
+    /// Screenshots: forgets the in-app result (a first use).
+    func showcaseClearResult() { lastInAppResult = nil }
+
+    func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "", trigger: Trigger = .hotkey) {
         resetTask?.cancel()
+        self.trigger = trigger
         self.phase = phase
+        self.liveText = liveText
         if let inAppResult { lastInAppResult = inAppResult }
     }
+}
+
+/// Whether a dictation's transcript came from a retry rather than the live attempt.
+nonisolated private final class RetryFlag: Sendable {
+    private let value = Mutex(false)
+    func set() { value.withLock { $0 = true } }
+    var isSet: Bool { value.withLock { $0 } }
 }

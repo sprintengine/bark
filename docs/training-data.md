@@ -4,6 +4,14 @@ Fairspoken can keep your dictations so you can later fine-tune a speech
 model or train a polish model on them. This is off by default. Turn it on in
 **Settings → General → Training data → Keep my dictations to improve models**.
 
+In the native macOS app it is **Post-training › Save recordings for post-training**. It
+writes the same on-device layout and fields (below; `polishedText` and `editedText` are not set
+yet), to `~/Library/Application Support/ie.fairspoken.mac/training-data` or a folder you choose,
+for example on an external drive. Its recordings are kept until you delete them, and it has no
+export yet: the folder itself is the data. Deleting a recording, or **Delete All…**, asks first and
+moves the recordings to the Trash. On a drive without a Trash, nothing is deleted until you confirm
+deleting permanently.
+
 Kept dictations never leave the device unless you export them yourself. They
 may contain sensitive or patient information: do not turn this on for
 clinical dictation unless your practice's data protection arrangements allow
@@ -23,9 +31,49 @@ For each dictation:
 | speech model | the model id (`parakeet-tdt-0.6b-v3`, `large-v3-turbo`…), or `remote-host` / `cloud` |
 | app category | `messaging`, `email`, `docs`, `code`, `terminal` or `other`; never the app's name or window contents |
 | timestamp, duration | epoch seconds, and the audio length in seconds |
+| recorded by | `fairspoken-desktop` on entries this app wrote (not in the export) |
 
-Retention is 30 days (default), 90 days, or until you delete it. **Delete all**
-removes every kept dictation.
+## Keeping and deleting
+
+Kept dictations stay **until you delete them** (the default). You can choose
+30 or 90 days instead, under **Keep recordings**. A chosen retention only runs
+while capture is on, and only removes dictations this app recorded itself
+(entries with `"recordedBy": "fairspoken-desktop"`): entries from the native
+macOS app, which can share the layout, and entries from builds before this
+field are never removed by retention. Before this change the setting was
+stored as `trainingRetentionDays` and defaulted to 30 days; that value is no
+longer read, so everyone starts at "until you delete them" and picks a
+retention again if they want one.
+
+**Delete all** (asks for a second click) removes only the dictations listed in
+`index.jsonl`: their `<id>/` folders, then their lines. Other files in the
+folder stay, and so does the folder. In this app, deletion is permanent; the
+native macOS app moves recordings to the Trash.
+
+Both apps protect the folder the same way:
+
+- An entry id must be a single plain name (not empty, no `/`, `\`, `:` or
+  `..`) before it is used as a path; a line with any other id is ignored and
+  left in the index.
+- An index line that cannot be read (damaged, or from a newer version) is
+  never dropped: every rewrite of `index.jsonl` keeps it byte for byte.
+- An index that exists but cannot be read is never rewritten.
+- Rewrites of `index.jsonl` and `meta.json` are atomic (a temporary file,
+  then a rename).
+- An append starts a new line if the index's last line lacks its newline.
+- Both apps hold an advisory lock on `.index.lock` in the folder (`flock` on
+  macOS and Linux) around every change that reads and then writes the index:
+  appends, edits, deletes, retention and rebuilds. The index itself is never
+  locked, since a rewrite replaces it. If the other app holds the lock for
+  more than two seconds, retention waits for its next run and deletes ask you
+  to try again. An append waits for the lock however long it takes (its audio
+  and `meta.json` are already written), because appending without it could be
+  undone by the other app's rewrite; the lock is released if that app quits.
+
+The macOS app can also rebuild `index.jsonl` from each `<id>/meta.json`
+(`TrainingDataStore.rebuildIndex()`), for example after recordings are put
+back from the Trash; the old index is kept beside it as
+`index.jsonl.<epoch seconds>-<suffix>.bak`.
 
 ## On-device layout
 
@@ -36,6 +84,7 @@ macOS and Linux, `%LOCALAPPDATA%\Fairspoken\training-data` on Windows;
 ```text
 training-data/
   index.jsonl          one entry per line (camelCase fields, as in meta.json)
+  .index.lock          empty; the lock both apps share (see above)
   <id>/audio.wav
   <id>/meta.json
 ```

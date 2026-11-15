@@ -24,8 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.dictation.onPhaseChange = { [weak self] phase in
             self?.pill.update(for: phase)
             self?.statusItem.update(for: phase)
+            // A model chosen during the dictation is loaded once it ends.
+            if !phase.isActive { self?.model.models.dictationEnded() }
         }
-        model.dictation.onNeedsOnboarding = { [weak self] in self?.windows.showOnboarding() }
+        model.dictation.onNeedsOnboarding = { [weak self] in self?.windows.showOnboarding(reset: false) }
 
         if let dir = AppInfo.screenshotDirectory {
             harness = ScreenshotHarness(model: model, windows: windows, output: dir)

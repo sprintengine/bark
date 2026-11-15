@@ -68,7 +68,8 @@ public struct DictationRetryPolicy: Sendable, Equatable {
 public enum DictationOutcome: Sendable, Equatable {
     /// Transcribed and delivered; the audio is deleted.
     case delivered(TranscriptionOutput)
-    /// The host or the engine heard no speech; the audio is deleted, as for a silent recording.
+    /// The host or the engine heard no speech. Right after recording the audio is deleted, as
+    /// for a silent recording; a kept dictation's audio goes to the Trash instead.
     case noSpeech
     /// Every attempt failed; the audio is kept for a later retry.
     case kept(PendingDictation)
@@ -105,11 +106,30 @@ public struct DictationRecovery: Sendable {
         var hostFailure: String?
         var localFailure: String?
         var hostRefused = false
+        /// No speech was heard, but the audio couldn't go to the Trash, so it is kept.
+        var silentButKept = false
 
-        func finish(_ output: TranscriptionOutput) async -> DictationOutcome {
-            guard !output.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        /// A kept dictation was saved because something failed, so an empty answer later is not
+        /// proof it held nothing: it goes to the Trash, where the user can still find it. If the
+        /// Trash can't be used it stays kept.
+        func noSpeech() -> DictationOutcome? {
+            if live != nil {
                 store.remove(id)
                 return .noSpeech
+            }
+            do {
+                try store.trash(id)
+                return .noSpeech
+            } catch {
+                return nil
+            }
+        }
+
+        func finish(_ output: TranscriptionOutput) async -> DictationOutcome? {
+            guard !output.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                if let outcome = noSpeech() { return outcome }
+                silentButKept = true
+                return nil
             }
             await deliver(output)
             store.remove(id)
@@ -119,8 +139,9 @@ public struct DictationRecovery: Sendable {
         /// Nil to keep going, an outcome when there is nothing more to try.
         func failed(_ error: Error, onThisMac: Bool = false) -> DictationOutcome? {
             if case .noSpeech? = error as? RemoteTranscriptionError {
-                store.remove(id)
-                return .noSpeech
+                if let outcome = noSpeech() { return outcome }
+                silentButKept = true
+                return nil
             }
             failures += 1
             if onThisMac {
@@ -134,12 +155,14 @@ public struct DictationRecovery: Sendable {
         }
 
         if let live {
-            do { return await finish(try await live()) } catch {
+            do {
+                if let outcome = await finish(try await live()) { return outcome }
+            } catch {
                 if let outcome = failed(error) { return outcome }
             }
         }
 
-        if let remote = routes.remote, !hostRefused, !Task.isCancelled {
+        if let remote = routes.remote, !hostRefused, !silentButKept, !Task.isCancelled {
             do {
                 let wav = try store.wav(id)
                 let deadline = ContinuousClock.now + policy.budget
@@ -148,10 +171,12 @@ public struct DictationRecovery: Sendable {
                     let left = deadline - ContinuousClock.now
                     guard left > .zero else { break }
                     progress(.retrying(attempt: i + 1, of: policy.delays.count))
-                    do { return await finish(try await remote(wav, min(policy.attemptTimeout, left))) } catch {
+                    do {
+                        if let outcome = await finish(try await remote(wav, min(policy.attemptTimeout, left))) { return outcome }
+                    } catch {
                         if let outcome = failed(error) { return outcome }
-                        if hostRefused { break }
                     }
+                    if hostRefused || silentButKept { break }
                 }
             } catch is CancellationError {
                 // Fall through: the recording is kept below.
@@ -160,15 +185,18 @@ public struct DictationRecovery: Sendable {
             }
         }
 
-        if let local = routes.local, !Task.isCancelled {
+        if let local = routes.local, !silentButKept, !Task.isCancelled {
             progress(.transcribingOnThisMac)
-            do { return await finish(try await local(try store.samples(id))) } catch {
+            do {
+                if let outcome = await finish(try await local(try store.samples(id))) { return outcome }
+            } catch {
                 if let outcome = failed(error, onThisMac: true) { return outcome }
             }
         }
 
         // Nothing worked: keep it, saying what the host and this Mac answered.
-        let message = [hostFailure, localFailure.map { "On this Mac: \($0)" }].compactMap(\.self).joined(separator: " · ")
+        let silent = silentButKept ? "No speech was heard, and the recording couldn't be moved to the Trash" : nil
+        let message = [silent, hostFailure, localFailure.map { "On this Mac: \($0)" }].compactMap(\.self).joined(separator: " · ")
         store.update(id) {
             $0.state = .failed
             $0.attempts += max(1, failures)

@@ -1,6 +1,6 @@
 import AppKit
 import FairspokenCore
-import FairspokenSpeech
+import FairspokenWhisper
 import Observation
 import OSLog
 import UniformTypeIdentifiers
@@ -9,13 +9,18 @@ import UniformTypeIdentifiers
 /// Application Support as it is captured (`PendingDictationStore`) and deleted once its
 /// transcript is delivered. One that every attempt failed on stays there: it is retried on its
 /// own (at launch, when the host answers again, then at growing intervals) and from Home, where
-/// it can also be exported or deleted.
+/// it can also be exported or moved to the Trash. With "Save recordings to improve models" on, a
+/// delivered dictation's audio moves on to the post-training folder instead of being written
+/// there a second time.
 @Observable
 final class PendingDictations {
     /// Dictations whose every attempt failed, newest first.
     private(set) var items: [PendingDictation] = []
     /// Ids being retried right now.
     private(set) var retrying: Set<String> = []
+    /// A recording the Trash couldn't take (a volume without one), waiting for the user to
+    /// confirm deleting it permanently. Nothing has been deleted yet.
+    private(set) var needsPermanentDeletion: String?
 
     /// A kept dictation was transcribed: its word count, and whether it went to the clipboard.
     @ObservationIgnored var onRecovered: ((_ words: Int, _ copied: Bool, _ placement: ComputePlacement) -> Void)?
@@ -24,15 +29,17 @@ final class PendingDictations {
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let models: ModelLibrary
     @ObservationIgnored private let history: HistoryStore
+    @ObservationIgnored private let training: TrainingLibrary?
     @ObservationIgnored private var loop: Task<Void, Never>?
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "pending")
 
-    init(settings: SettingsStore, models: ModelLibrary, history: HistoryStore,
+    init(settings: SettingsStore, models: ModelLibrary, history: HistoryStore, training: TrainingLibrary? = nil,
          directory: URL = AppInfo.isDemo ? FileManager.default.temporaryDirectory.appendingPathComponent("fairspoken-demo-pending")
              : AppInfo.supportDirectory.appendingPathComponent("Pending Dictations", isDirectory: true)) {
         self.settings = settings
         self.models = models
         self.history = history
+        self.training = training
         store = PendingDictationStore(directory: directory)
     }
 
@@ -40,6 +47,7 @@ final class PendingDictations {
 
     /// At launch: what the last run left unfinished joins the list, and the retry loop starts.
     func start() {
+        store.clearHandOffs()
         let recovered = store.recoverInterrupted()
         if !recovered.isEmpty { Self.log.info("\(recovered.count) dictation(s) waiting to be transcribed") }
         reload()
@@ -88,6 +96,19 @@ final class PendingDictations {
         store.remove(id)
     }
 
+    /// A dictation was delivered: with post-training capture on, its recording moves from here to
+    /// the post-training folder (or, if it never reached the disk, `samples` are written there).
+    /// Call before the pending entry is removed.
+    func keepForTraining(_ id: String, samples: [Float]?, rawText: String, finalText: String, model: String, appBundleID: String?) {
+        guard let training, training.isCapturing else { return }
+        let duration = WAVFile.durationSeconds(store.audioURL(id))
+        if let duration, let file = store.handOff(id) {
+            training.keep(.file(file, durationSeconds: duration), rawText: rawText, finalText: finalText, model: model, appBundleID: appBundleID)
+        } else if let samples {
+            training.keep(.samples(samples), rawText: rawText, finalText: finalText, model: model, appBundleID: appBundleID)
+        }
+    }
+
     // MARK: Retrying
 
     /// Where a kept dictation can be transcribed now: the host (when one is in use), then this
@@ -100,7 +121,7 @@ final class PendingDictations {
                                                                          language: s.language, vocabularyHints: hints))
             routes.remote = { wav, timeout in try await client.transcribe(wav: wav, timeout: timeout) }
         }
-        if FluidAudioEngine.isInstalled(s.model) {
+        if SpeechModels.isInstalled(s.model) {
             let options = TranscriptionRequestOptions(language: s.language, vocabularyHints: hints)
             routes.local = { [models] samples in try await models.transcribeOnThisMac(samples, model: s.model, options: options) }
         }
@@ -153,6 +174,7 @@ final class PendingDictations {
         let text = await BasicPostProcessor().process(output.text, context: PostProcessContext(appBundleID: item.appBundleId, vocabulary: s.vocabularyHints))
         guard !text.isEmpty else { return }
         if copy { TextInserter.copy(text) }
+        keepForTraining(item.id, samples: nil, rawText: output.text, finalText: text, model: output.model, appBundleID: item.appBundleId)
         history.add(TranscriptHistoryItem(
             id: "transcript-\(item.createdAt)", createdAt: item.createdAt, text: text, backend: output.backend,
             location: output.placement == .remoteHost ? "remote-host" : "local", durationSeconds: item.durationSeconds,
@@ -181,9 +203,28 @@ final class PendingDictations {
         }
     }
 
+    /// Moves the recording to the Trash. When that fails nothing is deleted, and
+    /// `needsPermanentDeletion` asks the user first.
     func delete(_ id: String) {
+        guard !retrying.contains(id) else { return }
+        do {
+            try store.trash(id)
+        } catch {
+            Self.log.error("Moving a recording to the Trash failed: \(error.localizedDescription, privacy: .public)")
+            needsPermanentDeletion = id
+        }
+        reload()
+    }
+
+    /// Only after the user confirmed it, when moving to the Trash failed.
+    func deletePermanently(_ id: String) {
+        needsPermanentDeletion = nil
         guard !retrying.contains(id) else { return }
         store.remove(id)
         reload()
+    }
+
+    func keepAfterTrashFailed() {
+        needsPermanentDeletion = nil
     }
 }

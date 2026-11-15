@@ -187,7 +187,7 @@ Open `site/index.html` through any static server (font preloads need http; for e
 - **Sections:** how it works (scroll-pinned three steps with a practice/terminal toggle), speed (40–80 ms with a blink timeline), privacy (animated floor plan of a practice), the practice host (live request flow and log; vertical layout on phones), developers (terminal demo; *All signal. No noise.*), GP practices (referral letter and DPO Q&A), models, open source (the real host protocol), download.
 - **Performance:** lazy start after fonts and idle; canvases render only on screen; DPR capped at 1.75; no third-party requests; about 550 KB of fonts. Light and dark themes with a toggle; the nav adapts to inverted bands; tested at 1440 and 390 px.
 
-Screenshots (2×) in `site/screenshots/`: `hero-light/dark`, `hero-scroll-light`, `how-light/dark`, `speed-light`, `privacy-light/dark`, `host-light/dark`, `developers-light`, `practices-light/dark`, `models-light/dark`, `opensource-light`, `download-light/dark`, `mobile-hero-light/dark`, `mobile-host-dark`, `mobile-practices-light`, `reduced-motion-hero-light`.
+Screenshots aren't committed. Capture them locally with `_tools/shoot.mjs` (use `?t=3.2` for a frozen hero frame).
 
 ## 10. Liquid Glass app mockups (`app/`)
 Open `app/index.html` in Chrome. Screens are 1600 × 1000 desktops with an original generative wallpaper.
@@ -199,7 +199,7 @@ Open `app/index.html` in Chrome. Screens are 1600 × 1000 desktops with an origi
 | Server | `server.html` | Practice devices, host queue, workers and models as glass nodes over a live request-flow canvas (comets, bundles); metrics, latency chart, recent requests |
 | Models | `models.html` | In-use model banner with glass chips and stats over generative art; library cards with glass actions over each model's own signal portrait; Hugging Face search |
 
-Screenshots (2×, light and dark) in `app/screenshots/`. The pill is captured in both scenes and both system appearances.
+Screenshots aren't committed. Capture them locally with `_tools/shoot.mjs --theme light|dark`; the pill has two scenes (`?scene=dev|gp`).
 
 **Information architecture** follows the existing concepts and the Swift app at `apps/macos/` (Home, Notes, Activity; Engine: Models, Server, Settings; the Server graph is devices → queue → workers → models, as in `HostGraphView`).
 
@@ -230,8 +230,8 @@ design/brand/
 ├── board/brand-board.png     one-page summary (3840 × 2400); brand-board.html + assets/ source
 ├── research/                 README.md + 2× captures of 15 sites
 ├── logo/                     lockups, marks, wordmark, favicon, app-icon layers + previews, exploration/
-├── site/                     index.html, site.css, site.js, hero-gl.js, fonts/ (OFL), screenshots/
-├── app/                      index.html, dashboard/pill/server/models.html, glass.js, glass.css, app.css, shell.js, screenshots/
+├── site/                     index.html, site.css, site.js, hero-gl.js, fonts/ (OFL)
+├── app/                      index.html, dashboard/pill/server/models.html, glass.js, glass.css, app.css, shell.js
 └── _tools/                   contrast.mjs, marks.mjs, gen-logo.mjs, gen-exploration.mjs, outline_text.py, shoot.mjs
 ```
 The `_tools/` scripts need Node 22+, with Playwright and sharp installed outside the repo, and fontTools for `outline_text.py`. They're for regenerating assets, not for the product.
