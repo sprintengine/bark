@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { accelTokens, keyGlyph, keyWord } from "./shortcuts";
 import { SPEECH_MODELS, formatBytes, isMeasured, speechInfo, starterChoices } from "./modelCatalog";
+import dogTile from "./assets/brand/dog-tile.jpg";
 
 // First-run setup in its own window: welcome, permissions, a microphone
 // check, a speech model, a first dictation, the training-data choice, done.
@@ -111,7 +112,7 @@ function renderWelcome(): void {
   ]);
   stepHost.replaceChildren(
     h("header", { class: "ob-head ob-head--hero" }, [
-      h("span", { class: "ob-mark", "aria-hidden": "true" }, [svg(ICONS.wave)]),
+      h("span", { class: "ob-mark", "aria-hidden": "true" }, [h("img", { src: dogTile, alt: "" })]),
       h("h1", { tabindex: "-1" }, ["Welcome to Fairspoken"]),
       h("p", {}, ["Speak anywhere you type. Fast, private, and on your computer."]),
     ]),

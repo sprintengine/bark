@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="design/brand/logo/dog/readme-header.png" width="480" alt="The logo: a close-up of a black-and-white border collie's face on black, mouth open in a bark">
+</p>
+
 # Fairspoken
 
 Fast, private, local-first desktop dictation. Press a shortcut, speak, and the

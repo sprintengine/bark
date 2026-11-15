@@ -444,12 +444,15 @@ address may bring up macOS's Local Network prompt the first time another device 
   `Config/Server-{Debug,Release}.xcconfig` include the client's and then `Server.xcconfig`, so version,
   signing and Swift settings are shared.
 - **Brand:** `FairspokenUI` holds the palette (`Color.fs*` from `design/brand/README.md`: Copybook Blue,
-  Margin Red for the signal only, Limestone/Night, status colours) and the mark (`FairspokenMark`, the
-  logo's own paths). The server follows the brand's Liquid Glass rules: glass only on the control layer
-  (sidebar, toolbar, constellation nodes); cards, tables and charts are opaque. The client puts its
-  sidebar on the window's frost and its content on solid cards (`design/crystal/README.md` › Fairspoken
-  for Mac). The server icon is the brand's dark icon
-  composite (`scripts/make-server-icon.sh`); no taglines anywhere.
+  Margin Red for the signal only, Limestone/Night, status colours) and the marks: `BrandMark` is the
+  app icon's sheepdog photo on its tile (the client's `BrandTile` image), and `DogMark` is the
+  one-colour mark traced from it (`design/brand/logo/dog/dog-mark.svg`), which `FairspokenMark` fits
+  to a square. The server follows the brand's Liquid Glass rules:
+  glass only on the control layer (sidebar, toolbar, constellation nodes); cards, tables and charts
+  are opaque. The client puts its sidebar on the window's frost and its content on solid cards
+  (`design/crystal/README.md` › Fairspoken for Mac). Both app icons, `BrandTile` and
+  `DogMarkPaths.swift` come from `design/brand/_tools/gen-dog-icons.mjs`; the server's tile adds
+  faint ruled lines. No taglines anywhere.
 - **Wire identifiers** (per `PROTOCOL.md`): the `x-fairspoken-*` headers, the
   `application/vnd.fairspoken.pcm-stream` content type, `FAIRSPOKEN_HOST_*` and the client id `fairspoken-macos`.
 
