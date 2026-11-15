@@ -113,6 +113,9 @@ private struct GeneralSettings: View {
                     .disabled(!store.settings.insertAtCursor)
                 Toggle("Start and stop sounds", isOn: binding(\.interactionSounds))
                     .tint(Crystal.clientAccent)
+                Toggle("Show text while speaking", isOn: binding(\.showTextWhileSpeaking))
+                    .tint(Crystal.clientAccent)
+                    .help("The recording pill shows your words as you speak. The text that is inserted still comes from the whole recording. Not available with a remote host.")
             }
             Section("Permissions") {
                 PermissionRow(kind: .microphone)

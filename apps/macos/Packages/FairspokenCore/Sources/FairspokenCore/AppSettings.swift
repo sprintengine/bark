@@ -91,6 +91,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var restoreClipboard = true
     /// Where kept dictations go (`TrainingDataStore`); empty for the app's own folder.
     public var trainingDataFolder = ""
+    /// Show the words in the recording pill while the user speaks (local transcription only;
+    /// the host protocol has no partial results).
+    public var showTextWhileSpeaking = true
 
     public init() {}
 
@@ -133,6 +136,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         modelLinks = c.lenient([String: String].self, .modelLinks) ?? d.modelLinks
         restoreClipboard = c.lenient(Bool.self, .restoreClipboard) ?? d.restoreClipboard
         trainingDataFolder = c.lenient(String.self, .trainingDataFolder) ?? d.trainingDataFolder
+        showTextWhileSpeaking = c.lenient(Bool.self, .showTextWhileSpeaking) ?? d.showTextWhileSpeaking
         self = normalized()
     }
 

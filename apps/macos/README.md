@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Fairspoken,Fairspoken Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (46), FairspokenHost (42), FairspokenUpdates (18)
+scripts/test.sh                       # unit tests: FairspokenCore (126), FairspokenHost (78), FairspokenUpdates (19)
 scripts/install.sh                    # Release Fairspoken → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Fairspoken Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Fairspoken-<version>-macos-arm64.{zip,dmg}
@@ -168,6 +168,37 @@ Settings › Transcription › **Network device** holds the host URL, token (Key
 connection button and a status line such as "Using host: practice-mini.local:48173 · connected"
 (one `GET /v1/health` when Settings or Home opens, or on Test; no background polling). Monitoring a
 host is Fairspoken Server's job (or the web dashboard at the host's `/`); the client has no Server view.
+
+### Text while speaking
+
+Settings › General › **Show text while speaking** (`showTextWhileSpeaking`, on by default, a Mac-only
+key) grows the recording pill to show the newest line or two of what you have said, under the level
+bars; with Reduce Motion it changes without animating. It works with on-device transcription
+(`LiveTranscriptionSession` in FairspokenCore): about every 0.45 s the audio not yet in a finished
+segment is decoded again by the loaded Parakeet model, and once that reaches 12 s it is cut at the
+quietest 20 ms between 7 and 12 s and decoded once, so no decode exceeds the model's 15 s window.
+Silence after a decode is skipped, and the interval stretches so the Neural Engine is never busy more
+than a fifth of the time. The text inserted still comes from one pass over the whole recording, exactly
+as with the setting off, so accuracy is unchanged. With a remote host the pill shows no text (the host
+protocol has no partial results).
+
+Decoding a growing tail was chosen over FluidAudio's streaming managers: its sliding-window manager
+emits text only once per window (the first words after 3–5 s, then every 4–11 s) and duplicates or
+splits words where windows meet, and its true streaming models are separate downloads.
+
+Measured on the M4 with Parakeet TDT v3 (recordings played in real time in 100 ms frames;
+`FAIRSPOKEN_LIVE_TEXT_CLIPS=a.wav,b.wav swift test --filter LiveText` in `Packages/FairspokenSpeech`):
+
+| Recording | First words | Updates | Decode, mean (longest) | Neural Engine busy | Extra CPU | Release → text, live vs off |
+|---|---|---|---|---|---|---|
+| 3 s | 0.52 s | every ~0.5 s | 49–56 ms (70 ms) | 9–11% | 7–8% of one core | 52–56 ms vs 50–53 ms |
+| 11 s | 0.53–0.55 s | every ~0.55 s | 71–79 ms (122 ms) | 13–14% | 12–15% of one core | 106–116 ms vs 98–154 ms |
+| 86 s | 0.52–0.53 s | every ~0.6 s | 92–120 ms (402 ms) | 17–20% | 17–19% of one core | 493–613 ms vs 375–503 ms |
+
+In a third run on a busy machine (other builds running; setting-off release → text 154–923 ms) decodes
+took 144–292 ms on average, so the interval stretched to 0.65–1.7 s between updates, holding the Neural
+Engine at 19–20% and the extra CPU at 8–10% of one core. The inserted text matched the setting-off
+transcript word for word on every recording in every run.
 
 ## Where the text goes
 
@@ -376,7 +407,8 @@ Keychain, and the JSON keeps empty strings. Keys the app doesn't model are prese
 ## Screenshots
 
 `docs/screenshots/` (Fairspoken, light and dark): `home`, `home-listening`, `models`, `training`, `settings`,
-`settings-transcription` (Network device), `onboarding-welcome`, `onboarding-permissions`, `pill`.
+`settings-transcription` (Network device), `onboarding-welcome`, `onboarding-permissions`, `pill` (every
+pill state, with and without text while speaking).
 
 `docs/screenshots/server-app/` (Fairspoken Server, light and dark, demo simulator): `activity`
 (the live constellation with requests in flight), `clients`, `models`, `connect`, `configuration`.
