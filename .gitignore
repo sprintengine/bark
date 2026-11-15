@@ -55,10 +55,17 @@ design/brand/research/
 # only the README showcase images that docs/images/src/render.sh writes.
 docs/images/*
 !docs/images/src/
-!docs/images/home-*.png
-!docs/images/models-*.png
-!docs/images/setup-*.png
-!docs/images/pill-*.png
+docs/images/src/*
+!docs/images/src/compose.swift
+!docs/images/src/render.sh
+!docs/images/home-light.png
+!docs/images/home-dark.png
+!docs/images/models-light.png
+!docs/images/models-dark.png
+!docs/images/setup-light.png
+!docs/images/setup-dark.png
+!docs/images/pill-light.png
+!docs/images/pill-dark.png
 design/brand/app/screenshots/
 design/brand/site/screenshots/
 design/concepts/*/*.png

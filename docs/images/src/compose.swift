@@ -38,8 +38,11 @@ guard let source = NSImage(contentsOfFile: input)?.cgImage(forProposedRect: nil,
 var image = source
 if let cropArg {
     let n = cropArg.split(separator: ",").compactMap { Double($0) }
-    guard n.count == 4, let cut = source.cropping(to: CGRect(x: n[0], y: n[1], width: n[2], height: n[3])) else {
-        fail("bad --crop \(cropArg)")
+    let rect = n.count == 4 ? CGRect(x: n[0], y: n[1], width: n[2], height: n[3]) : .null
+    // The crop is in the capture's pixels (the harness captures at 2x); it must lie inside it.
+    guard !rect.isNull, CGRect(x: 0, y: 0, width: source.width, height: source.height).contains(rect),
+          let cut = source.cropping(to: rect) else {
+        fail("--crop \(cropArg) is not inside the \(source.width)x\(source.height) capture")
     }
     image = cut
 }
