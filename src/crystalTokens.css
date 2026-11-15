@@ -75,12 +75,13 @@
   --crystal-glass: var(--crystal-card);
   --crystal-glass-strong: var(--crystal-card);
   --crystal-glass-edge: var(--crystal-card-edge);
-  /* The brand mark: a green tile with a facet of light. */
-  --crystal-mark-top: #3fae78;
-  --crystal-mark-bottom: #1f7a4f;
-  --crystal-mark-sheen: rgba(255, 255, 255, 0.35);
-  --crystal-mark-edge: rgba(0, 0, 0, 0.12);
-  --crystal-mark-shadow: rgba(16, 24, 32, 0.18);
+  /* The brand mark: the app icon's black tile behind its photo, with a hairline edge
+     so it holds on any surface. */
+  --crystal-mark-top: #2a2a2d;
+  --crystal-mark-bottom: #0a0a0b;
+  --crystal-mark-sheen: rgba(255, 255, 255, 0.08);
+  --crystal-mark-edge: rgba(0, 0, 0, 0.2);
+  --crystal-mark-shadow: rgba(16, 24, 32, 0.22);
   /* Sidebar icon tiles: one hue per place, as a system settings list. */
   --crystal-tile-home: #2f9e63;
   --crystal-tile-notes: #e0a10b;
@@ -147,10 +148,10 @@
   --crystal-shadow-track: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   --crystal-well: rgba(255, 255, 255, 0.05);
   --crystal-well-strong: rgba(255, 255, 255, 0.08);
-  --crystal-mark-top: #4cc489;
-  --crystal-mark-bottom: #23855a;
-  --crystal-mark-sheen: rgba(255, 255, 255, 0.28);
-  --crystal-mark-edge: rgba(255, 255, 255, 0.14);
+  --crystal-mark-top: #2a2a2d;
+  --crystal-mark-bottom: #0a0a0b;
+  --crystal-mark-sheen: rgba(255, 255, 255, 0.08);
+  --crystal-mark-edge: rgba(255, 255, 255, 0.2);
   --crystal-mark-shadow: rgba(0, 0, 0, 0.4);
   --crystal-tile-home: #34a86a;
   --crystal-tile-notes: #d99c0c;

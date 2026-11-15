@@ -91,6 +91,7 @@ body {
 .sidebar-chrome { height: 44px; }
 .sidebar-brand { padding: 0 8px 14px; gap: 9px; }
 .brand-mark {
+  position: relative; overflow: hidden;
   width: 24px; height: 24px; border-radius: 7px;
   background:
     linear-gradient(160deg, var(--crystal-mark-sheen), transparent 55%),
@@ -98,7 +99,12 @@ body {
   box-shadow: inset 0 0 0 0.5px var(--crystal-mark-edge), 0 1px 2px var(--crystal-mark-shadow);
   color: #ffffff;
 }
-.brand-mark svg { width: 15px; height: 15px; }
+/* The brand tiles show the app icon's photo; the edge sits above it. */
+.brand-mark img, .empty-mark img { display: block; width: 100%; height: 100%; }
+.brand-mark::after, .empty-mark::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 0 0.5px var(--crystal-mark-edge);
+}
 .brand-name { font-size: var(--sem-font-size-heading); font-weight: 650; letter-spacing: -0.015em; color: var(--crystal-ink); }
 
 .nav { gap: 1px; }
@@ -532,11 +538,11 @@ body {
 .empty .e-sub { color: var(--crystal-ink-2); }
 .empty .e-actions { display: flex; gap: var(--sem-space-sm); margin-top: 8px; }
 .empty-mark {
+  position: relative; overflow: hidden;
   display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 6px; border-radius: 14px; color: #ffffff;
   background: linear-gradient(160deg, var(--crystal-mark-sheen), transparent 55%), linear-gradient(180deg, var(--crystal-mark-top), var(--crystal-mark-bottom));
   box-shadow: inset 0 0 0 0.5px var(--crystal-mark-edge), 0 1px 2px var(--crystal-mark-shadow);
 }
-.empty .empty-mark svg { width: 28px; height: 28px; opacity: 1; margin: 0; }
 /* Inside a card an empty state is plain content, not a second card. */
 .settings-card .empty, #activityList > .empty, .note-detail .empty {
   background: none; border: 0; box-shadow: none; margin: 0; max-width: none;

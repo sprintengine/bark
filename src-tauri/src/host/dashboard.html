@@ -144,11 +144,15 @@
     border-bottom: 1px solid var(--hairline);
   }
   .brand { display: flex; align-items: center; gap: 10px; flex: none; white-space: nowrap; }
+  /* The app icon in small: the sheepdog photo on its black tile, with a light edge. */
   .logo {
-    width: 30px; height: 30px; border-radius: 9px; flex: none;
-    display: grid; place-items: center; color: var(--accent);
-    background: var(--surface-strong); border: 1px solid var(--hairline);
-    box-shadow: var(--shadow);
+    position: relative; width: 30px; height: 30px; border-radius: 8px; flex: none;
+    overflow: hidden; background: #000; box-shadow: var(--shadow);
+  }
+  .logo-photo { display: block; width: 100%; height: 100%; }
+  .logo::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
   }
   .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.015em; }
   .brand-sub { font-size: 15px; font-weight: 500; color: var(--ink-3); letter-spacing: -0.01em; }
@@ -593,7 +597,7 @@
   <header class="topbar">
     <div class="brand">
       <span class="logo" aria-hidden="true">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="5" width="2" height="6" rx="1"/><rect x="5" y="2.5" width="2" height="11" rx="1"/><rect x="8.5" y="4" width="2" height="8" rx="1"/><rect x="12" y="6" width="2" height="4" rx="1"/></svg>
+        <img class="logo-photo" src="data:image/jpeg;base64,/9j/2wBDAAUFBQUFBQYGBgYICQgJCAwLCgoLDBINDg0ODRIbERQRERQRGxgdGBYYHRgrIh4eIisyKigqMjw2NjxMSExkZIb/2wBDAQUFBQUFBQYGBgYICQgJCAwLCgoLDBINDg0ODRIbERQRERQRGxgdGBYYHRgrIh4eIisyKigqMjw2NjxMSExkZIb/wgARCABAAEADASIAAhEBAxEB/8QAHQAAAQQDAQEAAAAAAAAAAAAABgQFBwgBAwkCAP/EABQBAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhADEAAAAKbqPDiFV6+bs6lxQrn2uJchL7BqeGveSfcTxUckGu5nM5UfZnQGbDIUfHTqtkSxoThYOg5SBSjSuLdDrJKQ0sBqECdUiJSrI0UC5//EADEQAAIBAwQABQIEBgMAAAAAAAECAwQFEQAGEiEHEyIxQSNRCHGBghAUMlJhkRahsf/aAAgBAQABPwA4UfOTqGNWOPWWPwvetr7qr9pVDtFSQ1VNIOMtLOA0bA68Lt0Ul62g17dUgpYpnhTkR6UQZwdXbxR2RaIo3rLzTqZBlEU8mbU/jLsWeQwCskj59eZ0uvFqHbckxrLfWzTyTNyZuUXBv+y5OqcSr9ZASEOWK+4H3P8AjUnFpzgelcD/AF1o4ijVDIqsw9ROeKA/lkk6Ky08gRZFZX7VlOVbViqLhT+Bu9UeZ0gF5oBB+cg+pqVZJJo4+YwwVFZj0B7dk+wGqiJYn/k5mbmqqVZo2iPqAYHDdlSD1nQfMixzs3D+kn7f5/TSRyRTlQcOpI6Pv8HUT8W5YyfjVuFDMtQtXHI0jEYcHtB3nA671tDad88TtzClppZQAokrK2oYSOFUcctqv8KdsQbBXatXdmo6LzhKaqV0QvN9zzwNX38OVygoZbhs7cdHejD2aYcOf6EFk1dTL9dqyOf+cEnly+ezGRXjwuDy79OMYOnLEgt7nSBncBT6gMj9PjUGEBfGT8aph9b09kn214GbfgsuzKGpCBZK9zPMx+QPSg14mbh3RNvy+zX2iWYwVk0UUNWpaGGAORGIkJAwRrYG5dwUu+9v1Vip0imashhkgo0EYnjdvXG6j3BGvxK7HiguEO7rbCgirJRT1qj4n74S/v0yMPQcH7YOgSpBHuDrcthbb5ponVwCgY8umYkf7GoTK/D1cV9lVfSBk4zq01NDbrNbKem4CGOhgVAB7KIx8jXjdPte9T0ctfX0omhjYIeX1Qv2AXJOvCSp2jZrnTV63CE1bIVYy9Ogb3ADa8XLnbqrw2v4nKlTTxGM8cgyCVSuiAZVUKBlvbPWrjRtSSgYbgwBVj7H8iPfW4ZzvCGnehTnJH06Jqrpa6ilEE0ZSTPyPf7kf+arfE3eVBZKWyuBHilBjmcHmYz0MaqLbc5o1rphI/nAPzbstn501srKXyZ5ImEbSBQ2Pn41ctwbmuO24KWpOLaJzwYAgyvEMDJJ7451To8sy8esHOrtc2rjGvBQEGMjvOrLsWym2Q1VHmKZAodgQnE4/owufV99bk2dabtH5dTNLDVK3JZCck4/Ma3j4fW27eGVuuEQE9dZ4mLtF00kHfNf29ONbYoaLcW0KNRTr51JAtLOo7GUGVcH5VgQc63vZ6G2bLrZZaYuPoqgHXrLjvl8Aa8Q9nW6jt+17BDz8uitSGRUB5GaTt3YDVyjgtxligkSRWOFdcj26IZW7Vh/Dwy3nEkVNRTukEC9LGDlhDCmScnAGrhUC5R5VUw6CTB9kVuxkn51tXcv/HameiuWJbZVRtHIP7OY4n9pGmodxbAqJ122Y7zYpqgzxQBylRBkYABUj2XUk+6N9AUFfQrZ7S5iNbUTsXlkSI8giq5JOtx3yiqLhV3DkY42IjpgeuKRjii63XcFuV1mnHBiWI5heDHHxIv9w/h//8QAFBEBAAAAAAAAAAAAAAAAAAAAQP/aAAgBAgEBPwAH/8QAFBEBAAAAAAAAAAAAAAAAAAAAQP/aAAgBAwEBPwAH/9k=" alt="">
       </span>
       <span class="brand-name">Bark</span>
       <span class="brand-sub">Server</span>

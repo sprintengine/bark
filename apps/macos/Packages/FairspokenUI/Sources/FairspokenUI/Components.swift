@@ -308,33 +308,24 @@ public struct Tag: View {
     }
 }
 
-/// Brand mark: a silver (light) / graphite (dark) crystal tile with the waveform, its lower
-/// edge catching a faint hint of `accent`. Built from SF Symbols so it scales.
+/// Brand mark: a small copy of the app icon, the sheepdog photo on its black tile with a
+/// light hairline edge. The photo is the client's `BrandTile` image, so only Bark
+/// itself can show this; elsewhere use `FairspokenMark`.
 public struct BrandMark: View {
     var size: CGFloat = 28
-    var accent: Color = Crystal.clientAccent
-    @Environment(\.colorScheme) private var scheme
-    public init(size: CGFloat = 28, accent: Color = Crystal.clientAccent) { self.size = size; self.accent = accent }
+    public init(size: CGFloat = 28) { self.size = size }
     public var body: some View {
-        let dark = scheme == .dark
-        let shape = RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-        ZStack {
-            shape.fill(LinearGradient(colors: dark ? [Color(white: 0.30), Color(white: 0.14)]
-                                                   : [Color(white: 1.0), Color(white: 0.80)],
-                                      startPoint: .top, endPoint: .bottom))
-            // The crystal facet: a soft diagonal sheen across the top half.
-            shape.fill(LinearGradient(colors: [.white.opacity(dark ? 0.16 : 0.7), .clear],
-                                      startPoint: .topLeading, endPoint: .center))
-            shape.strokeBorder(LinearGradient(colors: [.white.opacity(dark ? 0.28 : 0.95), Crystal.hairline],
-                                              startPoint: .top, endPoint: .bottom), lineWidth: max(0.75, size / 40))
-            Image(systemName: "waveform")
-                .font(.system(size: size * 0.5, weight: .bold))
-                .foregroundStyle(LinearGradient(colors: [Crystal.ink, Crystal.ink.mix(with: accent, by: dark ? 0.55 : 0.45)],
-                                                startPoint: .top, endPoint: .bottom))
-        }
-        .frame(width: size, height: size)
-        .shadow(color: .black.opacity(dark ? 0.35 : 0.10), radius: size * 0.08, y: size * 0.04)
-        .accessibilityHidden(true)
+        let shape = RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous)
+        Image("BrandTile")
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size, height: size)
+            .background(Color.black)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.32), .white.opacity(0.12), .white.opacity(0.18)],
+                                                       startPoint: .top, endPoint: .bottom), lineWidth: max(0.5, size / 90)))
+            .shadow(color: .black.opacity(0.25), radius: size * 0.06, y: size * 0.03)
+            .accessibilityHidden(true)
     }
 }
 
@@ -387,8 +378,9 @@ public enum Format {
     }
 }
 
-/// The Bark mark ("the Settle"): a spoken wave settling into one straight line,
-/// stopped by the red caret. Paths from design/brand/logo/fairspoken-mark.svg (64-unit grid).
+/// The Bark mark, fitted to a square: the sheepdog mark in one colour (`Crystal.ink`
+/// unless `monochrome` says otherwise). On a dark surface its shapes are the dog's white
+/// markings; on a light one they read as a dark-marked dog.
 public struct FairspokenMark: View {
     var size: CGFloat
     var monochrome: Color?
@@ -397,24 +389,49 @@ public struct FairspokenMark: View {
         self.monochrome = monochrome
     }
 
-    static let wave = "M7 32 C7.11 31.29 7.46 29.08 7.69 27.77 C7.92 26.46 8.15 25.2 8.38 24.13 C8.6 23.07 8.83 22.11 9.06 21.37 C9.29 20.63 9.52 20.05 9.75 19.68 C9.98 19.3 10.21 19.13 10.44 19.13 C10.67 19.14 10.9 19.35 11.13 19.71 C11.35 20.08 11.58 20.64 11.81 21.31 C12.04 21.97 12.27 22.82 12.5 23.71 C12.73 24.6 12.96 25.63 13.19 26.66 C13.42 27.68 13.65 28.8 13.88 29.87 C14.1 30.93 14.33 32.03 14.56 33.03 C14.79 34.04 15.02 35.03 15.25 35.89 C15.48 36.76 15.71 37.56 15.94 38.21 C16.17 38.87 16.4 39.42 16.63 39.83 C16.85 40.24 17.08 40.51 17.31 40.66 C17.54 40.8 17.77 40.79 18 40.68 C18.23 40.56 18.46 40.3 18.69 39.95 C18.92 39.61 19.15 39.14 19.38 38.61 C19.6 38.09 19.83 37.46 20.06 36.82 C20.29 36.18 20.52 35.46 20.75 34.77 C20.98 34.08 21.21 33.35 21.44 32.68 C21.67 32 21.9 31.32 22.13 30.72 C22.35 30.12 22.58 29.55 22.81 29.07 C23.04 28.59 23.27 28.17 23.5 27.84 C23.73 27.51 23.96 27.26 24.19 27.1 C24.42 26.94 24.65 26.87 24.88 26.87 C25.1 26.87 25.33 26.96 25.56 27.11 C25.79 27.26 26.02 27.49 26.25 27.75 C26.48 28.01 26.71 28.34 26.94 28.68 C27.17 29.02 27.4 29.41 27.63 29.78 C27.85 30.16 28.08 30.56 28.31 30.93 C28.54 31.3 28.77 31.67 29 32 C29.23 32.33 29.46 32.64 29.69 32.91 C29.92 33.17 30.15 33.4 30.38 33.58 C30.6 33.76 30.83 33.9 31.06 33.99 C31.29 34.08 31.52 34.12 31.75 34.13 C31.98 34.14 32.21 34.1 32.44 34.04 C32.67 33.98 32.9 33.88 33.13 33.77 C33.35 33.66 33.58 33.52 33.81 33.38 C34.04 33.24 34.27 33.09 34.5 32.94 C34.73 32.8 34.96 32.65 35.19 32.53 C35.42 32.4 35.65 32.28 35.88 32.18 C36.1 32.08 36.33 31.99 36.56 31.93 C36.79 31.87 37.02 31.83 37.25 31.8 C37.48 31.77 37.71 31.77 37.94 31.77 C38.17 31.78 38.4 31.8 38.63 31.83 C38.85 31.85 39.08 31.89 39.31 31.92 C39.54 31.95 39.89 31.99 40 32 L45 32"
+    public var body: some View {
+        DogMark(height: size, color: monochrome ?? Crystal.ink)
+            .frame(width: size, height: size)
+    }
+}
 
-    /// Parses the M / C / L commands of the mark's SVG path.
-    static func path(_ d: String, scale: CGFloat) -> Path {
+/// The one-colour sheepdog mark from design/brand/logo/dog/dog-mark.svg, traced from the
+/// app icon's photo: the blaze, the muzzle with the nose cut out, the open mouth with its
+/// tongue, and the catchlights. Whatever it sits on is the dog's black. `height` is the
+/// mark's height; it is about half as wide.
+public struct DogMark: View {
+    var height: CGFloat
+    var color: Color
+    public init(height: CGFloat, color: Color = .white) {
+        self.height = height
+        self.color = color
+    }
+
+    static let path = DogMark.parse(pathData)
+
+    /// Parses the absolute M / L / C / Z commands the master uses.
+    static func parse(_ d: String) -> Path {
         var path = Path()
-        let tokens = d.replacingOccurrences(of: "M", with: " M ").replacingOccurrences(of: "C", with: " C ")
-            .replacingOccurrences(of: "L", with: " L ").split(separator: " ").map(String.init)
+        var spaced = ""
+        for ch in d {
+            if "MLCZ".contains(ch) { spaced += " \(ch) " } else if ch == "," { spaced += " " } else { spaced.append(ch) }
+        }
+        let tokens = spaced.split(separator: " ").map(String.init)
         var i = 0
         var command = ""
-        func number() -> CGFloat { defer { i += 1 }; return CGFloat(Double(tokens[i]) ?? 0) * scale }
+        func number() -> CGFloat { defer { i += 1 }; return i < tokens.count ? CGFloat(Double(tokens[i]) ?? 0) : 0 }
+        func point() -> CGPoint { CGPoint(x: number(), y: number()) }
         while i < tokens.count {
-            if ["M", "C", "L"].contains(tokens[i]) { command = tokens[i]; i += 1; continue }
+            if ["M", "L", "C", "Z"].contains(tokens[i]) {
+                command = tokens[i]
+                i += 1
+                if command == "Z" { path.closeSubpath() }
+                continue
+            }
             switch command {
-            case "M": path.move(to: CGPoint(x: number(), y: number()))
-            case "L": path.addLine(to: CGPoint(x: number(), y: number()))
-            case "C":
-                let c1 = CGPoint(x: number(), y: number()), c2 = CGPoint(x: number(), y: number()), p = CGPoint(x: number(), y: number())
-                path.addCurve(to: p, control1: c1, control2: c2)
+            case "M": path.move(to: point()); command = "L"
+            case "L": path.addLine(to: point())
+            case "C": let c1 = point(), c2 = point(); path.addCurve(to: point(), control1: c1, control2: c2)
             default: i += 1
             }
         }
@@ -422,16 +439,14 @@ public struct FairspokenMark: View {
     }
 
     public var body: some View {
+        let width = height * Self.box.width / Self.box.height
         Canvas { ctx, canvas in
-            let s = canvas.width / 64
-            let style = StrokeStyle(lineWidth: 4.5 * s, lineCap: .round, lineJoin: .round)
-            ctx.stroke(Self.path(Self.wave, scale: s), with: .color(monochrome ?? .fsBlue), style: style)
-            var caret = Path()
-            caret.move(to: CGPoint(x: 53 * s, y: 20 * s))
-            caret.addLine(to: CGPoint(x: 53 * s, y: 44 * s))
-            ctx.stroke(caret, with: .color(monochrome ?? .fsRed), style: style)
+            let s = canvas.height / Self.box.height
+            ctx.scaleBy(x: s, y: s)
+            ctx.translateBy(x: -Self.box.minX, y: -Self.box.minY)
+            ctx.fill(Self.path, with: .color(color), style: FillStyle(eoFill: true))
         }
-        .frame(width: size, height: size)
+        .frame(width: width, height: height)
         .accessibilityHidden(true)
     }
 }
