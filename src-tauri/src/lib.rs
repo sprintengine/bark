@@ -33,6 +33,7 @@ mod macos_input;
 mod models;
 mod note_debug;
 mod notes;
+mod onboarding;
 mod phonetic_index;
 mod polish;
 mod polish_adapters;
@@ -1823,6 +1824,7 @@ fn perform_stop_and_transcribe(app: &AppHandle, services: &AppServices) -> Resul
             total_ms: released_at.elapsed().as_millis() as u64,
         }),
         format: format_record,
+        app_name: frontmost_app.as_ref().map(|app| app.name.clone()),
     };
 
     #[cfg(target_os = "macos")]
@@ -3014,7 +3016,7 @@ pub fn run() {
     app_dirs::migrate_legacy_dirs();
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            let _ = open_home_window(app.clone(), None);
+            onboarding::open_start_window(app);
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
@@ -3026,6 +3028,15 @@ pub fn run() {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
+                }
+            }
+            // Closing onboarding before the end is "later": it opens again at
+            // the next start, and Home opens now so the app is not windowless.
+            if window.label() == onboarding::WINDOW_LABEL {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    let _ = open_home_window(window.app_handle().clone(), None);
                 }
             }
         })
@@ -3079,7 +3090,7 @@ pub fn run() {
                     .unwrap_or_default(),
             );
             updates::start(handle.clone());
-            let _ = open_home_window(handle.clone(), None);
+            onboarding::open_start_window(handle);
             #[cfg(target_os = "macos")]
             {
                 let services = app.state::<AppServices>();
@@ -3159,13 +3170,18 @@ pub fn run() {
             training_capture::get_training_data_summary,
             training_capture::export_training_data,
             training_capture::delete_training_data,
+            onboarding::get_onboarding_state,
+            onboarding::complete_onboarding,
+            onboarding::open_onboarding_window,
+            onboarding::get_permission_status,
+            onboarding::request_permission,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| match event {
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Reopen { .. } => {
-                let _ = open_home_window(app.clone(), None);
+                onboarding::open_start_window(app);
             }
             tauri::RunEvent::Exit => {
                 let services = app.state::<AppServices>();
@@ -3269,6 +3285,7 @@ mod capability_tests {
             include_str!("../capabilities/home.json"),
             include_str!("../capabilities/transcript-shelf.json"),
             include_str!("../capabilities/cursor-preview.json"),
+            include_str!("../capabilities/onboarding.json"),
         ]
         .iter()
         .map(|raw| serde_json::from_str(raw).unwrap())
@@ -3322,6 +3339,7 @@ mod capability_tests {
                 "home" => &["core:window:allow-start-dragging", "opener:allow-open-url"],
                 "transcript-shelf" => &["core:window:allow-start-dragging"],
                 "cursor-preview" => &[],
+                "onboarding" => &["core:window:allow-start-dragging"],
                 other => panic!("unexpected window {other}"),
             };
             assert_eq!(extra, expected, "{window}");

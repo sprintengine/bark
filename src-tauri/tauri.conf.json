@@ -71,6 +71,26 @@
         "visible": false
       },
       {
+        "title": "Welcome to Fairspoken",
+        "label": "onboarding",
+        "url": "onboarding.html",
+        "width": 720,
+        "height": 860,
+        "minWidth": 600,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 18, "y": 22 },
+        "shadow": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "visible": false
+      },
+      {
         "title": "Dictation preview",
         "label": "cursor-preview",
         "url": "cursor-preview.html",
