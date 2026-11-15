@@ -178,7 +178,11 @@ final class ModelLibrary {
     func use(_ requested: String) {
         let id = SpeechModelCatalog.resolve(requested).id
         perform(activation.request(id, installed: SpeechModels.isInstalled(id), downloading: isDownloading(id),
-                                   dictationActive: isDictating()))
+                                   dictationActive: switchMustWait))
+    }
+
+    private var switchMustWait: Bool {
+        ModelActivation.mustWait(dictating: isDictating(), engineReady: engineState.isReady)
     }
 
     /// The dictation in progress ended: load a model chosen during it.
@@ -225,7 +229,7 @@ final class ModelLibrary {
                 self.refresh()
                 // A model chosen before it was downloaded is used now (or after the dictation).
                 self.perform(self.activation.downloadFinished(id, success: SpeechModels.isInstalled(id),
-                                                              dictationActive: self.isDictating()))
+                                                              dictationActive: self.switchMustWait))
             }
         }
     }

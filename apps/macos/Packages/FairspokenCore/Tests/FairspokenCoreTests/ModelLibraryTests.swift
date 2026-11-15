@@ -210,6 +210,18 @@ struct ModelActivationTests {
         #expect(a.dictationEnded() == .load("large-v3"))
     }
 
+    /// A dictation started before any model was ready waits for one, so the first model loads
+    /// at once instead of waiting for that dictation to end.
+    @Test func onlyALoadedModelMakesAChoiceWait() {
+        #expect(ModelActivation.mustWait(dictating: true, engineReady: true))
+        #expect(!ModelActivation.mustWait(dictating: true, engineReady: false))
+        #expect(!ModelActivation.mustWait(dictating: false, engineReady: true))
+        var a = ModelActivation()
+        _ = a.request("large-v3", installed: false, downloading: false, dictationActive: false)
+        let wait = ModelActivation.mustWait(dictating: true, engineReady: false)
+        #expect(a.downloadFinished("large-v3", success: true, dictationActive: wait) == .load("large-v3"))
+    }
+
     @Test func aNewerChoiceReplacesOneWaitingForItsDownload() {
         var a = ModelActivation()
         _ = a.request("large-v3", installed: false, downloading: false, dictationActive: false)
