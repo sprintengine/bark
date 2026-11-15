@@ -5,7 +5,7 @@ Swift packages:
 
 | App | Bundle id (Release / Debug) | What it is |
 |---|---|---|
-| **Fairspoken** (`Fairspoken.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a Liquid Glass dashboard (Home, Models, Settings), a floating recording pill, and optional transcription on your own host |
+| **Fairspoken** (`Fairspoken.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a dashboard with a frosted sidebar and solid content (Home, Models, Post-training, Settings), a setup guide, a floating recording pill, and optional transcription on your own host |
 | **Fairspoken Server** (`Fairspoken Server.app`, scheme `FairspokenServer`) | `ie.fairspoken.server` / `.dev` | A transcription server for a practice or a team: the host protocol of `src-tauri/src/host/PROTOCOL.md` on Parakeet and the Neural Engine, with a live view of who is dictating, models, configuration and the address clients need |
 
 Fairspoken (Mac), the Windows and Linux desktop app and the web dashboard all talk to Fairspoken
@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Fairspoken,Fairspoken Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (126), FairspokenHost (78), FairspokenUpdates (19)
+scripts/test.sh                       # unit tests: FairspokenCore (164), FairspokenHost (78), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Fairspoken → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Fairspoken Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Fairspoken-<version>-macos-arm64.{zip,dmg}
@@ -378,7 +378,11 @@ Fairspoken:
 | Accessibility | To send ⌘V into the frontmost app and to detect secure/password fields. Without it, text is copied only | System Settings › Privacy & Security › Accessibility: switch on **Fairspoken** |
 | Input Monitoring | Only for "hold fn to dictate" (a listen-only event tap) | System Settings › Privacy & Security › Input Monitoring |
 
-Onboarding shows live status for each permission and deep-links to the right pane. For hold-fn, also set
+The setup guide (shown at first launch, whenever the microphone isn't allowed, and from Settings ›
+General › Setup guide or the menu bar) walks through: permissions with live status, a microphone test,
+choosing a model from the catalogue (it downloads in the background), the shortcut, a place to try it,
+and a live checklist of what is set up, with a fix for anything that isn't. It always reopens at its
+first step, and closing or hiding it stops its microphone test. For hold-fn, also set
 System Settings › Keyboard › "Press 🌐 key to" › **Do Nothing**. If the Tauri app is running, quit it or
 change one app's shortcut, because both default to ⌘⇧1.
 
@@ -406,8 +410,9 @@ address may bring up macOS's Local Network prompt the first time another device 
 - **Brand:** `FairspokenUI` holds the palette (`Color.fs*` from `design/brand/README.md`: Copybook Blue,
   Margin Red for the signal only, Limestone/Night, status colours) and the mark (`FairspokenMark`, the
   logo's own paths). The server follows the brand's Liquid Glass rules: glass only on the control layer
-  (sidebar, toolbar, constellation nodes); cards, tables and charts are opaque. The client keeps its
-  teal look (`Brand`, `BrandMark`) until it is re-skinned. The server icon is the brand's dark icon
+  (sidebar, toolbar, constellation nodes); cards, tables and charts are opaque. The client puts its
+  sidebar on the window's frost and its content on solid cards (`design/crystal/README.md` › Fairspoken
+  for Mac). The server icon is the brand's dark icon
   composite (`scripts/make-server-icon.sh`); no taglines anywhere.
 - **Wire identifiers** (per `PROTOCOL.md`): the `x-fairspoken-*` headers, the
   `application/vnd.fairspoken.pcm-stream` content type, `FAIRSPOKEN_HOST_*` and the client id `fairspoken-macos`.
@@ -458,10 +463,12 @@ Keychain, and the JSON keeps empty strings. Keys the app doesn't model are prese
 
 ## Screenshots
 
-`docs/screenshots/` (Fairspoken, light and dark): `home`, `home-listening`, `models`, `models-library` (a
-download in progress and a favourite), `models-detail`, `models-link-open`, `models-link-saved`, `training`, `settings`,
-`settings-transcription` (Network device), `onboarding-welcome`, `onboarding-permissions`, `pill` (every
-pill state, with and without text while speaking).
+`docs/screenshots/` (Fairspoken, light and dark): `home`, `home-listening`, `home-all` (See all),
+`home-first-use` (before the first dictation), `models`, `models-library` (a download in progress and a
+favourite), `models-detail`, `models-link-open`, `models-link-saved`, `training`, `settings`,
+`settings-transcription`, `settings-host` (Network device), `settings-vocabulary`, every step of the setup
+guide (`onboarding-1-welcome` … `onboarding-7-finish`), and `pill` (every pill state, with and without text
+while speaking, with the keys that stop and cancel).
 
 `docs/screenshots/server-app/` (Fairspoken Server, light and dark, demo simulator): `activity`
 (the live constellation with requests in flight), `clients`, `models`, `connect`, `configuration`.

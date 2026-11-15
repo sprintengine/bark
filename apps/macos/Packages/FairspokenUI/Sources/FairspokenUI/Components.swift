@@ -123,7 +123,7 @@ public struct PrimaryButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Crystal.onAccent)
                 .padding(.horizontal, large ? 18 : 12)
                 .frame(minHeight: large ? 32 : 26)
                 .background {

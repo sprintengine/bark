@@ -69,6 +69,35 @@ something should read as brushed silver, not colour.
 
 Radii: 20 for cards, 12 for fields and rows, capsule for buttons and chips.
 
+## Fairspoken for Mac: a frosted sidebar beside solid content
+
+The Mac client keeps glass to the window's chrome and to small floating pieces. Content is opaque,
+so it reads crisply and nothing translucent stacks on anything translucent.
+
+- **Frost:** the window's background is the desktop blurred behind the window
+  (`NSVisualEffectView`, material `.sidebar`, blending `.behindWindow`), with `frostTint` (the page
+  tone at 52%) laid over it **once**. The sidebar stands on it directly. With Reduce Transparency
+  the frost is `frostSolid`, the same tone, opaque.
+- **Content:** one opaque card (`canvas`) beside the sidebar, inset 4 pt from the window's edges so
+  a thin line of frost frames it. Inside it, solid cards (`card`): 12 pt corners, a `hairline`
+  edge (8–10%, stronger with Increase Contrast), a 1 pt highlight along the top edge and a tight,
+  soft shadow. Rows inside cards hover with `rowHover`; rows on the frost use `chromeHover` and
+  `chromeSelected`, one alpha step over the tint.
+- **Glass** only for the recording pill, toasts and popovers.
+- **Sidebar:** each section has a coloured rounded-square icon tile (Home orange, Models indigo,
+  Post-training purple, Settings grey); the engine status sits at the bottom.
+- **Type:** system font, 13 pt body, six steps: 11 / 12 / 13 / 15 / 20 / 28 (`TypeScale`).
+- **Motion:** 120 / 180 / 260 ms on one ease-out curve (`Motion`), none with Reduce Motion.
+- **Primary action:** one per screen, an accent capsule drawn with an explicit fill
+  (`PrimaryButtonStyle`).
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| `canvas` | `#F5F6F8` | `#111316` |
+| `card` | `#FFFFFF` | `#1A1D21` |
+| `frostTint` | `#EAEEF2` at 52% | `#090A0C` at 52% |
+| `hairline` | `rgba(16,24,32,0.10)` | `rgba(255,255,255,0.09)` |
+
 ## Type
 
 System font (SF Pro / system-ui / Roboto). Titles semibold with slightly tight tracking.

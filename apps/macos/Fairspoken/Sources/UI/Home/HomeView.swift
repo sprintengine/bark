@@ -22,6 +22,7 @@ struct HomeView: View {
                 PageTitle("Home") { MicDeviceChip() }
                 if model.history.items.isEmpty {
                     FirstUseCard()
+                    EmptyRecent()
                 } else {
                     StatsStrip()
                     DictateBar()
@@ -129,6 +130,27 @@ private struct FirstUseCard: View {
             }
         }
         return "To dictate, \(ListFormatter.localizedString(byJoining: names))."
+    }
+}
+
+/// Where dictations will appear, before there are any.
+private struct EmptyRecent: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeading("Recent dictations")
+            VStack(spacing: 6) {
+                Image(systemName: "text.bubble").font(.system(size: 20)).foregroundStyle(Crystal.ink3)
+                Text("Your dictations appear here, with the app each one went to.")
+                    .font(TypeScale.body).foregroundStyle(Crystal.ink2)
+                Text("Usage stats start after your first dictation.")
+                    .font(TypeScale.meta).foregroundStyle(Crystal.ink3)
+            }
+            .frame(maxWidth: .infinity, minHeight: 150)
+            .background {
+                RoundedRectangle(cornerRadius: CardMetrics.radius, style: .continuous)
+                    .strokeBorder(Crystal.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            }
+        }
     }
 }
 
@@ -280,7 +302,7 @@ struct DictateButton: View {
                         .contentTransition(.symbolEffect(.replace))
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(listening ? Color.white : Crystal.onAccent)
             .frame(width: size, height: size)
             .background {
                 let base = listening ? Crystal.live : Crystal.clientAccent

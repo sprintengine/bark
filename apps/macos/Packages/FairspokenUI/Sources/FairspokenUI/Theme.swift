@@ -69,6 +69,9 @@ public enum Crystal {
 
     /// The clients' hint (Fairspoken for Mac): sage green.
     public static let clientAccent = Color(hex: 0x2E8B5E, dark: 0x5CCB94, highContrast: (0x1D6B45, 0x7FE0AE))
+    /// Text and glyphs on an accent fill: white on the light theme's deep green, near-black on the
+    /// dark theme's light green (4.5:1 or better on both).
+    public static let onAccent = Color(hex: 0xFFFFFF, dark: 0x08140E)
     /// The server's hint (Fairspoken Server): garnet.
     public static let serverAccent = Color(hex: 0xB2453E, dark: 0xF07F76)
 

@@ -647,6 +647,7 @@ private struct TryItStep: View {
                 composer
             }
             .cardSurface()
+            .padding(.bottom, 4)
             if case .preparing(let fraction) = model.modelProgress {
                 Label(fraction.map { "The model is still downloading (\(Int($0 * 100))%). Dictation starts working when it's done." }
                       ?? "The model is getting ready. Dictation starts working in a moment.", systemImage: "arrow.down.circle")
@@ -681,7 +682,7 @@ private struct TryItStep: View {
                 }
                 .padding(16)
             }
-            .frame(height: 330)
+            .frame(minHeight: 260, maxHeight: .infinity)
             .onChange(of: messages) { _, list in
                 if let last = list.last { withAnimation(Motion.normal) { proxy.scrollTo(last.id, anchor: .bottom) } }
             }
@@ -745,7 +746,7 @@ private struct Bubble: View {
     var body: some View {
         Text(text)
             .font(TypeScale.body)
-            .foregroundStyle(mine ? Color.white : Crystal.ink)
+            .foregroundStyle(mine ? Crystal.onAccent : Crystal.ink)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(mine ? Crystal.clientAccent : Crystal.well, in: .rect(cornerRadius: 14, style: .continuous))
