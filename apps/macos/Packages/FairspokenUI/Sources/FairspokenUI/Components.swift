@@ -99,6 +99,46 @@ public struct IconTile: View {
     }
 }
 
+/// The one primary action of a screen: an accent capsule with white text. Drawn with an explicit
+/// fill, so it keeps its colour in a window that isn't key.
+public struct PrimaryButtonStyle: ButtonStyle {
+    var tint: Color
+    var large: Bool
+    public init(tint: Color = Crystal.clientAccent, large: Bool = false) {
+        self.tint = tint
+        self.large = large
+    }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        PrimaryButtonBody(configuration: configuration, tint: tint, large: large)
+    }
+
+    private struct PrimaryButtonBody: View {
+        var configuration: ButtonStyleConfiguration
+        var tint: Color
+        var large: Bool
+        @Environment(\.isEnabled) private var isEnabled
+        @State private var hovered = false
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, large ? 18 : 12)
+                .frame(minHeight: large ? 32 : 26)
+                .background {
+                    Capsule().fill(tint.mix(with: .black, by: configuration.isPressed ? 0.18 : hovered ? 0.08 : 0))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+                        .shadow(color: tint.opacity(0.25), radius: 2, y: 1)
+                }
+                .opacity(isEnabled ? 1 : 0.45)
+                .contentShape(.capsule)
+                .onHover { hovered = $0 }
+                .animation(Motion.fast, value: configuration.isPressed)
+        }
+    }
+}
+
 /// The heading over a group of cards: 13 pt semibold, with an optional trailing control.
 public struct SectionHeading<Trailing: View>: View {
     var title: String

@@ -4,19 +4,11 @@ import SwiftUI
 /// radius, hairline separators, 13 pt body text and compact rows. Kept in one place so a later
 /// restyle of the app's chrome changes them once.
 public enum ContentMetrics {
-    public static let cornerRadius: CGFloat = 12
+    public static let cornerRadius: CGFloat = CardMetrics.radius
     public static let bodySize: CGFloat = 13
     public static let rowHeight: CGFloat = 40
     public static let rowPadding: CGFloat = 12
     public static let columnSpacing: CGFloat = 14
-}
-
-extension Crystal {
-    /// The opaque fill of a content card.
-    public static let surface = Color(hex: 0xFFFFFF, dark: 0x16191D)
-    /// A row under the pointer.
-    public static let rowHover = Color(light: NSColor(srgbRed: 16 / 255, green: 24 / 255, blue: 32 / 255, alpha: 0.035),
-                                       dark: NSColor(white: 1, alpha: 0.04))
 }
 
 extension Font {
@@ -26,8 +18,8 @@ extension Font {
     public static let contentCaption = Font.system(size: 11, weight: .medium)
 }
 
-/// An opaque card for content: solid fill, 12 pt corners, a hairline edge. No glass, so it can
-/// hold rows, fields and controls directly.
+/// A `Card` whose content runs to its edges and is clipped to its corners: tables and lists,
+/// whose rows draw their own hover and selection.
 public struct ContentCard<Content: View>: View {
     var padding: CGFloat
     @ViewBuilder var content: Content
@@ -42,9 +34,8 @@ public struct ContentCard<Content: View>: View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background(Crystal.surface, in: shape)
             .clipShape(shape)
-            .overlay(shape.strokeBorder(Crystal.hairline))
+            .cardSurface(cornerRadius: ContentMetrics.cornerRadius)
     }
 }
 
@@ -149,7 +140,7 @@ public struct ContentSearchField: View {
         .font(.contentBody)
         .padding(.horizontal, 9)
         .frame(height: 28)
-        .background(Crystal.surface, in: .rect(cornerRadius: 8, style: .continuous))
+        .background(Crystal.card, in: .rect(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Crystal.hairline))
     }
 }

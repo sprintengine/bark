@@ -34,10 +34,8 @@ struct SettingsView: View {
             PageTitle("Settings")
                 .padding(.horizontal, Layout.pageH)
                 .padding(.top, Layout.pageTop)
-            GlassEffectContainer {
-                tabStrip(selection: $app.settingsTab)
-            }
-            .padding(.horizontal, Layout.pageH)
+            tabStrip(selection: $app.settingsTab)
+                .padding(.horizontal, Layout.pageH)
             Group {
                 switch model.settingsTab {
                 case .general: GeneralSettings()
@@ -59,24 +57,25 @@ struct SettingsView: View {
         .onDisappear { model.permissions.endPolling() }
     }
 
-    /// One glass capsule; the selected tab is a flat accent wash that slides between tabs.
+    /// One flat capsule on the canvas; the selected tab is a raised card that slides between tabs.
     private func tabStrip(selection: Binding<Tab>) -> some View {
         HStack(spacing: 2) {
             ForEach(Tab.allCases) { tab in
                 let selected = selection.wrappedValue == tab
                 let badged = tab == .updates && model.updates.isUpdatePending
                 Button {
-                    withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85)) { selection.wrappedValue = tab }
+                    withAnimation(Motion.unlessReduced(Motion.normal, reduceMotion)) { selection.wrappedValue = tab }
                 } label: {
                     Label(tab.title, systemImage: tab.symbol)
-                        .font(.callout.weight(selected ? .semibold : .regular))
+                        .font(.system(size: 12, weight: selected ? .semibold : .medium))
                         .foregroundStyle(selected ? Crystal.ink : Crystal.ink2)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 11)
+                        .frame(height: 26)
                         .background {
                             if selected {
-                                Capsule().fill(Crystal.clientAccent.opacity(0.14))
-                                    .overlay(Capsule().strokeBorder(Crystal.clientAccent.opacity(0.22)))
+                                Capsule().fill(Crystal.card)
+                                    .overlay(Capsule().strokeBorder(Crystal.hairline))
+                                    .shadow(color: .black.opacity(0.06), radius: 1.5, y: 1)
                                     .matchedGeometryEffect(id: "selection", in: tabSelection)
                             }
                         }
@@ -92,8 +91,9 @@ struct SettingsView: View {
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
-        .padding(4)
-        .glassEffect(.regular, in: .capsule)
+        .padding(3)
+        .background(Crystal.well, in: .capsule)
+        .overlay(Capsule().strokeBorder(Crystal.hairline))
     }
 }
 
@@ -117,6 +117,22 @@ private struct GeneralSettings: View {
                 Toggle("Show text while speaking", isOn: binding(\.showTextWhileSpeaking))
                     .tint(Crystal.clientAccent)
                     .help("The recording pill shows your words as you speak. The text that is inserted still comes from the whole recording. Not available with a remote host.")
+            }
+            Section {
+                Toggle(isOn: binding(\.trainingCapture)) {
+                    Text("Save recordings to improve models")
+                    Text("Keeps each dictation's audio and text on this Mac, for training a model on your voice. Nothing is uploaded.")
+                }
+                .tint(Crystal.clientAccent)
+                LabeledContent("Saved to") {
+                    Button(model.training.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) {
+                        model.section = .training
+                    }
+                    .buttonStyle(.link)
+                    .help("Choose the folder and review recordings in Post-training")
+                }
+            } header: {
+                Text("Recordings")
             }
             Section("Permissions") {
                 PermissionRow(kind: .microphone)
@@ -181,7 +197,7 @@ private struct ShortcutSettings: View {
 
 private struct AudioSettings: View {
     @Environment(AppModel.self) private var model
-    @State private var devices: [AudioCapture.InputDevice] = []
+    @State private var devices: [String] = []
     @State private var testing = false
 
     var body: some View {
@@ -189,8 +205,8 @@ private struct AudioSettings: View {
         Form {
             Section {
                 Picker("Microphone", selection: Binding(get: { s.audioDevice }, set: { v in model.settings.update { $0.audioDevice = v } })) {
-                    Text("System default\(AudioCapture.defaultInputName().map { " (\($0))" } ?? "")").tag("")
-                    ForEach(devices) { Text($0.name).tag($0.name) }
+                    Text("System default\(Microphones.defaultName().map { " (\($0))" } ?? "")").tag("")
+                    ForEach(devices, id: \.self) { Text($0).tag($0) }
                 }
                 LabeledContent("Level") {
                     HStack(spacing: 12) {
@@ -207,7 +223,7 @@ private struct AudioSettings: View {
                 }
             }
         }
-        .onAppear { devices = AudioCapture.inputDevices() }
+        .onAppear { devices = Microphones.names() }
         .onDisappear { if testing { toggleTest() } }
     }
 
@@ -397,7 +413,7 @@ private struct DiscoveredHostRow: View {
                     Button("Cancel") { finder.cancelPairing() }
                         .keyboardShortcut(.cancelAction)
                     Button("Pair", action: pair)
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.borderedProminent)
                         .tint(Crystal.clientAccent)
                         .keyboardShortcut(.defaultAction)
                         .disabled(!canPair)
@@ -597,17 +613,13 @@ struct PermissionRow: View {
     var body: some View {
         let status = model.permissions.status(kind)
         HStack(spacing: 12) {
-            Image(systemName: info.symbol)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Crystal.ink2)
-                .frame(width: 30, height: 30)
-                .well(cornerRadius: 8)
+            IconTile(info.symbol, color: info.tile, size: 26)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
-                    Text(info.title).font(.body.weight(.medium)).foregroundStyle(Crystal.ink)
+                    Text(info.title).font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink)
                     if optional { Tag(text: "Optional", color: Crystal.ink3) }
                 }
-                Text(info.why).font(.caption).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
+                Text(info.why).font(.system(size: 11)).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             if status.isGranted {
@@ -619,11 +631,11 @@ struct PermissionRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var info: (title: String, why: String, symbol: String) {
+    private var info: (title: String, why: String, symbol: String, tile: Color) {
         switch kind {
-        case .microphone: ("Microphone", "Only while you dictate", "mic")
-        case .accessibility: ("Accessibility", "Paste into the current app", "accessibility")
-        case .inputMonitoring: ("Input Monitoring", "Hold fn to dictate", "keyboard")
+        case .microphone: ("Microphone", "Only while you dictate", "mic.fill", Crystal.Tile.red)
+        case .accessibility: ("Accessibility", "Types into the current app", "character.cursor.ibeam", Crystal.Tile.blue)
+        case .inputMonitoring: ("Input Monitoring", "Hold fn to dictate", "keyboard.fill", Crystal.Tile.gray)
         }
     }
 }

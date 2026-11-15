@@ -111,7 +111,7 @@ private struct FirstUseCard: View {
                         }
                         Spacer(minLength: 12)
                         Button("Continue Setup") { model.openOnboarding?() }
-                            .buttonStyle(.borderedProminent).tint(Crystal.clientAccent)
+                            .buttonStyle(PrimaryButtonStyle(large: true))
                             .keyboardShortcut(.defaultAction)
                     }
                 }
@@ -414,7 +414,7 @@ private struct AllDictationsView: View {
                     .help("Back to Home")
                     .accessibilityLabel("Back to Home")
                     PageTitle("Dictations", subtitle: "\(model.history.items.count) kept on this Mac")
-                    SearchField(text: $query, prompt: "Search dictations").frame(width: 220)
+                    ContentSearchField(text: $query, prompt: "Search dictations").frame(width: 220)
                 }
                 if days.isEmpty {
                     ContentUnavailableView.search(text: query).frame(maxWidth: .infinity, minHeight: 200)
@@ -487,29 +487,6 @@ private struct DictationRow: View {
             Button("Copy") { TextInserter.copy(item.text) }
             Button("Delete", role: .destructive) { model.history.delete(item.id) }
         }
-    }
-}
-
-/// A rounded search field for the top of a content screen.
-struct SearchField: View {
-    @Binding var text: String
-    var prompt: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Crystal.ink3)
-            TextField(prompt, text: $text).textFieldStyle(.plain)
-            if !text.isEmpty {
-                Button { text = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Crystal.ink3) }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
-            }
-        }
-        .font(TypeScale.body)
-        .padding(.horizontal, 9)
-        .frame(height: 28)
-        .background(Crystal.card, in: .rect(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Crystal.hairline))
     }
 }
 

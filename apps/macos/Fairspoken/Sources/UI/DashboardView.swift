@@ -27,6 +27,7 @@ struct DashboardView: View {
         }
         .background(WindowFrost())
         .ignoresSafeArea()
+        .screenshotActive()
         .frame(minWidth: 960, minHeight: 640)
         .onAppear { if model.settings.settings.transcriptionLocation == .remoteHost { model.hostStatus.refresh() } }
     }

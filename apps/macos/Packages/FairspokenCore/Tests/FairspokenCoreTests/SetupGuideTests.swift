@@ -35,6 +35,22 @@ struct SetupGuideTests {
         #expect(!SetupGuide.ModelProgress.notStarted.engineUsable)
     }
 
+    @Test func offersTheDefaultFirstThenAShortListFromTheCatalogue() {
+        let choices = SetupGuide.modelChoices(from: SpeechModelCatalog.all, defaultID: SpeechModelCatalog.defaultModelID)
+        #expect(choices.count == 4)
+        #expect(choices.first?.id == SpeechModelCatalog.defaultModelID)
+        #expect(choices.allSatisfy { $0.isLocal && !$0.isExperimental })
+        // Every recommended model is offered.
+        for model in SpeechModelCatalog.all where model.isRecommended && !model.isExperimental {
+            #expect(choices.contains { $0.id == model.id })
+        }
+        // A model chosen earlier is listed too.
+        let withChosen = SetupGuide.modelChoices(from: SpeechModelCatalog.all, defaultID: SpeechModelCatalog.defaultModelID,
+                                                 including: "tiny")
+        #expect(withChosen.last?.id == "tiny")
+        #expect(withChosen.count == 5)
+    }
+
     // MARK: Microphone check
 
     @Test func tellsPermissionDeviceFailureAndSilenceApart() {

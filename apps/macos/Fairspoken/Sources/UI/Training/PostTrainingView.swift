@@ -15,7 +15,7 @@ struct PostTrainingView: View {
     var body: some View {
         let training = model.training
         ScrollView {
-            GlassEffectContainer(spacing: Layout.gap) {
+            VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: Layout.gap) {
                     PageTitle("Post-training", subtitle: "Teach the speech model your voice and accent")
                         .padding(.bottom, 4)
@@ -28,9 +28,11 @@ struct PostTrainingView: View {
                     RecordingsCard(training: training, player: player, confirmDeleteAll: $confirmDeleteAll,
                                    confirmDelete: $confirmDelete)
                 }
+                .frame(maxWidth: Layout.readable, alignment: .leading)
                 .padding(.horizontal, Layout.pageH)
                 .padding(.vertical, Layout.pageTop)
             }
+            .frame(maxWidth: .infinity)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .onAppear { training.refresh() }
@@ -75,7 +77,7 @@ private struct SavingCard: View {
 
     var body: some View {
         let on = model.settings.settings.trainingCapture
-        GlassCard(cornerRadius: Layout.card) {
+        Card(cornerRadius: Layout.card) {
             VStack(alignment: .leading, spacing: 14) {
                 Toggle(isOn: Binding(get: { on }, set: { v in model.settings.update { $0.trainingCapture = v } })) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -128,7 +130,7 @@ private struct ProgressCard: View {
     var summary: TrainingSummary
 
     var body: some View {
-        GlassCard(cornerRadius: Layout.card, fillHeight: true) {
+        Card(cornerRadius: Layout.card, fillHeight: true) {
             VStack(alignment: .leading, spacing: 14) {
                 Eyebrow(text: "Your recordings", symbol: "waveform")
                 HStack(alignment: .firstTextBaseline, spacing: 24) {
@@ -172,7 +174,7 @@ private struct TrainCard: View {
     var capturing: Bool
 
     var body: some View {
-        GlassCard(cornerRadius: Layout.card, fillHeight: true) {
+        Card(cornerRadius: Layout.card, fillHeight: true) {
             VStack(alignment: .leading, spacing: 12) {
                 Eyebrow(text: "Post-train", symbol: "graduationcap")
                 VStack(alignment: .leading, spacing: 8) {
@@ -184,7 +186,7 @@ private struct TrainCard: View {
                 Spacer(minLength: 0)
                 HStack(spacing: 12) {
                     Button("Post-train") {}
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.borderedProminent)
                         .tint(Crystal.clientAccent)
                         .disabled(true)
                     Text(status)
@@ -221,7 +223,7 @@ private struct RecordingsCard: View {
     private static let shown = 30
 
     var body: some View {
-        GlassCard(cornerRadius: Layout.card) {
+        Card(cornerRadius: Layout.card) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Recent recordings").cardHeading()

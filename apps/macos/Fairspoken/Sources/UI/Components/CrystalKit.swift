@@ -45,6 +45,12 @@ struct PageTitle<Trailing: View>: View {
 }
 
 extension View {
+    /// Screenshot runs: controls draw as in the key window even when the session can't make the
+    /// app active (a locked screen).
+    @ViewBuilder func screenshotActive() -> some View {
+        if AppWindow.appearsActive { environment(\.controlActiveState, .key) } else { self }
+    }
+
     /// The flat fill for things that sit inside a card: fields, results, code.
     func well(cornerRadius: CGFloat = Layout.row) -> some View {
         background(Crystal.well, in: .rect(cornerRadius: cornerRadius))

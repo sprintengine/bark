@@ -10,6 +10,7 @@ struct ModelsView: View {
     @Environment(AppModel.self) private var model
     @State private var query = ModelCatalogueQuery()
     @State private var pendingDelete: SpeechModelInfo?
+    @State private var tableWidth: CGFloat = 900
 
     var body: some View {
         let library = model.models
@@ -20,9 +21,10 @@ struct ModelsView: View {
                 PageTitle("Models", subtitle: "Speech recognition on this Mac's Neural Engine")
                     .padding(.bottom, 4)
                 ModelFilterBar(query: $query)
+                let columns = ModelColumns(width: tableWidth)
                 ContentCard {
                     VStack(spacing: 0) {
-                        ModelTableHeader(sort: $query.sort)
+                        ModelTableHeader(sort: $query.sort, columns: columns)
                         Hairline()
                         if rows.isEmpty {
                             Text("No models match. Clear the search or a filter.")
@@ -31,17 +33,20 @@ struct ModelsView: View {
                         }
                         ForEach(Array(rows.enumerated()), id: \.element.id) { index, info in
                             if index > 0 { Hairline(inset: ContentMetrics.rowPadding) }
-                            ModelRow(info: info, open: { model.modelDetailID = info.id }, delete: { pendingDelete = info })
+                            ModelRow(info: info, columns: columns, open: { model.modelDetailID = info.id }, delete: { pendingDelete = info })
                         }
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
                 Text("Speed and accuracy: measured on an M4 Mac with the app's own engines, on 20 LibriSpeech test-clean clips (147 s). Rows marked “published” use the authors' figures.")
                     .font(.caption).foregroundStyle(Crystal.ink3)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
             }
+            .frame(maxWidth: Layout.readable, alignment: .leading)
             .padding(.horizontal, Layout.pageH)
             .padding(.vertical, Layout.pageTop)
+            .frame(maxWidth: .infinity)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .onAppear { library.refresh() }
@@ -68,9 +73,38 @@ private struct ModelFilterBar: View {
     @Binding var query: ModelCatalogueQuery
 
     var body: some View {
-        HStack(spacing: 10) {
-            ContentSearchField(text: $query.search, prompt: "Search models")
-                .frame(maxWidth: 260)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                search.frame(width: 220)
+                filters
+                Spacer(minLength: 0)
+                sortPicker
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    search
+                    sortPicker
+                }
+                HStack(spacing: 10) { filters }
+            }
+        }
+        .labelsHidden()
+        .controlSize(.small)
+        .font(.contentBody)
+    }
+
+    private var search: some View {
+        ContentSearchField(text: $query.search, prompt: "Search models")
+    }
+
+    private var sortPicker: some View {
+        Picker("Sort", selection: $query.sort) {
+            ForEach(ModelCatalogueQuery.Sort.allCases) { Text($0.label).tag($0) }
+        }
+        .fixedSize()
+    }
+
+    @ViewBuilder private var filters: some View {
             Picker("Engine", selection: $query.engine) {
                 Text("All engines").tag(SpeechEngineKind?.none)
                 ForEach(SpeechEngineKind.allCases) { kind in
@@ -85,19 +119,21 @@ private struct ModelFilterBar: View {
             Toggle("Downloaded", isOn: $query.downloadedOnly).toggleStyle(.button)
             Toggle("On this Mac", isOn: $query.localOnly).toggleStyle(.button)
                 .help("Models that run on this Mac (remote endpoints are coming)")
-            Spacer(minLength: 0)
-            Picker("Sort", selection: $query.sort) {
-                ForEach(ModelCatalogueQuery.Sort.allCases) { Text($0.label).tag($0) }
-            }
-            .fixedSize()
-        }
-        .labelsHidden()
-        .controlSize(.small)
-        .font(.contentBody)
     }
 }
 
 // MARK: Table
+
+/// Which columns fit: in a narrow window the engine column goes first, then size, so a
+/// model's name keeps its room.
+struct ModelColumns: Equatable {
+    var engine: Bool
+    var size: Bool
+    init(width: CGFloat) {
+        engine = width >= 700
+        size = width >= 600
+    }
+}
 
 /// Column widths shared by the header and every row.
 private enum Column {
@@ -110,17 +146,22 @@ private enum Column {
 
 private struct ModelTableHeader: View {
     @Binding var sort: ModelCatalogueQuery.Sort
+    var columns: ModelColumns
 
     var body: some View {
         HStack(spacing: ContentMetrics.columnSpacing) {
             Color.clear.frame(width: Column.star, height: 1)
             SortHeader("Name", active: sort == .name) { sort = .name }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text("Engine").font(.contentCaption).foregroundStyle(Crystal.ink3)
-                .frame(width: Column.engine + 22, alignment: .center)
+            if columns.engine {
+                Text("Engine").font(.contentCaption).foregroundStyle(Crystal.ink3)
+                    .frame(width: Column.engine + 22, alignment: .center)
+            }
             SortHeader("Speed", active: sort == .speed) { sort = .speed }.frame(width: Column.bar, alignment: .leading)
             SortHeader("Accuracy", active: sort == .accuracy) { sort = .accuracy }.frame(width: Column.bar, alignment: .leading)
-            SortHeader("Size", active: sort == .size) { sort = .size }.frame(width: Column.size, alignment: .trailing)
+            if columns.size {
+                SortHeader("Size", active: sort == .size) { sort = .size }.frame(width: Column.size, alignment: .trailing)
+            }
             Color.clear.frame(width: Column.action, height: 1)
         }
         .padding(.horizontal, ContentMetrics.rowPadding)
@@ -130,6 +171,7 @@ private struct ModelTableHeader: View {
 
 struct ModelRow: View {
     var info: SpeechModelInfo
+    var columns: ModelColumns
     var open: () -> Void
     var delete: () -> Void
     @Environment(AppModel.self) private var model
@@ -148,23 +190,29 @@ struct ModelRow: View {
             .help(favourite ? "Remove from favourites" : "Add to favourites (listed first)")
             .accessibilityLabel(favourite ? "Remove \(info.name) from favourites" : "Add \(info.name) to favourites")
 
-            HStack(spacing: 6) {
+            // Badges sit under the name, so a long name keeps the row's room.
+            VStack(alignment: .leading, spacing: 3) {
                 Text(info.name).font(.contentBody.weight(.medium)).foregroundStyle(Crystal.ink).lineLimit(1)
-                ModelBadges(info: info, inUse: library.activeModelID == info.id)
+                    .truncationMode(.middle)
+                ModelBadges(info: info, inUse: library.activeModelID == info.id, engine: columns.engine ? nil : info.engine)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
-            EngineIcon(engine: info.engine).frame(width: Column.engine + 22)
+            if columns.engine { EngineIcon(engine: info.engine).frame(width: Column.engine + 22) }
             ScoreBar(value: info.speed, label: "Speed").frame(width: Column.bar, alignment: .leading)
                 .help(info.rtfx.map { String(format: "%.0f× real time", $0) } ?? "")
             ScoreBar(value: info.accuracy, label: "Accuracy").frame(width: Column.bar, alignment: .leading)
                 .help(info.wer.map { String(format: "%.1f%% word error rate", $0) } ?? "")
-            Text(Format.bytes(library.diskBytes[info.id] ?? info.approxBytes))
-                .font(.contentBody).monospacedDigit().foregroundStyle(Crystal.ink2)
-                .frame(width: Column.size, alignment: .trailing)
+            if columns.size {
+                Text(Format.bytes(library.diskBytes[info.id] ?? info.approxBytes))
+                    .font(.contentBody).monospacedDigit().foregroundStyle(Crystal.ink2)
+                    .frame(width: Column.size, alignment: .trailing)
+            }
             ModelActionControl(info: info, delete: delete).frame(width: Column.action, alignment: .trailing)
         }
         .padding(.horizontal, ContentMetrics.rowPadding)
+        .padding(.vertical, 8)
         .frame(minHeight: ContentMetrics.rowHeight)
         .background(hovering ? Crystal.rowHover : .clear)
         .contentShape(.rect)
@@ -179,9 +227,12 @@ struct ModelRow: View {
 struct ModelBadges: View {
     var info: SpeechModelInfo
     var inUse: Bool
+    /// The engine as a badge, where the engine column has collapsed.
+    var engine: SpeechEngineKind? = nil
 
     var body: some View {
         HStack(spacing: 4) {
+            if let engine { Badge(engine.label) }
             if inUse { Badge("In use", style: .positive) }
             if info.isRecommended { Badge("Recommended", style: .accent) }
             if info.englishOnly { Badge("EN", style: .outline).help("English only") }

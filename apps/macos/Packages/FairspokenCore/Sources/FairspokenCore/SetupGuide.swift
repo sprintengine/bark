@@ -67,6 +67,26 @@ public enum SetupGuide {
         }
     }
 
+    /// The model step's short list from the catalogue: the default first, then the other
+    /// recommended models, then the best of the rest (accuracy plus speed, then the smaller
+    /// download). Only speech models that run on this Mac and aren't slow; `including` (the model
+    /// already chosen) is always listed.
+    public static func modelChoices(from catalogue: [SpeechModelInfo], defaultID: String, including chosen: String? = nil,
+                                    limit: Int = 4) -> [SpeechModelInfo] {
+        let usable = catalogue.filter { $0.isLocal && $0.kind == .speech && !$0.isExperimental }
+        let ranked = usable.sorted { a, b in
+            if (a.id == defaultID) != (b.id == defaultID) { return a.id == defaultID }
+            if a.isRecommended != b.isRecommended { return a.isRecommended }
+            if a.accuracy + a.speed != b.accuracy + b.speed { return a.accuracy + a.speed > b.accuracy + b.speed }
+            return a.approxBytes < b.approxBytes
+        }
+        var list = Array(ranked.prefix(limit))
+        if let chosen, !list.contains(where: { $0.id == chosen }), let model = usable.first(where: { $0.id == chosen }) {
+            list.append(model)
+        }
+        return list
+    }
+
     // MARK: Microphone check
 
     /// What the microphone test found, each with its own fix.

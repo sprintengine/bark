@@ -178,15 +178,27 @@ final class AppModel {
         UserDefaults.standard.set(true, forKey: "onboardingCompleted")
     }
 
-    /// Where the speech model is, as the setup guide and Home show it.
+    /// Where the chosen speech model is, as the setup guide and Home show it: its tracked library
+    /// download (progress, failure), then loading on the engine.
     var modelProgress: SetupGuide.ModelProgress {
         if settings.settings.transcriptionLocation == .remoteHost { return .remote }
-        switch models.engineState {
-        case .ready: return .ready
-        case .failed(let message): return .failed(message)
+        let id = SpeechModelCatalog.resolve(settings.settings.model).id
+        if let error = models.downloadErrors[id] { return .failed(error) }
+        switch models.state(of: id) {
         case .downloading(let f): return .preparing(fraction: f)
-        case .unpacking, .compiling, .loading, .warming: return .preparing(fraction: nil)
-        case .idle: return .notStarted
+        case .unpacking, .compiling: return .preparing(fraction: nil)
+        case .available:
+            if models.activeModelID == id, case .downloading(let f) = models.engineState { return .preparing(fraction: f) }
+            if models.activeModelID == id, models.engineState.isBusy { return .preparing(fraction: nil) }
+            if models.activeModelID == id, case .failed(let message) = models.engineState { return .failed(message) }
+            return .notStarted
+        case .installed:
+            guard models.activeModelID == id else { return .preparing(fraction: nil) }
+            switch models.engineState {
+            case .ready: return .ready
+            case .failed(let message): return .failed(message)
+            default: return .preparing(fraction: nil)
+            }
         }
     }
 

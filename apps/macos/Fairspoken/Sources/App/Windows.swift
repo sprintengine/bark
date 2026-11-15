@@ -19,7 +19,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         if let section { model.section = section }
         if dashboard == nil {
             let hosting = NSHostingController(rootView: DashboardView().environment(model))
-            let window = NSWindow(contentViewController: hosting)
+            let window = AppWindow(contentViewController: hosting)
             // A hidden, transparent title bar: the traffic lights sit on the sidebar's frost.
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.title = AppInfo.displayName
@@ -47,10 +47,15 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         .environment(model)
         if let window = onboarding {
             stopOnboardingAudio()
-            window.contentViewController = NSHostingController(rootView: view)
+            let hosting = NSHostingController(rootView: view)
+            hosting.sizingOptions = []
+            window.contentViewController = hosting
             window.setContentSize(OnboardingView.size)
         } else {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+            let hosting = NSHostingController(rootView: view)
+            // The window keeps the guide's size; the view fills it.
+            hosting.sizingOptions = []
+            let window = AppWindow(contentViewController: hosting)
             window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
             window.title = "Set up \(AppInfo.displayName)"
             window.titleVisibility = .hidden
@@ -110,4 +115,12 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         let anyVisible = [dashboard, onboarding].contains { $0?.isVisible == true }
         if !anyVisible { NSApp.setActivationPolicy(.accessory) }
     }
+}
+
+/// The app's windows. `appearsActive` (screenshot runs only) draws them as the key window even
+/// when the session can't activate the app (a locked screen), so captures show live controls.
+final class AppWindow: NSWindow {
+    static var appearsActive = false
+    override var isKeyWindow: Bool { Self.appearsActive || super.isKeyWindow }
+    override var isMainWindow: Bool { Self.appearsActive || super.isMainWindow }
 }

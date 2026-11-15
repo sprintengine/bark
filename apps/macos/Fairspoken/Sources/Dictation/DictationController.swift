@@ -75,6 +75,8 @@ final class DictationController {
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "dictation")
 
     var meter: LevelMeter { capture.meter }
+    /// Hold or toggle, for the pill's key hints.
+    var shortcutMode: RecordingShortcutMode { settings.settings.recordingShortcutMode }
 
     init(settings: SettingsStore, models: ModelLibrary, history: HistoryStore, permissions: Permissions, training: TrainingLibrary? = nil) {
         self.settings = settings
@@ -302,8 +304,9 @@ final class DictationController {
 
     // MARK: Demo/screenshot support
 
-    func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "") {
+    func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "", trigger: Trigger = .hotkey) {
         resetTask?.cancel()
+        self.trigger = trigger
         self.phase = phase
         self.liveText = liveText
         if let inAppResult { lastInAppResult = inAppResult }
