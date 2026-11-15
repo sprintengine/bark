@@ -125,7 +125,19 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/installer-hooks.nsh"
+      }
+    },
+    "linux": {
+      "deb": {
+        "provides": ["fairspoken"],
+        "conflicts": ["fairspoken"],
+        "replaces": ["fairspoken"]
+      }
+    }
   },
   "plugins": {
     "updater": {

@@ -93,7 +93,7 @@ path and macOS build); later launches load in under a second.
    and event frames as `/v1/events`, decoded by the `HostEvent`/`HostLiveState` code in FairspokenCore.
 2. **Start at login**: Configuration › This Mac › Start at login (`SMAppService.mainApp`). The app
    opens in the menu bar when you log in; System Settings › General › Login Items lists it.
-3. **Headless**: `Bark Server.app/Contents/MacOS/Bark Server --headless` serves with no UI
+3. **Headless**: `Bark Server.app/Contents/MacOS/Fairspoken Server --headless` serves with no UI
    and logs one line per job (never transcript text) to standard output; SIGTERM / SIGINT stop it
    cleanly. As a per-user LaunchAgent (starts at login, restarted by launchd if it exits abnormally):
 
@@ -157,7 +157,7 @@ first four fields are the Rust host's file (`PersistedHostConfig`), so either ho
 # The Swift server headless on a test port, then the language-neutral suite (Node 22, no deps):
 FAIRSPOKEN_HOST_ADDR=127.0.0.1:48981 FAIRSPOKEN_HOST_TOKEN=secret FAIRSPOKEN_HOST_WORKERS=1 \
 FAIRSPOKEN_HOST_QUEUE_CAPACITY=2 FAIRSPOKEN_HOST_CONFIG_PATH=$(mktemp -d)/host-config.json \
-  "build/Build/Products/Debug/Bark Server.app/Contents/MacOS/Bark Server" --headless &
+  "build/Build/Products/Debug/Bark Server.app/Contents/MacOS/Fairspoken Server" --headless &
 node ../../shared/host-conformance/run.mjs --url http://127.0.0.1:48981 --token secret --slow
 ```
 
@@ -377,7 +377,7 @@ in the app's own UI rather than Sparkle's windows.
 ```sh
 # An appcast with sparkle:version above 1, served from this Mac (ATS allows plain HTTP to localhost):
 python3 -m http.server 18765 --bind 127.0.0.1 --directory /path/to/appcast-dir &
-"build/Build/Products/Debug/Bark.app/Contents/MacOS/Bark" \
+"build/Build/Products/Debug/Bark.app/Contents/MacOS/Fairspoken" \
   -FAIRSPOKEN_APPCAST_URL http://127.0.0.1:18765/appcast.xml -updateChannel nightly
 # or persist it:  defaults write ie.fairspoken.mac.dev FAIRSPOKEN_APPCAST_URL http://127.0.0.1:18765/appcast.xml
 ```
@@ -389,7 +389,7 @@ was found. To look at the UI without a feed, `-FAIRSPOKEN_UPDATE_STATE idle|chec
 
 ## Developer switches
 
-Run as `…/Contents/MacOS/<name> <flags>`:
+Run as `…/Contents/MacOS/<executable> <flags>` (`Fairspoken` or `Fairspoken Server`):
 
 | App | Flag | What it does |
 |---|---|---|
@@ -439,7 +439,8 @@ address may bring up macOS's Local Network prompt the first time another device 
 - **Display names:** `MV_DISPLAY_NAME` in `Config/Base.xcconfig` (Bark) and `Config/Server.xcconfig`
   (Bark Server). They flow into `CFBundleDisplayName` and the .app names; Swift reads them back
   (`AppInfo.displayName`, `ServerInfo.displayName`). Release files are `<client name>-…` and
-  `<client name>-Server-…`.
+  `<client name>-Server-…`. The executables keep their pre-rename names (`EXECUTABLE_NAME`:
+  `Fairspoken`, `Fairspoken Server`) so installed copies and LaunchAgents keep working.
 - **Bundle ids:** `MV_BUNDLE_ID_BASE` in the same files; Debug appends `.dev` (`Config/Debug.xcconfig`).
   `Config/Server-{Debug,Release}.xcconfig` include the client's and then `Server.xcconfig`, so version,
   signing and Swift settings are shared.

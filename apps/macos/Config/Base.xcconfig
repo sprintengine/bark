@@ -22,6 +22,10 @@ MARKETING_VERSION = 0.1.0
 CURRENT_PROJECT_VERSION = 1
 
 PRODUCT_NAME = $(MV_DISPLAY_NAME)
+// The executable inside the .app keeps the name from before the rename. Sparkle installs an
+// update at the installed copy's path (an older install stays Fairspoken.app), and anything that
+// launches Contents/MacOS/<executable> directly keeps working across the rename.
+EXECUTABLE_NAME = Fairspoken
 PRODUCT_MODULE_NAME = FairspokenApp
 INFOPLIST_FILE = Fairspoken/Info.plist
 CODE_SIGN_ENTITLEMENTS = Config/Fairspoken.entitlements

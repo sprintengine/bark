@@ -51,5 +51,5 @@ the model for the Neural Engine once (20 s for Tiny to 2.5 min for Medium on the
 To check a model through the app's own path:
 
 ```sh
-build/Build/Products/Debug/Bark.app/Contents/MacOS/Bark --selftest <clip.wav> --model large-v3-turbo
+build/Build/Products/Debug/Bark.app/Contents/MacOS/Fairspoken --selftest <clip.wav> --model large-v3-turbo
 ```

@@ -7,14 +7,14 @@ import FairspokenCore
 
 /// Headless end-to-end check of the real pipeline without the microphone or TCC:
 ///
-///   Bark --selftest <file.wav> [--model parakeet-ultra | large-v3-turbo | …] [--host URL --token T]
+///   Contents/MacOS/Fairspoken --selftest <file.wav> [--model parakeet-ultra | large-v3-turbo | …] [--host URL --token T]
 ///
 /// 1. Loads the model on the Neural Engine (timing), transcribes the file through the same
 ///    `LocalBatchSession` + post-processor the hotkey path uses.
 /// 2. With `--host`: streams the file through `RemoteStreamSession` (framed PCM16, chunked,
 ///    paced at 4× real time) while subscribed to `/v1/events`, and reports both.
 ///
-///   Bark --discover [name | name:port [--password P]]
+///   Contents/MacOS/Fairspoken --discover [name | name:port [--password P]]
 ///
 /// Scans the tailnet the way Settings › Find my host does (or probes one typed entry) and
 /// prints what answered; with `--password`, pairs with the typed host (nothing is saved).

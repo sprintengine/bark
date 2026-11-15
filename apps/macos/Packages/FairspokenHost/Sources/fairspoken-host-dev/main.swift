@@ -1,7 +1,7 @@
 // Development host: the real HTTP server, queue and workers over the stub speech engine
 // (no models, no Neural Engine). For protocol work and the conformance suite:
 //   FAIRSPOKEN_HOST_ADDR=127.0.0.1:48980 FAIRSPOKEN_HOST_TOKEN=secret swift run fairspoken-host-dev
-// The real server is `Bark Server.app/Contents/MacOS/Bark Server --headless`.
+// The real server is `Bark Server.app/Contents/MacOS/Fairspoken Server --headless`.
 import FairspokenHost
 import Foundation
 

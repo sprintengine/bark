@@ -3,7 +3,7 @@ import FairspokenSpeech
 import Foundation
 import FairspokenCore
 
-/// `Bark Server --headless`: the same host with no window, menu bar item or Dock icon,
+/// `Contents/MacOS/Fairspoken Server --headless`: the same host with no window, menu bar item or Dock icon,
 /// for a LaunchAgent (or a LaunchDaemon). Logs one line per job to standard output, never
 /// transcript text. Stops cleanly on SIGTERM / SIGINT (what `launchctl` sends).
 nonisolated enum HeadlessServer {
