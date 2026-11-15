@@ -4,7 +4,7 @@ October 2026. Brand, website prototype and macOS 26 Liquid Glass mockups for **F
 
 | | |
 |---|---|
-| **Mark** | "The Settle": a spoken wave settles into one straight line and stops at a red caret |
+| **Mark** | A black-and-white Holstein cow's head in negative space: only the white patches, ears, eyes and nostrils are drawn, and the black of the cow is the black it sits on. The head turns a little to the right with its mouth open, and a row of rounded voice-level bars comes out of it. Monochrome, no name in it. Vector masters (full, plus simplified ones for small sizes) in [`logo/cow/`](logo/cow/); every app icon is generated from them by `_tools/gen-cow-icons.mjs`. It replaces "the Settle"; the notes on the Settle below are kept as history |
 | **Palette** | Limestone, Bog Oak, Copybook Blue, and Margin Red for the signal only |
 | **Type** | Host Grotesk (signal), Newsreader italic (fair copy), Atkinson Hyperlegible Mono (data). All SIL OFL, self-hosted, **nothing to buy** |
 | **Website** | [`site/index.html`](site/index.html): raw WebGL2 hero, scroll story, light/dark, responsive, reduced motion |

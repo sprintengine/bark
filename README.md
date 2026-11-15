@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="design/brand/logo/cow/readme-header.svg" width="480" alt="The logo: a black-and-white cow with its mouth open and voice level bars coming out of it">
+</p>
+
 # Fairspoken
 
 Fast, private, local-first desktop dictation. Press a shortcut, speak, and the

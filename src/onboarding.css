@@ -49,9 +49,9 @@ body {
   background:
     linear-gradient(160deg, var(--crystal-mark-sheen), transparent 55%),
     linear-gradient(180deg, var(--crystal-mark-top), var(--crystal-mark-bottom));
-  box-shadow: inset 0 0 0 0.5px var(--crystal-mark-edge), 0 1px 2px var(--crystal-mark-shadow), 0 12px 32px -10px color-mix(in srgb, var(--crystal-accent) 55%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--crystal-mark-edge), 0 1px 2px var(--crystal-mark-shadow), 0 12px 32px -10px rgba(0, 0, 0, 0.45);
 }
-.ob-mark svg { width: 46px; height: 46px; }
+.ob-mark svg { width: 68px; height: 68px; }
 
 .ob-tile {
   --tile: var(--crystal-tile-settings);

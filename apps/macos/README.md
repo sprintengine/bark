@@ -444,12 +444,14 @@ address may bring up macOS's Local Network prompt the first time another device 
   `Config/Server-{Debug,Release}.xcconfig` include the client's and then `Server.xcconfig`, so version,
   signing and Swift settings are shared.
 - **Brand:** `FairspokenUI` holds the palette (`Color.fs*` from `design/brand/README.md`: Copybook Blue,
-  Margin Red for the signal only, Limestone/Night, status colours) and the mark (`FairspokenMark`, the
-  logo's own paths). The server follows the brand's Liquid Glass rules: glass only on the control layer
-  (sidebar, toolbar, constellation nodes); cards, tables and charts are opaque. The client puts its
+  Margin Red for the signal only, Limestone/Night, status colours) and the cow mark (`CowMark`, drawn
+  from the masters in `design/brand/logo/cow/`; `FairspokenMark` fits it to a square in one colour and
+  `BrandMark` puts it on the icon's dark tile). The server follows the brand's Liquid Glass rules:
+  glass only on the control layer (sidebar, toolbar, constellation nodes); cards, tables and charts
+  are opaque. The client puts its
   sidebar on the window's frost and its content on solid cards (`design/crystal/README.md` › Fairspoken
-  for Mac). The server icon is the brand's dark icon
-  composite (`scripts/make-server-icon.sh`); no taglines anywhere.
+  for Mac). Both app icons, and `CowMarkPaths.swift`, come from
+  `design/brand/_tools/gen-cow-icons.mjs`; the server's tile adds faint ruled lines. No taglines anywhere.
 - **Wire identifiers** (per `PROTOCOL.md`): the `x-fairspoken-*` headers, the
   `application/vnd.fairspoken.pcm-stream` content type, `FAIRSPOKEN_HOST_*` and the client id `fairspoken-macos`.
 
