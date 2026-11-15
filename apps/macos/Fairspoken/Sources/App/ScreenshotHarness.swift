@@ -23,6 +23,8 @@ final class ScreenshotHarness {
 
     func run() {
         try? FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        AppWindow.appearsActive = true
+        Self.drawAsActiveApp()
         model.models.prepare(model.settings.settings.model)
         NSApp.setActivationPolicy(.regular)
         Task {
@@ -57,6 +59,9 @@ final class ScreenshotHarness {
     }
 
     private func dashboardShots(suffix: String) async {
+        windows.showDashboard(.home)
+        // One size for every shot, whatever the window was last left at.
+        windows.dashboard?.setContentSize(NSSize(width: 1180, height: 800))
         model.dictation.showcase(.idle, inAppResult: .init(
             text: "Please book a follow-up appointment in ten days and request a chest X-ray.",
             words: 14, delivery: .shownInApp, latencyMs: 74, placement: .neuralEngine))
@@ -68,15 +73,40 @@ final class ScreenshotHarness {
             if let window = windows.dashboard { await capture(window, as: "\(section.rawValue)-\(suffix)") }
         }
         await modelLinkShots(suffix: suffix)
-        // Home while listening, to show the live mic rings.
+        // Home while listening: the level and the words so far in the dictate bar.
         windows.showDashboard(.home)
-        model.dictation.showcase(.listening(since: Date().addingTimeInterval(-7)))
+        model.dictation.showcase(.listening(since: Date().addingTimeInterval(-7)),
+                                 liveText: "Can we move the Thursday practice meeting to")
         let feeder = feedLevels(into: model.dictation.meter)
         try? await Task.sleep(for: .milliseconds(1400))
         await freshFrame()
         if let window = windows.dashboard { await capture(window, as: "home-listening-\(suffix)") }
         feeder.cancel()
         model.dictation.showcase(.idle)
+        // "See all": every dictation by day.
+        model.homeShowsAllDictations = true
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "home-all-\(suffix)") }
+        model.homeShowsAllDictations = false
+        // Before the first dictation.
+        model.history.showcaseEmpty(true)
+        model.dictation.showcaseClearResult()
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "home-first-use-\(suffix)") }
+        model.history.showcaseEmpty(false)
+        // `--small-windows`: Home and Models at the smallest window size, for layout review.
+        if AppInfo.arguments.contains("--small-windows") {
+            windows.dashboard?.setContentSize(NSSize(width: 960, height: 640))
+            for section in [AppModel.Section.home, .models, .settings] {
+                windows.showDashboard(section)
+                try? await Task.sleep(for: .milliseconds(1000))
+                await freshFrame()
+                if let window = windows.dashboard { await capture(window, as: "small-\(section.rawValue)-\(suffix)") }
+            }
+            windows.dashboard?.setContentSize(NSSize(width: 1180, height: 800))
+        }
         model.settingsTab = .transcription
         windows.showDashboard(.settings)
         try? await Task.sleep(for: .milliseconds(1000))
@@ -168,18 +198,37 @@ final class ScreenshotHarness {
         }
     }
 
+    /// Every step of the setup guide. The microphone test is fed sample levels and "Try it" shows
+    /// a dictated message with the next one arriving; nothing records and nothing downloads.
     private func onboardingShots(suffix: String) async {
-        for step in [OnboardingView.Step.welcome, .permissions] {
-            let hosting = NSHostingController(rootView: OnboardingView(initialStep: step) {}.environment(model))
-            let window = NSWindow(contentViewController: hosting)
-            window.styleMask = [.titled, .closable, .fullSizeContentView]
+        let names: [OnboardingView.Step: String] = [.welcome: "welcome", .permissions: "permissions", .microphone: "microphone",
+                                                    .model: "model", .shortcut: "shortcut", .tryIt: "try-it", .finish: "finish"]
+        for step in OnboardingView.Step.allCases {
+            var feeder: Task<Void, Never>?
+            if step == .microphone {
+                model.micTest.showcase(listening: true, peak: 0.7)
+                feeder = feedLevels(into: model.micTest.meter)
+            }
+            if step == .tryIt {
+                model.dictation.showcase(.listening(since: Date().addingTimeInterval(-4)), liveText: "And copy in the practice nurse so she")
+                feeder = feedLevels(into: model.dictation.meter)
+            }
+            let view = OnboardingView(initialStep: step, showcase: true) {}.environment(model)
+            let hosting = NSHostingController(rootView: view)
+            hosting.sizingOptions = []
+            let window = AppWindow(contentViewController: hosting)
+            window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.isReleasedWhenClosed = false
+            window.setContentSize(OnboardingView.size)
             window.center()
             window.makeKeyAndOrderFront(nil)
-            try? await Task.sleep(for: .milliseconds(1200))
-            await capture(window, as: "onboarding-\(step == .welcome ? "welcome" : "permissions")-\(suffix)")
+            try? await Task.sleep(for: .milliseconds(1400))
+            await capture(window, as: "onboarding-\(step.rawValue + 1)-\(names[step] ?? "step")-\(suffix)")
+            feeder?.cancel()
+            model.micTest.stop()
+            model.dictation.showcase(.idle)
             window.orderOut(nil)
         }
     }
@@ -187,6 +236,10 @@ final class ScreenshotHarness {
     /// The pill states over a wallpaper-like backdrop (the real pill samples the desktop,
     /// which a window capture can't include, so it is staged in a showcase window).
     private func pillShots(suffix: String) async {
+        // Toggle mode, so the hints show the shortcut that stops ("Stop ⇧⌘1 · Cancel esc").
+        let mode = model.settings.settings.recordingShortcutMode
+        model.settings.update { $0.recordingShortcutMode = .toggle }
+        defer { model.settings.update { $0.recordingShortcutMode = mode } }
         let phases: [(String, DictationController.Phase)] = [
             ("listening", .listening(since: Date().addingTimeInterval(-12))),
             ("listening-text", .listening(since: Date().addingTimeInterval(-9))),
@@ -206,7 +259,7 @@ final class ScreenshotHarness {
         }
         let view = PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols)
         let hosting = NSHostingController(rootView: view)
-        let window = NSWindow(contentViewController: hosting)
+        let window = AppWindow(contentViewController: hosting)
         window.styleMask = [.titled, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -222,6 +275,17 @@ final class ScreenshotHarness {
         await capture(window, as: "pill-\(suffix)")
         feeders.forEach { $0.cancel() }
         window.orderOut(nil)
+    }
+
+    /// Dev-only: the session may be locked while screenshots run, and then the app can't become
+    /// active, so AppKit draws every switch and button as in a background window. Reporting the
+    /// app as active for this run draws them as a person sees them.
+    private static func drawAsActiveApp() {
+        #if DEBUG
+        guard let method = class_getInstanceMethod(NSApplication.self, #selector(getter: NSApplication.isActive)) else { return }
+        let block: @convention(block) (AnyObject) -> Bool = { _ in true }
+        method_setImplementation(method, imp_implementationWithBlock(block))
+        #endif
     }
 
     private func feedLevels(into meter: LevelMeter) -> Task<Void, Never> {

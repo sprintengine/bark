@@ -55,11 +55,18 @@ final class DictationController {
 
     @ObservationIgnored var onPhaseChange: ((Phase) -> Void)?
     @ObservationIgnored var onNeedsOnboarding: (() -> Void)?
+    /// Called as any recording starts (shortcut, fn, the menu bar, a button), before it takes the
+    /// microphone: the setup guide's test steps aside.
+    @ObservationIgnored var onWillStart: (() -> Void)?
     @ObservationIgnored let capture = AudioCapture()
     @ObservationIgnored private var session: (any TranscriptionSession)?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private var resetTask: Task<Void, Never>?
-    @ObservationIgnored private var trigger: Trigger = .button
+    /// Which of this app's windows the recording is for (Home, the setup guide), or nil when it
+    /// is for another app.
+    @ObservationIgnored private(set) var startedInWindow: NSUserInterfaceItemIdentifier?
+    /// What started the current recording (the pill says how to end it).
+    private(set) var trigger: Trigger = .button
     @ObservationIgnored private var targetApp: NSRunningApplication?
     @ObservationIgnored private var placement: ComputePlacement = .neuralEngine
     @ObservationIgnored private var liveGeneration = 0
@@ -74,6 +81,8 @@ final class DictationController {
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "dictation")
 
     var meter: LevelMeter { capture.meter }
+    /// Hold or toggle, for the pill's key hints.
+    var shortcutMode: RecordingShortcutMode { settings.settings.recordingShortcutMode }
 
     init(settings: SettingsStore, models: ModelLibrary, history: HistoryStore, permissions: Permissions, training: TrainingLibrary? = nil) {
         self.settings = settings
@@ -107,6 +116,7 @@ final class DictationController {
 
     func start(_ trigger: Trigger) {
         guard !phase.isActive else { return }
+        onWillStart?()
         permissions.refresh()
         switch permissions.microphone {
         case .granted: break
@@ -143,6 +153,7 @@ final class DictationController {
 
         let front = NSWorkspace.shared.frontmostApplication
         targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
+        startedInWindow = targetApp == nil ? NSApp.keyWindow?.identifier : nil
         do {
             try capture.start(deviceName: s.audioDevice, maxSeconds: s.maxRecordingSeconds) { [newSession] chunk in
                 newSession.append(chunk)
@@ -301,8 +312,12 @@ final class DictationController {
 
     // MARK: Demo/screenshot support
 
-    func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "") {
+    /// Screenshots: forgets the in-app result (a first use).
+    func showcaseClearResult() { lastInAppResult = nil }
+
+    func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "", trigger: Trigger = .hotkey) {
         resetTask?.cancel()
+        self.trigger = trigger
         self.phase = phase
         self.liveText = liveText
         if let inAppResult { lastInAppResult = inAppResult }

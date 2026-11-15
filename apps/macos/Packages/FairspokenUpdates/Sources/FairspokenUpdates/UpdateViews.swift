@@ -110,10 +110,13 @@ private struct IndeterminateArc: View {
 public struct UpdateSidebarButton: View {
     var updates: UpdateController
     var style: UpdateStyle
+    /// A 22 pt glyph in the sidebar's icon column, with 12/11 pt text (the client's sidebar).
+    var compact: Bool
 
-    public init(updates: UpdateController, style: UpdateStyle) {
+    public init(updates: UpdateController, style: UpdateStyle, compact: Bool = false) {
         self.updates = updates
         self.style = style
+        self.compact = compact
     }
 
     public var body: some View {
@@ -121,18 +124,19 @@ public struct UpdateSidebarButton: View {
         Button {
             updates.performPrimaryAction()
         } label: {
-            HStack(spacing: 10) {
-                UpdateGlyph(presentation: p, style: style, size: 30)
-                    .padding(4)
+            HStack(spacing: compact ? 9 : 10) {
+                UpdateGlyph(presentation: p, style: style, size: compact ? 18 : 30)
+                    .padding(compact ? 2 : 4)
                     .background(Color.primary.opacity(0.05), in: .circle)
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.08)))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(p.title)
-                        .font(.callout.weight(p.isEnabled && p.badge != .none ? .semibold : .medium))
+                        .font(compact ? .system(size: 12, weight: p.isEnabled && p.badge != .none ? .semibold : .medium)
+                                      : .callout.weight(p.isEnabled && p.badge != .none ? .semibold : .medium))
                         .foregroundStyle(.primary)
                         .contentTransition(.numericText())
                     Text(p.detail)
-                        .font(.caption)
+                        .font(compact ? .system(size: 11) : .caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)

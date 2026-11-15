@@ -21,15 +21,19 @@ final class AppModel {
         }
         var symbol: String {
             switch self {
-            case .home: "waveform"
-            case .models: "square.stack.3d.up"
-            case .training: "graduationcap"
-            case .settings: "gearshape"
+            case .home: "house.fill"
+            case .models: "square.stack.3d.up.fill"
+            case .training: "waveform.badge.mic"
+            case .settings: "gearshape.fill"
             }
         }
     }
 
-    var section: Section = .home
+    var section: Section = .home {
+        didSet { if section != .home { homeShowsAllDictations = false } }
+    }
+    /// Home's "See all": every kept dictation, searchable, instead of the overview.
+    var homeShowsAllDictations = false
     var settingsTab: SettingsView.Tab = .general
 
     let settings: SettingsStore
@@ -38,6 +42,7 @@ final class AppModel {
     let permissions: Permissions
     let models: ModelLibrary
     let dictation: DictationController
+    let micTest: MicTest
     let hostStatus: HostStatus
     let hostFinder: HostFinder
     let updates: UpdateController
@@ -56,6 +61,7 @@ final class AppModel {
         models = ModelLibrary()
         dictation = DictationController(settings: settings, models: models, history: history, permissions: permissions,
                                         training: training)
+        micTest = MicTest(capture: dictation.capture)
         hostStatus = HostStatus(settings: settings)
         // A model that failed to load leaves the previous one in use; the saved choice follows it.
         models.onFallback = { [weak settings] id in settings?.update { $0.model = id } }
@@ -72,6 +78,8 @@ final class AppModel {
         // Carry an imported Tauri shortcut over once (KeyboardShortcuts owns it afterwards).
         if settings.importedFromTauri { HotkeyController.adoptAccelerator(settings.settings.recordingShortcut) }
 
+        // Every recording takes the microphone from the setup guide's test.
+        dictation.onWillStart = { [weak self] in self?.micTest.stop() }
         hotkeys.onPress = { [weak self] in self?.dictation.hotkeyPressed() }
         hotkeys.onRelease = { [weak self] in self?.dictation.hotkeyReleased() }
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
@@ -170,6 +178,43 @@ final class AppModel {
 
     func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: "onboardingCompleted")
+    }
+
+    /// Where the chosen speech model is, as the setup guide and Home show it: its tracked library
+    /// download (progress, failure), then loading on the engine.
+    var modelProgress: SetupGuide.ModelProgress {
+        let chosen = SpeechModelCatalog.resolve(settings.settings.model).id
+        let engine: SetupGuide.EngineStatus = switch models.engineState {
+        case .idle: .idle
+        case .downloading(let f): .downloading(f)
+        case .unpacking, .compiling, .loading, .warming: .busy
+        case .ready: .ready
+        case .failed(let message): .failed(message)
+        }
+        let item: SetupGuide.ItemStatus = switch models.state(of: chosen) {
+        case .available: .available
+        case .downloading(let f): .downloading(f)
+        case .unpacking, .compiling: .preparing
+        case .installed: .installed
+        }
+        return SetupGuide.modelProgress(remote: settings.settings.transcriptionLocation == .remoteHost, chosenID: chosen,
+                                        activeID: models.activeModelID, activeName: models.activeModel.shortName,
+                                        engine: engine, chosenItem: item, downloadError: models.downloadErrors[chosen])
+    }
+
+    static func permission(_ status: Permissions.Status) -> SetupGuide.Permission {
+        switch status {
+        case .granted: .granted
+        case .denied: .denied
+        case .notDetermined: .notDetermined
+        }
+    }
+
+    /// What is set up right now: the microphone, the model, typing into apps (and, in the guide,
+    /// whether the microphone test heard anything).
+    func setupChecklist(micHeard: Bool? = nil) -> [SetupGuide.ChecklistItem] {
+        SetupGuide.checklist(microphone: Self.permission(permissions.microphone), accessibility: permissions.accessibility.isGranted,
+                             model: modelProgress, micHeard: micHeard)
     }
 
     /// Engine summary used across the UI.

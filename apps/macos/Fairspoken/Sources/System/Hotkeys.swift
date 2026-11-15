@@ -68,8 +68,15 @@ final class HotkeyController {
         return AcceleratorString(modifiers: mods, code: code).string
     }
 
+    static var hasShortcut: Bool { KeyboardShortcuts.getShortcut(for: .dictation) != nil }
+
     static var currentShortcutSymbols: String {
         KeyboardShortcuts.getShortcut(for: .dictation)?.description ?? "Not set"
+    }
+
+    /// The key that cancels a recording ("⎋" unless changed).
+    static var cancelShortcutSymbols: String? {
+        KeyboardShortcuts.getShortcut(for: .cancelDictation)?.description
     }
 
     private static func key(for code: String) -> KeyboardShortcuts.Key? { codes[code] }

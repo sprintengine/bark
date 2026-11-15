@@ -15,9 +15,9 @@ struct PostTrainingView: View {
     var body: some View {
         let training = model.training
         ScrollView {
-            GlassEffectContainer(spacing: Layout.gap) {
+            VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: Layout.gap) {
-                    PageTitle("Post-training", subtitle: "Teach the speech model your voice and accent")
+                    PageTitle("Post-training", subtitle: "Collect recordings of your voice now; training them arrives in a later update")
                         .padding(.bottom, 4)
                     SavingCard(training: training)
                     HStack(alignment: .top, spacing: Layout.gap) {
@@ -28,9 +28,11 @@ struct PostTrainingView: View {
                     RecordingsCard(training: training, player: player, confirmDeleteAll: $confirmDeleteAll,
                                    confirmDelete: $confirmDelete)
                 }
+                .frame(maxWidth: Layout.readable, alignment: .leading)
                 .padding(.horizontal, Layout.pageH)
                 .padding(.vertical, Layout.pageTop)
             }
+            .frame(maxWidth: .infinity)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .onAppear { training.refresh() }
@@ -75,17 +77,21 @@ private struct SavingCard: View {
 
     var body: some View {
         let on = model.settings.settings.trainingCapture
-        GlassCard(cornerRadius: Layout.card) {
+        Card(cornerRadius: Layout.card) {
             VStack(alignment: .leading, spacing: 14) {
-                Toggle(isOn: Binding(get: { on }, set: { v in model.settings.update { $0.trainingCapture = v } })) {
+                HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Save recordings for post-training").cardHeading()
+                        Text("Save recordings to improve models").cardHeading()
                         Text("Keeps the audio of each dictation and what the model heard, so it can learn your voice later. Nothing is uploaded.")
-                            .font(.callout).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
+                            .font(TypeScale.body).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
                     }
+                    Spacer(minLength: 0)
+                    Toggle("Save recordings to improve models",
+                           isOn: Binding(get: { on }, set: { v in model.settings.update { $0.trainingCapture = v } }))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .tint(Crystal.clientAccent)
                 }
-                .toggleStyle(.switch)
-                .tint(Crystal.clientAccent)
 
                 Divider().overlay(Crystal.hairline)
                 HStack(spacing: 10) {
@@ -128,7 +134,7 @@ private struct ProgressCard: View {
     var summary: TrainingSummary
 
     var body: some View {
-        GlassCard(cornerRadius: Layout.card, fillHeight: true) {
+        Card(cornerRadius: Layout.card, fillHeight: true) {
             VStack(alignment: .leading, spacing: 14) {
                 Eyebrow(text: "Your recordings", symbol: "waveform")
                 HStack(alignment: .firstTextBaseline, spacing: 24) {
@@ -172,7 +178,7 @@ private struct TrainCard: View {
     var capturing: Bool
 
     var body: some View {
-        GlassCard(cornerRadius: Layout.card, fillHeight: true) {
+        Card(cornerRadius: Layout.card, fillHeight: true) {
             VStack(alignment: .leading, spacing: 12) {
                 Eyebrow(text: "Post-train", symbol: "graduationcap")
                 VStack(alignment: .leading, spacing: 8) {
@@ -184,8 +190,7 @@ private struct TrainCard: View {
                 Spacer(minLength: 0)
                 HStack(spacing: 12) {
                     Button("Post-train") {}
-                        .buttonStyle(.glassProminent)
-                        .tint(Crystal.clientAccent)
+                        .buttonStyle(PrimaryButtonStyle())
                         .disabled(true)
                     Text(status)
                         .font(.caption).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
@@ -221,7 +226,7 @@ private struct RecordingsCard: View {
     private static let shown = 30
 
     var body: some View {
-        GlassCard(cornerRadius: Layout.card) {
+        Card(cornerRadius: Layout.card) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Recent recordings").cardHeading()
@@ -265,7 +270,7 @@ private struct RecordingsCard: View {
                 Text(entry.rawText).font(.callout).foregroundStyle(Crystal.ink)
                     .lineLimit(3).textSelection(.enabled)
                 HStack(spacing: 6) {
-                    Text("\(Format.relative(entry.date)) · \(Format.duration(entry.durationSeconds)) · \(entry.speechModel)")
+                    Text("\(Format.relative(entry.date)) · \(Format.duration(entry.durationSeconds)) · \(SpeechModelCatalog.model(id: entry.speechModel)?.shortName ?? entry.speechModel)")
                         .font(.caption).foregroundStyle(Crystal.ink3)
                     if entry.appCategory != AppCategory.other.rawValue {
                         Tag(text: entry.appCategory.capitalized, color: Crystal.ink2)
