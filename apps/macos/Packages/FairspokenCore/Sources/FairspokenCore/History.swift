@@ -118,12 +118,17 @@ public struct UsageStats: Codable, Equatable, Sendable {
         }
     }
 
+    /// The typing speed assumed when the speed test hasn't measured one.
     public static let typingWPM = 40.0
+    /// The range a measured typing speed is kept within, as in `usage_stats.rs`.
+    public static let measuredTypingRange = 5.0...400.0
 
     public var totalWords = 0
     public var totalRecordingSeconds: Double = 0
     public var totalDictations = 0
     public var days: [String: DayBucket] = [:]
+    /// The user's own typing speed, from the speed test (shared with the desktop app's file).
+    public var measuredTypingWpm: Double?
 
     public init() {}
 
@@ -133,7 +138,20 @@ public struct UsageStats: Codable, Equatable, Sendable {
         totalRecordingSeconds = c.lenientDouble(.totalRecordingSeconds) ?? 0
         totalDictations = c.lenientInt(.totalDictations) ?? 0
         days = c.lenient([String: DayBucket].self, .days) ?? [:]
+        measuredTypingWpm = c.lenientDouble(.measuredTypingWpm).flatMap(Self.validTypingWPM)
     }
+
+    /// A measured speed kept within `measuredTypingRange`, or nil when it isn't a speed at all.
+    public static func validTypingWPM(_ wpm: Double) -> Double? {
+        guard wpm.isFinite, wpm > 0 else { return nil }
+        return min(max(wpm, measuredTypingRange.lowerBound), measuredTypingRange.upperBound)
+    }
+
+    /// The typing speed time saved is counted against: the measured one, else `typingWPM`.
+    public var typingWPMInUse: Double { measuredTypingWpm ?? Self.typingWPM }
+
+    /// How long typing every dictated word would have taken at `typingWPMInUse`.
+    public var typingSeconds: Double { Double(totalWords) / typingWPMInUse * 60 }
 
     public static func dayIndex(_ date: Date) -> Int { Int((date.timeIntervalSince1970 / 86_400).rounded(.down)) }
 
@@ -173,9 +191,9 @@ public struct UsageStats: Codable, Equatable, Sendable {
         return n
     }
 
-    /// Time saved vs typing at 40 wpm, in seconds.
+    /// Time saved against typing the same words at `typingWPMInUse`, in seconds.
     public var timeSavedSeconds: Double {
-        max(0, Double(totalWords) / Self.typingWPM * 60 - totalRecordingSeconds)
+        max(0, typingSeconds - totalRecordingSeconds)
     }
 
     public var speakingWPM: Double? {

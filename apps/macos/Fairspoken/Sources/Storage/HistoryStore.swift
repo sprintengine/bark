@@ -39,6 +39,20 @@ final class HistoryStore {
         save()
     }
 
+    /// The speed test measured the user's typing: time saved is counted against it from now on
+    /// (`measuredTypingWpm`, the key the desktop app uses).
+    func setMeasuredTypingWPM(_ wpm: Int) {
+        guard let valid = UsageStats.validTypingWPM(Double(wpm)) else { return }
+        usage.measuredTypingWpm = valid
+        save()
+    }
+
+    /// Screenshots: no measured typing speed (the assumed one), or a sample one. Never saved.
+    func showcaseTypingWPM(_ wpm: Double?) {
+        guard !persists else { return }
+        usage.measuredTypingWpm = wpm
+    }
+
     func delete(_ id: String) {
         items.removeAll { $0.id == id }
         save()
