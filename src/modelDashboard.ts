@@ -3,32 +3,55 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
 import "./modelDashboard.css";
 import { createPublisherIcon } from "./publisherIcons";
+import { POLISH_RATINGS, filterAndSort, formatBytes, measuredSpeed, speechInfo, type LibraryFilter, type LibraryRow, type ModelKind, type SortKey } from "./modelCatalog";
+
+// The Models screen: one library table of every speech and polish model, with
+// favourites, filters, sort and Hugging Face search. A row opens to show its
+// details: the full description, its download link and its page.
 
 type Settings = { model: string; transcriptionLocation: string; polishEnabled: boolean; polishProvider: "local" | "cloud"; polishModel: string; cloudAuthToken: string; modelLinks?: Record<string, string>; [key: string]: unknown };
 type Model = { id: string; name: string; publisher: string; description: string; bytes: number; installed: boolean; selected: boolean; loaded: boolean; source: string; downloads: number | null; supported: boolean };
 type Download = { model: string; stage: string; downloaded: number; total: number; message: string };
 type Catalog = { polish: Model[]; download: Download | null; metadataError: string | null };
 type SpeechModel = { model: string; cached: boolean };
+type HistoryEntry = { durationSeconds: number; timings?: { speechModelMs: number } | null };
 const root = document.querySelector<HTMLElement>("#screen-models")!;
 const feedback = root.querySelector<HTMLElement>("#modelFeedback")!;
+const rowsHost = root.querySelector<HTMLElement>("#modelRows")!;
 let settings: Settings;
 let catalog: Catalog;
 let speech: SpeechModel[] = [];
 let cloudAvailable = false;
 let download: Download | null = null;
 let speechDownload: string | null = null;
+let measured: number | null = null;
 let loading = false;
 let reloadRequested = false;
 // A Refresh pressed during an in-flight load still owes a Hugging Face refresh.
 let refreshRequested = false;
-const variants = new Map<string, string>();
 const speechProgress = new Map<string, { percentage: number; message: string; done: boolean }>();
-const rows = new Map<string, { status: HTMLElement; progress: HTMLProgressElement }>();
+const progressCells = new Map<string, { status: HTMLElement; bar: HTMLElement }>();
+const expanded = new Set<string>();
+const filter: LibraryFilter = { query: "", kind: "all", language: "all", downloadedOnly: false, localOnly: false };
+let sort: SortKey = "recommended";
+
+// Favourites are a view preference of this window, not a setting.
+const FAVORITES_KEY = "fairspoken.favoriteModels";
+function loadFavorites(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? "[]") as string[]); } catch { return new Set(); }
+}
+const favorites = loadFavorites();
+function toggleFavorite(id: string): void {
+  if (favorites.has(id)) favorites.delete(id); else favorites.add(id);
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites])); } catch { /* this session only */ }
+  render();
+}
+
 function say(message: string, error = false): void { feedback.textContent = message; feedback.dataset.error = String(error); }
-function button(label: string, action: () => Promise<unknown>, disabled = false): HTMLButtonElement {
-  const node = document.createElement("button"); node.type = "button"; node.className = "ds-button ds-button--outline";
+function button(label: string, action: () => Promise<unknown>, disabled = false, primary = false): HTMLButtonElement {
+  const node = document.createElement("button"); node.type = "button"; node.className = primary ? "ds-button ds-button--outline model-action is-primary" : "ds-button ds-button--outline model-action";
   node.textContent = label; node.disabled = disabled;
-  node.addEventListener("click", () => { node.disabled = true; void action().catch(e => say(String(e), true)).finally(() => { if (node.isConnected) node.disabled = disabled; }); });
+  node.addEventListener("click", (event) => { event.stopPropagation(); node.disabled = true; void action().catch(e => say(String(e), true)).finally(() => { if (node.isConnected) node.disabled = disabled; }); });
   return node;
 }
 async function choose(patch: Partial<Settings>): Promise<void> {
@@ -37,131 +60,351 @@ async function choose(patch: Partial<Settings>): Promise<void> {
   await invoke("save_settings", { settings: { ...latest, ...patch } });
   await load();
 }
-// Parakeet variants share one row; each has its own picker label, publisher and summary.
-const PARAKEET_VARIANTS: Record<string, { label: string; publisher: string; detail: string }> = {
-  "parakeet-tdt-0.6b-v3": { label: "0.6B v3 · Recommended", publisher: "NVIDIA", detail: "NVIDIA · Recommended · 25 languages" },
-  "parakeet-ultra": { label: "Ultra 0.6B · Moondream", publisher: "Moondream", detail: "Moondream · Post-trained v3, lower error rates · 25 languages · 2.60 GB download" },
-  "parakeet-tdt-0.6b-v2": { label: "0.6B v2 · English", publisher: "NVIDIA", detail: "NVIDIA · English · 2.51 GB download" },
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = ""): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag); if (className) node.className = className; if (text) node.textContent = text; return node;
+}
+const SVG = {
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
+  speech: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 10.5v3M8.5 7.5v9M12 4.5v15M15.5 8v8M19 10.5v3"/></svg>',
+  polish: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 13.8 9a2 2 0 0 0 1.2 1.2l5.5 1.8-5.5 1.8a2 2 0 0 0-1.2 1.2L12 20.5 10.2 15A2 2 0 0 0 9 13.8L3.5 12 9 10.2A2 2 0 0 0 10.2 9Z"/></svg>',
+  chevron: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
-const parakeetVariant = (model: string) => PARAKEET_VARIANTS[model] ?? PARAKEET_VARIANTS["parakeet-tdt-0.6b-v3"];
-const size = (bytes: number): string => bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${Math.round(bytes / 1e6)} MB`;
-function row(id: string, title: string, publisher: string, detail: string, status: string): { element: HTMLElement; actions: HTMLElement } {
-  const element = document.createElement("div"); element.className = "ds-list-row model-row"; element.id = `model-${id}`;
-  const icon = createPublisherIcon(publisher);
-  const content = document.createElement("div"); content.className = "ds-list-row-content";
-  const name = document.createElement("div"); name.className = "ds-list-row-title"; name.textContent = title;
-  const description = document.createElement("span"); description.className = "ds-list-row-supporting"; description.textContent = detail;
-  const state = document.createElement("span"); state.className = "model-status"; state.textContent = status;
-  const progress = document.createElement("progress"); progress.hidden = true; progress.max = 100; progress.setAttribute("aria-label", `${title} download`);
-  const actions = document.createElement("div"); actions.className = "models-actions";
-  content.append(name, description, state, progress); element.append(icon, content, actions); rows.set(id, { status: state, progress });
-  return { element, actions };
-}
-function chevron(): SVGSVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "ds-select-chevron");
-  svg.setAttribute("viewBox", "0 0 10 10");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS(svg.namespaceURI, "path");
-  path.setAttribute("d", "M2 4l3 3 3-3");
-  path.setAttribute("stroke", "currentColor");
-  path.setAttribute("stroke-width", "1.4");
-  path.setAttribute("fill", "none");
-  path.setAttribute("stroke-linecap", "round");
-  path.setAttribute("stroke-linejoin", "round");
-  svg.append(path);
-  return svg;
-}
-function checkMark(): SVGSVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "ds-select-check");
-  svg.setAttribute("viewBox", "0 0 10 10");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS(svg.namespaceURI, "path");
-  path.setAttribute("d", "M2 5.2l2 2 4-4");
-  path.setAttribute("stroke", "currentColor");
-  path.setAttribute("stroke-width", "1.6");
-  path.setAttribute("fill", "none");
-  path.setAttribute("stroke-linecap", "round");
-  path.setAttribute("stroke-linejoin", "round");
-  svg.append(path);
-  return svg;
-}
-function variantPicker(family: string, name: string, choices: { value: string; label: string }[], value: string): HTMLElement {
-  const field = document.createElement("div"); field.className = "model-variant";
-  const caption = document.createElement("span"); caption.textContent = "Variant";
-  const listId = `variant-list-${family}`;
-  const trigger = document.createElement("button");
-  trigger.type = "button"; trigger.className = "ds-select"; trigger.id = `variant-${family}`;
-  trigger.dataset.value = value;
-  trigger.setAttribute("role", "combobox");
-  trigger.setAttribute("aria-haspopup", "listbox");
-  trigger.setAttribute("aria-expanded", "false");
-  trigger.setAttribute("aria-controls", listId);
-  trigger.setAttribute("aria-label", `${name} variant`);
-  const shown = document.createElement("span"); shown.className = "ds-select-value";
-  shown.textContent = choices.find(choice => choice.value === value)?.label ?? value;
-  trigger.append(shown, chevron());
-  const list = document.createElement("ul");
-  list.className = "ds-select-listbox"; list.id = listId; list.hidden = true;
-  list.setAttribute("role", "listbox"); list.setAttribute("aria-label", `${name} variant`);
-  let active = Math.max(0, choices.findIndex(choice => choice.value === value));
-  const paint = () => {
-    [...list.children].forEach((node, index) => {
-      const option = node as HTMLElement;
-      option.classList.toggle("ds-select-option--active", index === active);
-      option.setAttribute("aria-selected", String(choices[index].value === trigger.dataset.value));
-      // An SVG has no `hidden` property; the presentation attribute hides the
-      // tick while keeping its slot, so labels stay aligned.
-      option.querySelector(".ds-select-check")!.setAttribute("visibility", choices[index].value === trigger.dataset.value ? "visible" : "hidden");
-    });
-    const current = list.children[active] as HTMLElement | undefined;
-    if (current) { trigger.setAttribute("aria-activedescendant", current.id); current.scrollIntoView({ block: "nearest" }); }
-  };
-  const place = () => {
-    const box = trigger.getBoundingClientRect();
-    list.style.setProperty("--ds-select-top", `${box.bottom + 4}px`);
-    list.style.setProperty("--ds-select-left", `${box.left}px`);
-    list.style.setProperty("--ds-select-trigger-width", `${box.width}px`);
-  };
-  const close = () => { list.hidden = true; trigger.setAttribute("aria-expanded", "false"); };
-  const open = () => {
-    active = Math.max(0, choices.findIndex(choice => choice.value === trigger.dataset.value));
-    list.hidden = false; trigger.setAttribute("aria-expanded", "true"); place(); paint();
-  };
-  const choose = (next: string) => {
-    close();
-    if (next === trigger.dataset.value) return;
-    variants.set(family, next);
-    render();
-    root.querySelector<HTMLButtonElement>(`#variant-${family}`)?.focus();
-  };
-  choices.forEach((choice, index) => {
-    const option = document.createElement("li");
-    option.className = "ds-select-option"; option.id = `${listId}-${index}`;
-    option.setAttribute("role", "option");
-    const label = document.createElement("span"); label.className = "ds-select-option-label"; label.textContent = choice.label;
-    option.append(label, checkMark());
-    option.addEventListener("pointerenter", () => { active = index; paint(); });
-    option.addEventListener("mousedown", event => event.preventDefault());
-    option.addEventListener("click", () => choose(choice.value));
-    list.append(option);
+
+type Row = LibraryRow & {
+  summary: string;
+  detail: string;
+  publisher: string;
+  languages: string;
+  recommended: boolean;
+  isNew: boolean;
+  source?: string;
+  polish?: Model;
+};
+
+function speechRows(): Row[] {
+  return speech.map((m) => {
+    const info = speechInfo(m.model);
+    return {
+      id: m.model, kind: "speech" as ModelKind, name: info.name, summary: info.summary, detail: "",
+      publisher: info.publisher, languages: info.languages, language: info.language, bytes: info.bytes, speed: info.speed, accuracy: info.accuracy, rank: info.rank,
+      installed: m.cached, inUse: settings.transcriptionLocation === "local" && settings.model === m.model, favorite: favorites.has(m.model),
+      location: "local" as const, recommended: !!info.recommended, isNew: !!info.isNew,
+      searchText: [info.name, info.publisher, m.model, info.languages, "speech dictation"].join(" "),
+    };
   });
-  trigger.addEventListener("click", () => { if (list.hidden) open(); else close(); });
-  trigger.addEventListener("keydown", event => {
-    if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key) && list.hidden) { event.preventDefault(); open(); return; }
-    if (list.hidden) return;
-    if (event.key === "Escape") { event.preventDefault(); close(); return; }
-    if (event.key === "ArrowDown") { event.preventDefault(); active = (active + 1) % choices.length; paint(); }
-    if (event.key === "ArrowUp") { event.preventDefault(); active = (active + choices.length - 1) % choices.length; paint(); }
-    if (event.key === "Home") { event.preventDefault(); active = 0; paint(); }
-    if (event.key === "End") { event.preventDefault(); active = choices.length - 1; paint(); }
-    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(choices[active].value); }
-  });
-  field.append(caption, trigger, list);
-  paint();
-  return field;
 }
+
+function polishRows(): Row[] {
+  return catalog.polish.map((m, index) => {
+    const rating = POLISH_RATINGS[m.id] ?? { speed: 3, accuracy: 3, language: "multi" as const, languages: "Many languages", rank: 20 + index };
+    const [summary] = m.description.split(" · ");
+    return {
+      id: m.id, kind: "polish" as ModelKind, name: m.name, summary, detail: m.description, publisher: m.publisher, languages: rating.languages,
+      language: rating.language, bytes: m.bytes, speed: rating.speed, accuracy: rating.accuracy, rank: rating.rank,
+      installed: m.installed, inUse: settings.polishEnabled && settings.polishProvider === "local" && m.selected && m.installed, favorite: favorites.has(m.id),
+      location: "local" as const, recommended: !!rating.recommended, isNew: !!rating.isNew, source: m.source, polish: m,
+      searchText: [m.name, m.publisher, m.id, m.description, "polish cleanup"].join(" "),
+    };
+  });
+}
+
+// Dictation or polish that runs elsewhere shows as a row too, so the table
+// always says what is in use.
+function remoteRows(): Row[] {
+  const rows: Row[] = [];
+  const remote = (id: string, kind: ModelKind, name: string, summary: string, location: "host" | "cloud"): Row => ({
+    id, kind, name, summary, detail: summary, publisher: location === "cloud" ? "Fairspoken" : "Host", languages: "", language: "multi",
+    bytes: 0, speed: 0, accuracy: 0, rank: -1, installed: true, inUse: true, favorite: favorites.has(id), location, recommended: false, isNew: false,
+    searchText: `${name} ${summary}`,
+  });
+  if (settings.transcriptionLocation === "remote-host") rows.push(remote("remote-host", "speech", "Your host", "Dictation runs on your transcription host", "host"));
+  if (settings.transcriptionLocation === "cloud") rows.push(remote("cloud-speech", "speech", "Fairspoken Cloud", "Hosted dictation", "cloud"));
+  if (settings.polishEnabled && settings.polishProvider === "cloud") rows.push(remote("cloud-polish", "polish", "Fairspoken Cloud polish", "Hosted cleanup", "cloud"));
+  return rows;
+}
+
+function steps(label: string, value: number, title = ""): HTMLElement {
+  const node = el("span", "model-steps");
+  node.setAttribute("role", "img");
+  node.setAttribute("aria-label", value ? `${label}: ${value} of 5` : `${label}: not rated`);
+  if (title) node.title = title;
+  for (let i = 1; i <= 5; i += 1) node.append(el("i", i <= value ? "on" : ""));
+  return node;
+}
+
+function badge(text: string, tone = ""): HTMLElement { return el("span", `model-badge${tone ? ` model-badge--${tone}` : ""}`, text); }
+
+function cell(...children: (Node | string)[]): HTMLElement {
+  const node = el("span", "model-cell"); node.setAttribute("role", "cell"); node.append(...children); return node;
+}
+
+function progressCell(id: string, percentage: number, message: string, cancel?: () => Promise<unknown>): HTMLElement {
+  const wrap = el("span", "model-progress");
+  const bar = el("span", "model-progress-bar"); const fill = el("span"); bar.append(fill);
+  fill.style.width = `${Math.max(2, Math.min(100, percentage))}%`;
+  const status = el("span", "model-progress-text", `${Math.round(percentage)}%`);
+  status.title = message;
+  wrap.append(bar, status);
+  progressCells.set(id, { status, bar: fill });
+  if (cancel) {
+    const stop = el("button", "icon-btn model-progress-cancel"); stop.type = "button"; stop.setAttribute("aria-label", "Cancel download"); stop.title = "Cancel download";
+    stop.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>';
+    stop.addEventListener("click", (event) => { event.stopPropagation(); void cancel().catch(e => say(String(e), true)); });
+    wrap.append(stop);
+  }
+  return wrap;
+}
+
+function action(row: Row): HTMLElement {
+  if (row.location !== "local") return el("span", "model-inuse", "In use");
+  if (row.kind === "speech") {
+    const progress = speechProgress.get(row.id);
+    if (speechDownload === row.id || (progress && !progress.done)) return progressCell(row.id, progress?.percentage ?? 0, progress?.message ?? "Starting download…");
+    if (row.installed && row.inUse) return el("span", "model-inuse", "In use");
+    if (row.installed) return button("Use", () => choose({ model: row.id, transcriptionLocation: "local" }));
+    return button("Download", () => startSpeechDownload(row.id), speechDownload !== null);
+  }
+  const m = row.polish!;
+  if (busyDownload() && download?.model === m.id) {
+    const total = download.total || m.bytes;
+    return progressCell(m.id, total ? (download.downloaded / total) * 100 : 0, download.message, async () => { await invoke("cancel_local_model_download"); say("Cancelling download…"); });
+  }
+  if (!m.supported) return el("span", "model-muted", "Unavailable");
+  if (row.inUse) return el("span", "model-inuse", "In use");
+  if (m.installed) return button("Use", () => choose({ polishProvider: "local", polishModel: m.id, polishEnabled: true }));
+  return button("Download", () => startPolishDownload(m), busyDownload());
+}
+
+function details(row: Row): HTMLElement {
+  const panel = el("div", "model-detail"); panel.setAttribute("role", "row"); panel.id = `model-detail-${row.id}`;
+  const body = el("div", "model-detail-body"); body.setAttribute("role", "cell");
+  if (row.detail && row.detail !== row.summary) body.append(el("p", "model-detail-text", row.detail));
+  const facts = el("dl", "model-facts");
+  const fact = (k: string, v: string) => { const d = el("div"); d.append(el("dt", "", k), el("dd", "", v)); facts.append(d); };
+  fact("Publisher", row.publisher);
+  if (row.languages) fact("Languages", row.languages);
+  if (row.bytes) fact(row.kind === "speech" ? "Download, about" : "Download", formatBytes(row.bytes));
+  if (row.kind === "speech" && row.inUse && measured) fact("Measured here", `${measured.toFixed(0)}× real time`);
+  if (row.polish?.downloads != null) fact("Hugging Face downloads", row.polish.downloads.toLocaleString());
+  body.append(facts);
+  if (row.location === "local") {
+    const supported = row.polish ? row.polish.supported : true;
+    const start = row.kind === "speech" ? () => startSpeechDownload(row.id) : () => startPolishDownload(row.polish!);
+    if (row.installed || (row.kind === "speech" ? speechDownload !== null : busyDownload())) linkDrafts.delete(row.id);
+    if (supported) body.append(...linkSection(row.id, row.name, start));
+    const buttons = el("div", "models-actions");
+    if (!row.installed && supported && !linkDrafts.has(row.id) && (row.kind === "speech" ? speechDownload === null : !busyDownload())) buttons.append(linkButton(row.id));
+    if (row.source?.startsWith("https://huggingface.co/")) buttons.append(button("Model page ↗", () => openUrl(row.source!)));
+    if (row.polish?.installed) buttons.append(button("Remove", async () => { await invoke("remove_local_model", { model: row.id }); await load(); }, busyDownload()));
+    if (buttons.childElementCount) body.append(buttons);
+  }
+  panel.append(body);
+  return panel;
+}
+
+function rowElement(row: Row): HTMLElement[] {
+  const node = el("div", `model-row${row.inUse ? " is-in-use" : ""}${expanded.has(row.id) ? " is-open" : ""}`);
+  node.setAttribute("role", "row"); node.id = `model-${row.id}`; node.dataset.kind = row.kind;
+
+  const star = el("button", `model-star${row.favorite ? " is-on" : ""}`); star.type = "button"; star.id = `model-star-${row.id}`;
+  star.setAttribute("aria-pressed", String(row.favorite)); star.setAttribute("aria-label", `Favourite ${row.name}`); star.title = row.favorite ? "Remove from favourites" : "Add to favourites";
+  star.innerHTML = SVG.star;
+  star.addEventListener("click", (event) => { event.stopPropagation(); toggleFavorite(row.id); document.getElementById(`model-${row.id}`)?.querySelector<HTMLElement>(".model-star")?.focus(); });
+
+  const open = el("button", "model-name-btn"); open.type = "button"; open.id = `model-open-${row.id}`;
+  open.setAttribute("aria-expanded", String(expanded.has(row.id))); open.setAttribute("aria-controls", `model-detail-${row.id}`);
+  const chevron = el("span", "model-chevron"); chevron.innerHTML = SVG.chevron;
+  const titleLine = el("span", "model-name");
+  titleLine.append(el("span", "model-name-text", row.name));
+  if (row.recommended) titleLine.append(badge("Recommended", "good"));
+  if (row.language === "en") titleLine.append(badge("EN"));
+  if (row.isNew) titleLine.append(badge("New", "new"));
+  const text = el("span", "model-name-stack"); text.append(titleLine, el("span", "model-name-summary", row.summary));
+  open.append(chevron, createPublisherIcon(row.publisher, { size: "sm" }), text);
+  open.addEventListener("click", (event) => { event.stopPropagation(); toggle(row.id); });
+
+  const kind = el("span", `model-kind model-kind--${row.kind}`); kind.innerHTML = row.kind === "speech" ? SVG.speech : SVG.polish;
+  kind.title = row.kind === "speech" ? "Speech to text" : "Cleanup and polish";
+  kind.setAttribute("aria-label", kind.title); kind.setAttribute("role", "img");
+
+  const measuredTitle = row.kind === "speech" && row.inUse && measured ? `Measured on this computer: ${measured.toFixed(0)}× real time` : "";
+  const where = row.location === "local" ? "This device" : row.location === "host" ? "Your host" : "Cloud";
+  node.append(
+    cell(star),
+    cell(open),
+    cell(kind),
+    cell(row.speed ? steps("Speed", row.speed, measuredTitle) : el("span", "model-muted", "—")),
+    cell(row.accuracy ? steps("Accuracy", row.accuracy) : el("span", "model-muted", "—")),
+    Object.assign(cell(row.bytes ? formatBytes(row.bytes) : "—"), { className: "model-cell col-size num" }),
+    Object.assign(cell(where), { className: `model-cell model-where model-where--${row.location}` }),
+    Object.assign(cell(action(row)), { className: "model-cell model-action-cell" }),
+  );
+  node.addEventListener("click", () => toggle(row.id));
+  return expanded.has(row.id) ? [node, details(row)] : [node];
+}
+
+function toggle(id: string): void {
+  if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+  render();
+  document.getElementById(`model-${id}`)?.querySelector<HTMLElement>(".model-name-btn")?.focus({ preventScroll: true });
+}
+
+function renderSummary(): void {
+  const speechName = settings.transcriptionLocation === "remote-host" ? "your host" : settings.transcriptionLocation === "cloud" ? "Fairspoken Cloud" : speechInfo(settings.model).name;
+  const dictation = root.querySelector("#dictationProvider")!;
+  dictation.replaceChildren(el("span", "model-summary-k", "Dictation"), el("strong", "", speechName));
+  const polishName = !settings.polishEnabled ? "Off" : settings.polishProvider === "cloud" ? "Fairspoken Cloud" : catalog.polish.find(m => m.id === settings.polishModel)?.name ?? settings.polishModel;
+  root.querySelector("#polishProvider")!.replaceChildren(el("span", "model-summary-k", "Polish"), el("strong", "", polishName));
+  const providerActions = root.querySelector("#polishProviderActions")!;
+  providerActions.replaceChildren();
+  if (settings.polishEnabled) providerActions.append(button("Turn polish off", () => choose({ polishEnabled: false })));
+  if (cloudAvailable) providerActions.append(button("Use cloud polish", () => choose({ polishProvider: "cloud", polishEnabled: true }), !settings.cloudAuthToken || (settings.polishEnabled && settings.polishProvider === "cloud")));
+}
+
+function render(): void {
+  if (!settings || !catalog) return;
+  const focusedId = root.contains(document.activeElement) ? (document.activeElement as HTMLElement).id : "";
+  progressCells.clear();
+  renderSummary();
+  const rows = filterAndSort([...remoteRows(), ...speechRows(), ...polishRows()], filter, sort);
+  rowsHost.replaceChildren(...rows.flatMap(rowElement));
+  if (!rows.length) {
+    const empty = el("div", "model-empty"); empty.setAttribute("role", "row");
+    const text = el("span", "", "No models match. "); text.setAttribute("role", "cell");
+    const reset = el("button", "link-btn", "Clear filters"); reset.type = "button";
+    reset.addEventListener("click", resetFilters);
+    text.append(reset); empty.append(text); rowsHost.append(empty);
+  }
+  if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
+}
+
+function resetFilters(): void {
+  Object.assign(filter, { query: "", kind: "all", language: "all", downloadedOnly: false, localOnly: false });
+  searchInput.value = ""; scheduleSearch(); syncFilterControls(); render();
+}
+
+const kindFilter = root.querySelector<HTMLElement>("#modelKindFilter")!;
+const languageFilter = root.querySelector<HTMLSelectElement>("#modelLanguageFilter")!;
+const downloadedFilter = root.querySelector<HTMLButtonElement>("#modelDownloadedFilter")!;
+const localFilter = root.querySelector<HTMLButtonElement>("#modelLocalFilter")!;
+const sortHead = root.querySelector<HTMLElement>("#modelSort")!;
+function syncFilterControls(): void {
+  for (const option of kindFilter.querySelectorAll<HTMLButtonElement>("button")) option.setAttribute("aria-pressed", String(option.dataset.value === filter.kind));
+  languageFilter.value = filter.language;
+  downloadedFilter.setAttribute("aria-pressed", String(filter.downloadedOnly));
+  localFilter.setAttribute("aria-pressed", String(filter.localOnly));
+  // Column headers sort; the active one says which way. Choosing it again
+  // returns to the recommended order.
+  for (const header of sortHead.querySelectorAll<HTMLButtonElement>(".model-sort-btn")) {
+    const active = header.dataset.sort === sort;
+    header.classList.toggle("is-active", active);
+    header.closest("[role='columnheader']")?.setAttribute("aria-sort", active ? (sort === "name" || sort === "size" ? "ascending" : "descending") : "none");
+    header.title = active ? "Back to recommended order" : `Sort by ${header.textContent?.toLowerCase()}`;
+  }
+}
+kindFilter.addEventListener("click", (event) => {
+  const value = (event.target as HTMLElement).closest<HTMLButtonElement>("button")?.dataset.value;
+  if (value === "all" || value === "speech" || value === "polish") { filter.kind = value; syncFilterControls(); render(); }
+});
+languageFilter.addEventListener("change", () => { filter.language = languageFilter.value as LibraryFilter["language"]; render(); });
+downloadedFilter.addEventListener("click", () => { filter.downloadedOnly = !filter.downloadedOnly; syncFilterControls(); render(); });
+localFilter.addEventListener("click", () => { filter.localOnly = !filter.localOnly; syncFilterControls(); render(); });
+sortHead.addEventListener("click", (event) => {
+  const key = (event.target as HTMLElement).closest<HTMLButtonElement>(".model-sort-btn")?.dataset.sort as SortKey | undefined;
+  if (!key) return;
+  sort = sort === key ? "recommended" : key;
+  syncFilterControls(); render();
+});
+syncFilterControls();
+
+async function startSpeechDownload(model: string): Promise<void> {
+  speechDownload = model; speechProgress.set(model, { percentage: 0, message: "Starting download…", done: false }); render();
+  try { await invoke("begin_prepare_transcription_model", { request: { model } }); }
+  catch (e) { speechDownload = null; speechProgress.delete(model); render(); throw e; }
+}
+async function startPolishDownload(m: Model): Promise<void> {
+  download = { model: m.id, stage: "runtime", downloaded: 0, total: 0, message: "Starting download…" }; render();
+  try { await invoke("download_local_model", { model: m.id }); say(`${m.name} downloaded. Choose Use to enable it.`); }
+  finally { await load(); }
+}
+function busyDownload(): boolean { return !!download && ["runtime", "model"].includes(download.stage); }
+function progressUpdate(value: Download): void {
+  download = value;
+  const current = progressCells.get(value.model);
+  if (current && value.total) {
+    const pct = (value.downloaded / value.total) * 100;
+    current.bar.style.width = `${Math.max(2, pct)}%`;
+    current.status.textContent = `${Math.round(pct)}%`;
+    current.status.title = `${value.message} · ${formatBytes(value.downloaded)} / ${formatBytes(value.total)}`;
+  }
+}
+async function load(refresh = false): Promise<void> {
+  if (loading) { reloadRequested = true; refreshRequested = refreshRequested || refresh; return; }
+  loading = true;
+  try {
+    const values = await Promise.all([
+      invoke<Settings>("get_settings"),
+      invoke<Catalog>("get_local_model_catalog", { refresh }),
+      invoke<SpeechModel[]>("get_dictation_models"),
+      invoke<boolean>("get_cloud_available").catch(() => false),
+      invoke<HistoryEntry[]>("get_transcript_history").catch(() => [] as HistoryEntry[]),
+    ]);
+    const previous = catalog;
+    let history: HistoryEntry[];
+    [settings, catalog, speech, cloudAvailable, history] = values;
+    measured = measuredSpeed(history ?? []);
+    if (!refresh && previous) {
+      for (const model of catalog.polish) model.downloads = previous.polish.find(m => m.id === model.id)?.downloads ?? model.downloads;
+    }
+    download = catalog.download; render();
+    if (refresh) say(catalog.metadataError ?? "Model information refreshed from Hugging Face.", !!catalog.metadataError);
+  } finally {
+    loading = false;
+    if (reloadRequested) {
+      const refreshNext = refreshRequested;
+      reloadRequested = refreshRequested = false;
+      void load(refreshNext).catch(e => say(String(e), true));
+    }
+  }
+}
+root.querySelector<HTMLButtonElement>("#refreshModels")!.addEventListener("click", event => {
+  const button = event.currentTarget as HTMLButtonElement; button.disabled = true;
+  void load(true).catch(e => say(String(e), true)).finally(() => { button.disabled = false; });
+});
+void listen<Download>("local-model-download", event => {
+  const wasBusy = busyDownload(); progressUpdate(event.payload);
+  if (catalog && wasBusy !== busyDownload()) render();
+  if (["error", "cancelled"].includes(event.payload.stage)) say(event.payload.message, event.payload.stage === "error");
+}).catch(e => say(String(e), true));
+void listen<{ model: string; percentage: number; message: string; done: boolean; error?: string }>("model-prepare-progress", event => {
+  const e = event.payload; speechProgress.set(e.model, e); if (!e.done) speechDownload = e.model;
+  const current = progressCells.get(e.model);
+  if (current && !e.done) { current.bar.style.width = `${Math.max(2, e.percentage)}%`; current.status.textContent = `${Math.round(e.percentage)}%`; current.status.title = e.message; }
+  else if (!current && !e.done && settings) render();
+  if (e.done) { speechDownload = null; if (e.error) say(e.error, true); void load().catch(e => say(String(e), true)); }
+}).catch(e => say(String(e), true));
+void listen<Settings>("settings-updated", event => { settings = event.payload; void load().catch(e => say(String(e), true)); }).catch(e => say(String(e), true));
+// Refresh memory state only while the Models screen is on screen in a visible
+// window; the poll stops when either goes away. Don't rebuild focused controls.
+let memoryPoll: ReturnType<typeof setInterval> | undefined;
+function syncMemoryPoll(): void {
+  const visible = root.classList.contains("active") && document.visibilityState === "visible";
+  if (visible && memoryPoll === undefined) {
+    memoryPoll = setInterval(() => {
+      if (!catalog || root.contains(document.activeElement) || busyDownload()) return;
+      void load().catch(() => {});
+    }, 5000);
+  } else if (!visible && memoryPoll !== undefined) {
+    clearInterval(memoryPoll);
+    memoryPoll = undefined;
+  }
+}
+document.addEventListener("home-screen-changed", syncMemoryPoll);
+document.addEventListener("visibilitychange", syncMemoryPoll);
+syncMemoryPoll();
+void load().catch(e => say(String(e), true));
+
+
 // Download links (model_link.rs): a model with one downloads from that link,
 // typically a .zip on the organisation's own server, instead of its usual
 // download. Open editors and what is typed in them survive re-renders.
@@ -245,136 +488,6 @@ function linkButton(model: string): HTMLButtonElement {
   node.id = `model-link-open-${model}`;
   return node;
 }
-async function startSpeechDownload(model: string): Promise<void> {
-  speechDownload = model; render();
-  try { await invoke("begin_prepare_transcription_model", { request: { model } }); }
-  catch (e) { speechDownload = null; render(); throw e; }
-}
-async function startPolishDownload(m: Model): Promise<void> {
-  download = { model: m.id, stage: "runtime", downloaded: 0, total: 0, message: "Starting download…" }; render();
-  try { await invoke("download_local_model", { model: m.id }); say(`${m.name} downloaded. Choose Use to enable it.`); }
-  finally { await load(); }
-}
-function busyDownload(): boolean { return !!download && ["runtime", "model"].includes(download.stage); }
-function progressUpdate(value: Download): void {
-  download = value;
-  const current = rows.get(value.model);
-  if (current) {
-    current.status.textContent = value.message + (value.total ? ` · ${size(value.downloaded)} / ${size(value.total)}` : "");
-    current.progress.hidden = !busyDownload();
-    current.progress.value = value.total ? (value.downloaded / value.total) * 100 : 0;
-  }
-}
-function render(): void {
-  const focusedId = root.contains(document.activeElement) ? (document.activeElement as HTMLElement).id : "";
-  rows.clear();
-  root.querySelector("#dictationProvider")!.textContent = settings.transcriptionLocation === "local" ? "" : `Dictating on ${settings.transcriptionLocation === "cloud" ? "Fairspoken Cloud" : "your host"}. Choose Use to dictate on this device.`;
-  const speechList = root.querySelector("#dictationModels")!; speechList.replaceChildren();
-  for (const family of ["parakeet", "whisper"]) {
-    const options = speech.filter(m => m.model.startsWith("parakeet") === (family === "parakeet"));
-    if (!options.length) continue;
-    const preferred = variants.get(family) ?? options.find(m => m.model === settings.model)?.model ?? options[0].model;
-    const m = options.find(m => m.model === preferred) ?? options[0];
-    variants.set(family, m.model);
-    const parakeet = family === "parakeet";
-    const selected = settings.transcriptionLocation === "local" && settings.model === m.model;
-    const r = row(m.model, parakeet ? "Parakeet" : "Whisper", parakeet ? parakeetVariant(m.model).publisher : "OpenAI", parakeet ? parakeetVariant(m.model).detail : "OpenAI · Multilingual speech recognition", "");
-    r.element.id = `family-${family}`;
-    const picker = variantPicker(family, parakeet ? "Parakeet" : "Whisper", options.map(option => ({
-      value: option.model,
-      label: `${parakeet ? parakeetVariant(option.model).label : option.model}${option.cached ? " · Downloaded" : ""}`,
-    })), m.model);
-    const name = parakeet ? `Parakeet ${parakeetVariant(m.model).label.split(" · ")[0]}` : `Whisper ${m.model}`;
-    if (m.cached || speechDownload !== null) linkDrafts.delete(m.model);
-    r.element.querySelector(".ds-list-row-content")!.append(picker, ...linkSection(m.model, name, () => startSpeechDownload(m.model)));
-    r.actions.append(button(m.cached ? (selected ? "Selected" : "Use") : speechDownload === m.model ? "Downloading…" : "Download", async () => {
-      if (m.cached) return choose({ model: m.model, transcriptionLocation: "local" });
-      await startSpeechDownload(m.model);
-    }, (selected && m.cached) || speechDownload !== null));
-    if (!m.cached && speechDownload === null && !linkDrafts.has(m.model)) r.actions.append(linkButton(m.model));
-    const progress = speechProgress.get(m.model); const current = rows.get(m.model)!;
-    if (progress && !progress.done) { current.status.textContent = progress.message; current.progress.hidden = false; current.progress.value = progress.percentage; }
-    speechList.append(r.element);
-  }
-  root.querySelector("#polishProvider")!.textContent = !settings.polishEnabled ? "Off" : settings.polishProvider === "local" ? "On this device" : "Fairspoken Cloud";
-  const providerActions = root.querySelector("#polishProviderActions")!;
-  providerActions.replaceChildren(button("Turn off", () => choose({ polishEnabled: false }), !settings.polishEnabled));
-  if (cloudAvailable) providerActions.append(button("Use cloud", () => choose({ polishProvider: "cloud", polishEnabled: true }), !settings.cloudAuthToken || (settings.polishEnabled && settings.polishProvider === "cloud")));
-  const polishList = root.querySelector("#polishModels")!; polishList.replaceChildren();
-  for (const m of catalog.polish) {
-    const r = row(m.id, m.name, m.publisher, `${m.description} · ${size(m.bytes)}${m.downloads !== null ? ` · ${m.downloads.toLocaleString()} downloads` : ""}`, !m.supported ? "Unavailable on this platform" : m.selected && m.installed && m.loaded ? "Loaded" : "");
-    if (busyDownload() && download?.model === m.id) {
-      r.actions.append(button("Cancel download", async () => { await invoke("cancel_local_model_download"); say("Cancelling download…"); }));
-    } else {
-      r.actions.append(button(m.installed ? (m.selected ? "Selected" : "Use") : "Download", async () => {
-        if (m.installed) return choose({ polishProvider: "local", polishModel: m.id, polishEnabled: true });
-        await startPolishDownload(m);
-      }, !m.supported || (m.selected && m.installed) || busyDownload()));
-      if (m.installed) r.actions.append(button("Remove", async () => { await invoke("remove_local_model", { model: m.id }); await load(); }, busyDownload()));
-      else if (m.supported && !busyDownload() && !linkDrafts.has(m.id)) r.actions.append(linkButton(m.id));
-    }
-    if (m.installed || !m.supported || busyDownload()) linkDrafts.delete(m.id);
-    if (m.supported) r.element.querySelector(".ds-list-row-content")!.append(...linkSection(m.id, m.name, () => startPolishDownload(m)));
-    polishList.append(r.element);
-  }
-  if (download) progressUpdate(download);
-  if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
-}
-async function load(refresh = false): Promise<void> {
-  if (loading) { reloadRequested = true; refreshRequested = refreshRequested || refresh; return; }
-  loading = true;
-  try {
-    const values = await Promise.all([invoke<Settings>("get_settings"), invoke<Catalog>("get_local_model_catalog", { refresh }), invoke<SpeechModel[]>("get_dictation_models"), invoke<boolean>("get_cloud_available").catch(() => false)]);
-    const previous = catalog;
-    [settings, catalog, speech, cloudAvailable] = values;
-    if (!refresh && previous) {
-      for (const model of catalog.polish) model.downloads = previous.polish.find(m => m.id === model.id)?.downloads ?? model.downloads;
-    }
-    download = catalog.download; render();
-    if (refresh) say(catalog.metadataError ?? "Compatible model information refreshed from Hugging Face.", !!catalog.metadataError);
-  } finally {
-    loading = false;
-    if (reloadRequested) {
-      const refreshNext = refreshRequested;
-      reloadRequested = refreshRequested = false;
-      void load(refreshNext).catch(e => say(String(e), true));
-    }
-  }
-}
-root.querySelector<HTMLButtonElement>("#refreshModels")!.addEventListener("click", event => {
-  const button = event.currentTarget as HTMLButtonElement; button.disabled = true;
-  void load(true).catch(e => say(String(e), true)).finally(() => { button.disabled = false; });
-});
-void listen<Download>("local-model-download", event => {
-  const wasBusy = busyDownload(); progressUpdate(event.payload);
-  if (catalog && wasBusy !== busyDownload()) render();
-  if (["error", "cancelled"].includes(event.payload.stage)) say(event.payload.message, event.payload.stage === "error");
-}).catch(e => say(String(e), true));
-void listen<{ model: string; percentage: number; message: string; done: boolean; error?: string }>("model-prepare-progress", event => {
-  const e = event.payload; speechProgress.set(e.model, e); if (!e.done) speechDownload = e.model; const row = rows.get(e.model);
-  if (row) { row.status.textContent = e.message; row.progress.hidden = e.done; row.progress.value = e.percentage; }
-  if (e.done) { speechDownload = null; if (e.error) say(e.error, true); void load().catch(e => say(String(e), true)); }
-}).catch(e => say(String(e), true));
-void listen<Settings>("settings-updated", event => { settings = event.payload; void load().catch(e => say(String(e), true)); }).catch(e => say(String(e), true));
-// Refresh memory state only while the Models screen is on screen in a visible
-// window; the poll stops when either goes away. Don't rebuild focused controls.
-let memoryPoll: ReturnType<typeof setInterval> | undefined;
-function syncMemoryPoll(): void {
-  const visible = root.classList.contains("active") && document.visibilityState === "visible";
-  if (visible && memoryPoll === undefined) {
-    memoryPoll = setInterval(() => {
-      if (!catalog || root.contains(document.activeElement) || busyDownload()) return;
-      void load().catch(() => {});
-    }, 5000);
-  } else if (!visible && memoryPoll !== undefined) {
-    clearInterval(memoryPoll);
-    memoryPoll = undefined;
-  }
-}
-document.addEventListener("home-screen-changed", syncMemoryPoll);
-document.addEventListener("visibilitychange", syncMemoryPoll);
-syncMemoryPoll();
-void load().catch(e => say(String(e), true));
 
 type HubModel = { id: string; author?: string; name?: string; downloads: number; likes: number; pipelineTag: string | null; libraryName: string | null; languages: string[]; license: string | null; description?: string | null; gated: boolean; source: string };
 type SearchHit = { key: string; title: string; publisher: string; detail: string; family?: string; model?: string; polishId?: string; repo?: string };
@@ -414,29 +527,24 @@ function compatibleHit(model: HubModel): SearchHit | null {
   const detail = [model.libraryName, model.languages.slice(0, 3).join(", "), `${(model.downloads ?? 0).toLocaleString()} downloads`, model.license, model.gated ? "Access approval required" : null].filter(Boolean).join(" · ");
   return { key: `hub-${model.id}`, title: `${publisher}/${title}`, publisher, detail, family: match?.family, model: match?.model, polishId: polish?.id, repo: model.id };
 }
+// What the query keeps in the table, for the popover's first group.
 function localHits(query: string): SearchHit[] {
-  const needle = query.toLowerCase();
-  const hits: SearchHit[] = [];
-  for (const family of ["parakeet", "whisper"] as const) {
-    const options = speech.filter(m => m.model.startsWith("parakeet") === (family === "parakeet"));
-    if (!options.length) continue;
-    const title = family === "parakeet" ? "Parakeet" : "Whisper";
-    const publisher = family === "parakeet" ? "NVIDIA" : "OpenAI";
-    if (![title, publisher, family, ...options.map(m => m.model), ...options.map(m => PARAKEET_VARIANTS[m.model]?.publisher ?? "")].join(" ").toLowerCase().includes(needle)) continue;
-    hits.push({ key: `local-${family}`, title, publisher, detail: family === "parakeet" ? "On-device dictation" : "whisper.cpp dictation", family, model: variants.get(family) ?? options.find(m => m.model === settings?.model)?.model ?? options[0].model });
-  }
-  for (const model of catalog?.polish ?? []) {
-    if (![model.id, model.name, model.publisher, model.description].join(" ").toLowerCase().includes(needle)) continue;
-    hits.push({ key: `local-${model.id}`, title: model.name, publisher: model.publisher, detail: model.description, polishId: model.id });
-  }
-  return hits;
+  if (!settings || !catalog) return [];
+  const rows = filterAndSort([...speechRows(), ...polishRows()], { ...filter, query }, sort);
+  return rows.slice(0, 4).map((row) => ({ key: `local-${row.id}`, title: row.name, publisher: row.publisher, detail: row.summary, model: row.kind === "speech" ? row.id : undefined, polishId: row.kind === "polish" ? row.id : undefined }));
 }
+// Show a model's row: clear what would hide it, open it, and move to it.
 function jumpTo(hit: SearchHit): void {
   closePopover();
-  if (hit.family && hit.model) { variants.set(hit.family, hit.model); render(); }
-  const target = hit.family ? document.getElementById(`variant-${hit.family}`) : document.getElementById(`model-${hit.polishId}`)?.querySelector("button");
+  const id = hit.model ?? hit.polishId ?? (hit.family === "whisper" ? speech.find(m => !m.model.startsWith("parakeet"))?.model : undefined);
+  if (!id) return;
+  Object.assign(filter, { query: "", kind: "all", language: "all", downloadedOnly: false, localOnly: false });
+  syncFilterControls();
+  expanded.add(id);
+  render();
+  const target = document.getElementById(`model-${id}`);
   target?.scrollIntoView({ block: "center", behavior: "smooth" });
-  target?.focus({ preventScroll: true });
+  target?.querySelector<HTMLElement>(".model-name-btn")?.focus({ preventScroll: true });
 }
 function placePopover(): void {
   const box = searchBox.getBoundingClientRect();
@@ -488,7 +596,7 @@ function renderPopover(local: SearchHit[], hub: SearchHit[], note: string | null
     group.append(heading, ...rows.map((hit, i) => optionButton(hit, start + i)));
     searchListbox.append(group);
   };
-  addGroup("On this device", local, 0);
+  addGroup("In your library", local, 0);
   addGroup("Hugging Face", hub, local.length);
   if (note && !searchHits.length) {
     const empty = document.createElement("div"); empty.className = "model-search-empty"; empty.textContent = note;
@@ -505,16 +613,18 @@ function renderPopover(local: SearchHit[], hub: SearchHit[], note: string | null
   placePopover();
   paintActive();
 }
+const hubSection = root.querySelector<HTMLElement>("#hubSection")!;
 function renderHubList(hits: SearchHit[]): void {
   searchResults.replaceChildren();
+  hubSection.hidden = hits.length === 0;
   for (const hit of hits) {
-    const item = document.createElement("div"); item.className = "ds-list-row model-row model-search-hit";
+    const item = document.createElement("div"); item.className = "ds-list-row model-hub-row model-search-hit";
     const content = document.createElement("div"); content.className = "ds-list-row-content";
     const title = document.createElement("div"); title.className = "ds-list-row-title"; title.textContent = hit.title;
     const detail = document.createElement("span"); detail.className = "ds-list-row-supporting"; detail.textContent = hit.detail;
     content.append(title, detail);
     const actions = document.createElement("div"); actions.className = "models-actions";
-    actions.append(button(hit.family ? "Choose variant" : "Show model", async () => jumpTo(hit)));
+    actions.append(button("Show in library", async () => jumpTo(hit)));
     if (hit.repo) actions.append(button("Model page ↗", () => openUrl(`https://huggingface.co/${hit.repo}`)));
     item.append(createPublisherIcon(hit.publisher), content, actions);
     searchResults.append(item);
@@ -528,7 +638,7 @@ async function searchHub(query: string, revision: number, local: SearchHit[]): P
     if (revision !== searchRevision) return;
     const hub = result.models.map(compatibleHit).filter((hit): hit is SearchHit => !!hit);
     const count = hub.length;
-    searchStatus.textContent = count ? `${count} compatible model${count === 1 ? "" : "s"}${result.cached ? " · Cached" : ""}` : "No compatible models for that search.";
+    searchStatus.textContent = count ? `${count} compatible on Hugging Face${result.cached ? " · cached" : ""}` : "No compatible models on Hugging Face for that search.";
     renderHubList(hub);
     if (document.activeElement === searchInput) renderPopover(localHits(query), hub, count ? null : "No compatible models for that search.");
   } catch (error) {
@@ -544,7 +654,8 @@ function scheduleSearch(): void {
   const revision = ++searchRevision; clearTimeout(searchTimer);
   const query = searchInput.value.trim();
   searchClear.hidden = !query;
-  searchResults.replaceChildren(); searchResults.setAttribute("aria-busy", "false");
+  filter.query = query; render();
+  searchResults.replaceChildren(); hubSection.hidden = true; searchResults.setAttribute("aria-busy", "false");
   if (!query) {
     closePopover();
     searchStatus.textContent = "";
@@ -585,13 +696,5 @@ searchInput.addEventListener("keydown", event => {
 });
 document.addEventListener("pointerdown", event => {
   if (popoverOpen && !searchBox.contains(event.target as Node) && !searchListbox.contains(event.target as Node)) closePopover();
-  for (const list of root.querySelectorAll<HTMLElement>(".ds-select-listbox")) {
-    if (list.hidden) continue;
-    const field = list.closest(".model-variant");
-    if (field && !field.contains(event.target as Node)) {
-      list.hidden = true;
-      field.querySelector("[role='combobox']")?.setAttribute("aria-expanded", "false");
-    }
-  }
 });
 window.addEventListener("resize", () => { if (popoverOpen) placePopover(); });

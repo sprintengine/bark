@@ -74,10 +74,13 @@
         <!-- ════ HOME (stats, driven by homeStats.ts) ════ -->
         <section class="screen active" id="screen-home">
           <div class="empty" id="homeEmpty" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19V9M9 19V5M14 19v-7M19 19v-11" stroke-linecap="round"/></svg>
+            <span class="empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4.5 10.5v3M8 7.5v9M11.5 4.5v15M15 8v8M18.5 10v4"/></svg></span>
             <div class="e-title">Start with your voice</div>
-            <div class="e-sub">Dictate with your shortcut. Your stats appear here.</div>
-            <button class="btn btn-primary" data-open="speedtest" type="button">Run a speed test</button>
+            <div class="e-sub">Press your shortcut in any app and speak. Your pace, words and time saved appear here.</div>
+            <div class="e-actions">
+              <button class="btn btn-primary" data-open="onboarding" type="button">Set up Fairspoken</button>
+              <button class="btn" data-open="speedtest" type="button">Run a speed test</button>
+            </div>
           </div>
 
           <div id="homeStats" hidden>
@@ -228,40 +231,54 @@
           </div>
         </section>
 
+        <!-- ════ MODELS (a library table, driven by modelDashboard.ts) ════ -->
         <section class="screen" id="screen-models" aria-label="Models">
-          <section class="settings-section" aria-label="Find models">
-            <div class="settings-card model-search-card">
-              <div class="row row--field">
-                <span class="ds-field-box" id="modelSearchBox">
-                  <svg class="model-search-hint" viewBox="0 0 11 11" fill="none" aria-hidden="true"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M7 7l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                  <input id="modelSearch" class="ds-input ds-input--seamless" type="search" placeholder="Search models on this device and Hugging Face" autocomplete="off" maxlength="120" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="modelSearchListbox" aria-label="Search speech models on this device and Hugging Face." aria-describedby="modelSearchStatus" />
-                  <button type="button" id="modelSearchClear" class="model-search-clear" hidden>Clear</button>
-                </span>
-                <button class="btn" id="refreshModels" type="button">Refresh</button>
-              </div>
-              <div class="model-search-status" id="modelSearchStatus" role="status" aria-live="polite"></div>
-              <div id="modelSearchListbox" class="ds-popover model-search-popover" role="listbox" aria-label="Model search results" hidden></div>
-              <div id="modelSearchResults" aria-busy="false"></div>
+          <div class="model-toolbar">
+            <span class="ds-field-box" id="modelSearchBox">
+              <svg class="model-search-hint" viewBox="0 0 11 11" fill="none" aria-hidden="true"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M7 7l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <input id="modelSearch" class="ds-input ds-input--seamless" type="search" placeholder="Search models, here and on Hugging Face" autocomplete="off" maxlength="120" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="modelSearchListbox" aria-label="Search models on this device and Hugging Face." aria-describedby="modelSearchStatus" />
+              <button type="button" id="modelSearchClear" class="model-search-clear" hidden>Clear</button>
+            </span>
+            <div class="seg" id="modelKindFilter" role="group" aria-label="Kind">
+              <button type="button" data-value="all" aria-pressed="true">All</button>
+              <button type="button" data-value="speech" aria-pressed="false">Speech</button>
+              <button type="button" data-value="polish" aria-pressed="false">Polish</button>
             </div>
-          </section>
+            <select id="modelLanguageFilter" class="setting-select" aria-label="Language">
+              <option value="all">All languages</option>
+              <option value="en">English only</option>
+              <option value="multi">Multilingual</option>
+            </select>
+            <button type="button" class="filter-chip" id="modelDownloadedFilter" aria-pressed="false">Downloaded</button>
+            <button type="button" class="filter-chip" id="modelLocalFilter" aria-pressed="false">On this device</button>
+            <span class="model-toolbar-spacer"></span>
+            <button class="icon-btn" id="refreshModels" type="button" aria-label="Refresh from Hugging Face" title="Refresh from Hugging Face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg></button>
+          </div>
+          <div class="model-search-status" id="modelSearchStatus" role="status" aria-live="polite"></div>
+          <div id="modelSearchListbox" class="ds-popover model-search-popover" role="listbox" aria-label="Model search results" hidden></div>
           <p id="modelFeedback" class="model-feedback" role="status" aria-live="polite"></p>
-          <section class="settings-section" aria-labelledby="dictationModelsTitle">
-            <h2 id="dictationModelsTitle">Dictation</h2>
-            <p class="settings-section-help" id="dictationProvider"></p>
-            <div class="settings-card" id="dictationModels"></div>
-          </section>
-          <section class="settings-section" aria-labelledby="polishModelsTitle">
-            <h2 id="polishModelsTitle">Text polish</h2>
-            <div class="settings-card" id="polishModelsCard">
-              <div class="row">
-                <div class="row-text">
-                  <div class="row-label">Polish</div>
-                  <div class="row-help" id="polishProvider"></div>
-                </div>
-                <div class="row-control" id="polishProviderActions"></div>
-              </div>
-              <div id="polishModels"></div>
+          <div class="model-summary" id="modelSummary">
+            <span id="dictationProvider"></span>
+            <span id="polishProvider"></span>
+            <span class="model-summary-actions" id="polishProviderActions"></span>
+          </div>
+          <div class="card model-table" id="modelTable" role="table" aria-label="Models" aria-describedby="modelFootnote">
+            <div class="model-table-head" role="row" id="modelSort">
+              <span role="columnheader"><span class="sr-only">Favourite</span></span>
+              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="name">Model</button></span>
+              <span role="columnheader">Kind</span>
+              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="speed">Speed</button></span>
+              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="accuracy">Accuracy</button></span>
+              <span role="columnheader" class="col-size"><button type="button" class="model-sort-btn" data-sort="size">Size</button></span>
+              <span role="columnheader">Runs on</span>
+              <span role="columnheader"><span class="sr-only">Action</span></span>
             </div>
+            <div id="modelRows" role="rowgroup"></div>
+          </div>
+          <p class="model-footnote" id="modelFootnote">Speed and accuracy are estimates from each model's published results, relative to the others of its kind. The model in use shows its speed as measured on this computer.</p>
+          <section class="home-section" aria-labelledby="hubTitle" id="hubSection" hidden>
+            <div class="section-head"><h2 id="hubTitle">From Hugging Face</h2></div>
+            <div class="card" id="modelSearchResults" aria-busy="false"></div>
           </section>
         </section>
 
@@ -306,6 +323,13 @@
             <option value="43200">After 30 days</option>
           </select>
         </div>
+      </div>
+      <div class="row">
+        <div class="row-text">
+          <div class="row-label">Setup guide</div>
+          <div class="row-help">Permissions, microphone, model and a first dictation.</div>
+        </div>
+        <div class="row-control"><button class="btn" type="button" data-open="onboarding">Open</button></div>
       </div>
     </div>
   </section>

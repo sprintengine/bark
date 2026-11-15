@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import "./dashboardShell";
@@ -172,6 +173,12 @@ for (const opener of document.querySelectorAll<HTMLElement>('[data-open="speedte
 
 for (const opener of document.querySelectorAll<HTMLElement>('[data-open="voicetest"]')) {
   opener.addEventListener("click", openVoiceTest);
+}
+
+// The setup guide is its own window (onboarding.rs); Settings and the empty
+// Home reopen it.
+for (const opener of document.querySelectorAll<HTMLElement>('[data-open="onboarding"]')) {
+  opener.addEventListener("click", () => { void invoke("open_onboarding_window").catch(() => {}); });
 }
 
 // The pill's gear opens this window and asks it to deep-link to a screen.
