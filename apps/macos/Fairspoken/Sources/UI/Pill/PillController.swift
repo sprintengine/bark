@@ -28,11 +28,16 @@ final class PillPanel: NSPanel {
 final class PillController {
     private let panel: PillPanel
     private var hideWork: DispatchWorkItem?
-    private static let size = NSSize(width: 520, height: 76)
+    /// Room for the pill at its largest (two lines of live text); the panel is transparent
+    /// and ignores the mouse, so the spare room is invisible.
+    private static let size = NSSize(width: 520, height: 150)
 
     init(model: AppModel) {
         panel = PillPanel(contentRect: NSRect(origin: .zero, size: Self.size))
+        // Pinned to the bottom so the pill grows upwards as live text appears.
         let root = PillView(dictation: model.dictation, shortcut: HotkeyController.currentShortcutSymbols)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 15)
         let host = NSHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: Self.size)

@@ -165,15 +165,18 @@ final class ScreenshotHarness {
     private func pillShots(suffix: String) async {
         let phases: [(String, DictationController.Phase)] = [
             ("listening", .listening(since: Date().addingTimeInterval(-12))),
+            ("listening-text", .listening(since: Date().addingTimeInterval(-9))),
             ("transcribing", .transcribing),
             ("inserted", .done(.init(text: "x", words: 38, delivery: .pasted(app: "Mail"), latencyMs: 68, placement: .neuralEngine))),
             ("error", .failed("No speech detected")),
         ]
         var controllers: [DictationController] = []
         var feeders: [Task<Void, Never>] = []
-        for (_, phase) in phases {
+        for (name, phase) in phases {
             let c = DictationController(settings: model.settings, models: model.models, history: model.history, permissions: model.permissions)
-            c.showcase(phase)
+            c.showcase(phase, liveText: name == "listening-text"
+                ? "The patient reports a dry cough for two weeks, with no fever, and mild shortness of breath when climbing stairs"
+                : "")
             feeders.append(feedLevels(into: c.meter))
             controllers.append(c)
         }
@@ -184,13 +187,13 @@ final class ScreenshotHarness {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 760, height: 470))
+        window.setContentSize(NSSize(width: 760, height: 600))
         window.center()
         window.makeKeyAndOrderFront(nil)
         showcaseWindow = window
         try? await Task.sleep(for: .milliseconds(1500))
         window.contentViewController = NSHostingController(rootView: PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols))
-        window.setContentSize(NSSize(width: 760, height: 470))
+        window.setContentSize(NSSize(width: 760, height: 600))
         try? await Task.sleep(for: .milliseconds(250))
         await capture(window, as: "pill-\(suffix)")
         feeders.forEach { $0.cancel() }
@@ -256,7 +259,7 @@ private struct PillShowcase: View {
             Circle().fill(Color(red: 0.55, green: 0.75, blue: 0.64).opacity(0.35)).frame(width: 420).blur(radius: 90).offset(x: -220, y: -120)
             VStack(spacing: 18) {
                 ForEach(Array(controllers.enumerated()), id: \.offset) { _, c in
-                    PillView(dictation: c, shortcut: shortcut).frame(width: 520, height: 76)
+                    PillView(dictation: c, shortcut: shortcut).frame(width: 520).frame(minHeight: 76)
                 }
             }
             .padding(.top, 20)

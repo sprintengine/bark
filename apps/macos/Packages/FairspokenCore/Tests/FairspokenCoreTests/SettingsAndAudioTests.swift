@@ -63,6 +63,21 @@ struct SettingsTests {
         #expect(out["transcriptionLocation"] == .string("remote-host"))
     }
 
+    @Test func showTextWhileSpeakingDefaultsOnAndRoundTrips() throws {
+        let tauri = try JSONDecoder().decode(AppSettings.self, from: Data(Self.tauriJSON.utf8))
+        #expect(tauri.showTextWhileSpeaking)  // absent from the Tauri file: on
+        let raw = try JSONDecoder().decode(JSONValue.self, from: Data(Self.tauriJSON.utf8)).objectValue ?? [:]
+        var s = tauri
+        s.showTextWhileSpeaking = false
+        let data = try JSONMerge.encode(s, over: raw)
+        let out = try JSONDecoder().decode(JSONValue.self, from: data).objectValue ?? [:]
+        #expect(out["showTextWhileSpeaking"] == .bool(false))
+        #expect(out["someFutureRustField"] == .object(["x": .number(1)]))
+        #expect(try JSONDecoder().decode(AppSettings.self, from: data).showTextWhileSpeaking == false)
+        let wrongType = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"showTextWhileSpeaking":"yes"}"#.utf8))
+        #expect(wrongType.showTextWhileSpeaking)
+    }
+
     @Test func acceleratorStringsRoundTrip() {
         let a = AcceleratorString(parsing: "CommandOrControl+Shift+Digit1")
         #expect(a == AcceleratorString(modifiers: [.command, .shift], code: "Digit1"))
