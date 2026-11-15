@@ -1,7 +1,7 @@
 import Foundation
 
-/// The decisions behind the setup guide (onboarding), Home's first-use card and the recording
-/// pill's key hints, kept free of UI so they can be tested.
+/// The decisions behind the setup guide (onboarding) and Home's first-use card, kept free of UI
+/// so they can be tested.
 public enum SetupGuide {
     // MARK: Steps
 

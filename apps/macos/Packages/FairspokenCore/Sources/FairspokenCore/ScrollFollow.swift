@@ -31,7 +31,11 @@ public struct ScrollFollow: Equatable, Sendable {
         let resized = contentHeight != lastContentHeight || viewportHeight != lastViewportHeight
         lastContentHeight = contentHeight
         lastViewportHeight = viewportHeight
-        if resized { return following && !atBottom }
+        if resized {
+            // Text shrinking (a re-decode) can land a scrolled-up view at the bottom.
+            if atBottom { following = true }
+            return following && !atBottom
+        }
         following = atBottom
         return false
     }

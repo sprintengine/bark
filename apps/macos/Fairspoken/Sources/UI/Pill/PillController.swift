@@ -88,8 +88,9 @@ final class PillController {
             position()
             panel.alphaValue = 0
             panel.orderFrontRegardless()
-            startMouseTracking()
         }
+        // Also when a new dictation starts during the fade-out, which stopped the tracking.
+        startMouseTracking()
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
             panel.animator().alphaValue = 1

@@ -16,7 +16,8 @@ nonisolated final class LevelMeter: @unchecked Sendable {
     func process(_ samples: UnsafeBufferPointer<Float>, sampleRate: Double) {
         let window = max(1, Int(sampleRate * MicLevel.windowSeconds))
         let powers = MicLevel.windowMeanSquares(samples, window: window)
-        let seconds = Double(window) / sampleRate
+        // A short tail window shares the buffer's true duration, so audio time never runs fast.
+        let seconds = powers.isEmpty ? 0 : Double(samples.count) / sampleRate / Double(powers.count)
         let now = Self.clock()
         state.withLock { $0.feed(meanSquares: powers, windowSeconds: seconds, arrival: now) }
     }

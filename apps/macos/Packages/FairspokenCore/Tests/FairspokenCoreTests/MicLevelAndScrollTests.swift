@@ -145,6 +145,17 @@ struct ScrollFollowTests {
         do { let jump = f.update(offset: 48, contentHeight: 128, viewportHeight: 64); #expect(jump) }
     }
 
+    @Test func textShrinkingToTheBottomResumesFollowing() {
+        var f = ScrollFollow()
+        _ = f.update(offset: 48, contentHeight: 112, viewportHeight: 64)
+        _ = f.update(offset: 10, contentHeight: 112, viewportHeight: 64)
+        #expect(!f.following)
+        // A re-decode shortens the text; the view is clamped to the bottom.
+        do { let jump = f.update(offset: 0, contentHeight: 64, viewportHeight: 64); #expect(!jump) }
+        #expect(f.following)
+        do { let jump = f.update(offset: 0, contentHeight: 80, viewportHeight: 64); #expect(jump) }
+    }
+
     @Test func nearTheBottomCountsAsTheBottom() {
         #expect(ScrollFollow.isAtBottom(offset: 30, contentHeight: 96, viewportHeight: 64))
         #expect(!ScrollFollow.isAtBottom(offset: 20, contentHeight: 96, viewportHeight: 64))

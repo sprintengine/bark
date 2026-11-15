@@ -58,6 +58,7 @@ struct PillView: View {
                     follow.reset()
                     scrollPosition = ScrollPosition(edge: .bottom)
                     moreAbove = false
+                    textHeight = 0
                 }
             }
             .accessibilityElement(children: .combine)
