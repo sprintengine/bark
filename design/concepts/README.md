@@ -34,11 +34,7 @@ Tools: `_tools/shot.mjs` is a dependency-free headless Chrome screenshotter that
 
 ## The current Home screen
 
-| Light | Dark |
-|---|---|
-| ![current light](current/home-light.png) | ![current dark](current/home-dark.png) |
-
-These were captured from the real `home.html` under `npm run dev` with stubbed Tauri data.
+Capture the real `home.html` under `npm run dev` with `_tools/shot.mjs --stub`, which supplies stubbed Tauri data. Screenshots are not committed.
 
 **What's good and should stay**
 - The figures are honest. Time saved is measured against your real typing speed, and nothing is invented when there's no data.
@@ -60,10 +56,7 @@ Every direction keeps the same information architecture: Home, Notes, Activity a
 
 ## A. Clinical Calm
 
-| Light | Dark (previews hidden) |
-|---|---|
-| ![A light](clinical-calm/home-light.png) | ![A dark](clinical-calm/home-dark.png) |
-| ![A recording light](clinical-calm/recording-light.png) | ![A recording dark](clinical-calm/recording-dark.png) |
+Prototype: [`clinical-calm/index.html`](clinical-calm/index.html) (add `?state=recording`, `?mode=dark` or `?previews=hidden`).
 
 **Rationale.** A GP is dictating into a clinical system between patients, often while sharing a screen or with someone else in the room. The design priorities follow from that:
 - Make the next action obvious: *Ready when you are. Hold `fn`.*
@@ -82,10 +75,7 @@ The sidebar has text labels, so nobody has to guess what an icon means. The samp
 
 ## B. Signal
 
-| Dark | Light |
-|---|---|
-| ![B dark](signal/home-dark.png) | ![B light](signal/home-light.png) |
-| ![B recording dark](signal/recording-dark.png) | ![B recording light](signal/recording-light.png) |
+Prototype: [`signal/index.html`](signal/index.html) (add `?state=recording` or `?mode=light`).
 
 **Rationale.** This is for developers who choose tools by feel and by numbers. The window reads like an instrument:
 - One giant figure (time saved) with a monospace sub-line of the other stats.
@@ -105,10 +95,7 @@ The sidebar has text labels, so nobody has to guess what an icon means. The samp
 
 ## C. Murmur
 
-| Light | Dark |
-|---|---|
-| ![C light](murmur/home-light.png) | ![C dark](murmur/home-dark.png) |
-| ![C recording light](murmur/recording-light.png) | ![C recording dark](murmur/recording-dark.png) |
+Prototype: [`murmur/index.html`](murmur/index.html) (add `?state=recording` or `?mode=dark`).
 
 **Rationale.** This direction is personal and quietly luxurious, for people who write: letters, chapters, replies. The greeting is set in a serif and the stats are written as a sentence ("You've given yourself back **14 hours 8 minutes** by speaking instead of typing"). While you dictate, the live transcript is shown large in the serif. Navigation is a centred segmented control in the title bar, which leaves the full width for the hero.
 
@@ -287,12 +274,11 @@ Native can meet the performance budget more easily: `MTKView.isPaused` and occlu
 ```
 design/concepts/
 ├── README.md                     this document
-├── current/                      screenshots of today's home.html (stubbed Tauri data)
-├── clinical-calm/                index.html + home-{light,dark}.png + recording-{light,dark}.png
-├── signal/                       index.html + screenshots
-├── murmur/                       index.html + screenshots
+├── clinical-calm/                index.html
+├── signal/                       index.html
+├── murmur/                       index.html
 └── _tools/
-    ├── shot.mjs                  headless Chrome (CDP) screenshots, --stub for Tauri, --perf for main-thread busy
+    ├── shot.mjs                  headless Chrome (CDP) screenshots, --stub for Tauri, --perf for main-thread busy (output is not committed)
     └── cpu.sh                    whole-Chrome CPU % over 10 s for a URL
 ```
 

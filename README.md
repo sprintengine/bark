@@ -12,11 +12,6 @@ there is an optional hosted service, **Fairspoken Cloud**, that you can sign in
 to and pay for with credits. It is off by default and the app is fully usable
 without it.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/app-home-dark.png">
-  <img alt="The Fairspoken window: a frosted sidebar of places beside Home, which shows average pace, words, apps used and time saved, then the latest dictations with copy buttons." src="docs/images/app-home-light.png">
-</picture>
-
 ## Features
 
 - **Local transcription** with Parakeet TDT 0.6B v3 (ONNX Runtime, in-process).
@@ -41,16 +36,6 @@ without it.
 A setup window walks through permissions, a microphone check, a speech model
 and a first dictation. Models is a library of every speech and polish model,
 with ratings, sizes and one-click downloads.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/app-onboarding-dark.png">
-  <img alt="Three steps of first-run setup: permissions with live status, choosing a speech model, and trying a first dictation." src="docs/images/app-onboarding-light.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/app-models-dark.png">
-  <img alt="The Models library: a table of speech and polish models with favourites, badges, speed and accuracy ratings, sizes and download buttons." src="docs/images/app-models-light.png">
-</picture>
 
 ## Install
 

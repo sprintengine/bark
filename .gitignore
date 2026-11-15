@@ -50,3 +50,9 @@ __pycache__/
 
 # Brand research captures of third-party sites: local reference only, never published
 design/brand/research/
+
+# Screenshots and mock-up captures are made locally, never committed
+docs/images/
+design/brand/app/screenshots/
+design/brand/site/screenshots/
+design/concepts/*/*.png
