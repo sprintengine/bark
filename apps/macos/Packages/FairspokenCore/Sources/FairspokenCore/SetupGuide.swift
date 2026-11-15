@@ -1,0 +1,208 @@
+import Foundation
+
+/// The decisions behind the setup guide (onboarding), Home's first-use card and the recording
+/// pill's key hints, kept free of UI so they can be tested.
+public enum SetupGuide {
+    // MARK: Steps
+
+    /// The guide's screens, in order. Saving recordings for post-training is a setting, not a step.
+    public enum Step: Int, CaseIterable, Sendable {
+        case welcome, permissions, microphone, model, shortcut, tryIt, finish
+
+        /// Shown in the progress line ("Microphone", "Model", …).
+        public var title: String {
+            switch self {
+            case .welcome: "Welcome"
+            case .permissions: "Permissions"
+            case .microphone: "Microphone"
+            case .model: "Model"
+            case .shortcut: "Shortcut"
+            case .tryIt: "Try it"
+            case .finish: "Done"
+            }
+        }
+    }
+
+    /// The step after `step`. "Try it" needs a working engine, so it is passed over while the
+    /// model is unusable (its download failed, or was skipped); the finish checklist then says what
+    /// is left.
+    public static func step(after step: Step, engineUsable: Bool) -> Step {
+        guard let next = Step(rawValue: step.rawValue + 1) else { return .finish }
+        if next == .tryIt && !engineUsable { return .finish }
+        return next
+    }
+
+    /// The step before `step`, passing over "Try it" the same way.
+    public static func step(before step: Step, engineUsable: Bool) -> Step {
+        guard let previous = Step(rawValue: step.rawValue - 1) else { return .welcome }
+        if previous == .tryIt && !engineUsable { return .shortcut }
+        return previous
+    }
+
+    // MARK: Model step
+
+    /// Where the chosen speech model is, as the model step shows it.
+    public enum ModelProgress: Equatable, Sendable {
+        case notStarted
+        /// Downloading, unpacking, compiling or loading; `fraction` while it downloads.
+        case preparing(fraction: Double?)
+        case ready
+        case failed(String)
+        /// Transcribing on a network device: no local model is needed.
+        case remote
+
+        /// The model step may move on: the download carries on in the background. A failure keeps
+        /// the person on the step with Retry and "Skip for now".
+        public var canContinue: Bool {
+            if case .failed = self { return false }
+            return true
+        }
+
+        /// "Try it" can run (now, or once loading finishes while the person sets the shortcut).
+        public var engineUsable: Bool {
+            switch self {
+            case .failed, .notStarted: false
+            default: true
+            }
+        }
+    }
+
+    // MARK: Microphone check
+
+    /// What the microphone test found, each with its own fix.
+    public enum MicCheck: Equatable, Sendable {
+        /// Not started yet.
+        case idle
+        /// The system hasn't asked yet: Allow.
+        case needsPermission
+        /// Turned off in System Settings: Open Privacy & Security.
+        case denied
+        /// No input device: connect a microphone.
+        case noDevice
+        /// The device wouldn't start: choose another.
+        case failed(String)
+        /// Listening, nothing heard yet.
+        case listening
+        /// Listening for a while and nothing above the noise floor: check the level or device.
+        case silent
+        /// Speech heard.
+        case hearing
+    }
+
+    /// The level (0…1, the meter's display scale: about -40 dBFS) that counts as someone speaking.
+    public static let speechLevel: Float = 0.3
+    /// How long the test listens before calling it silence.
+    public static let silenceSeconds: Double = 5
+
+    public enum Permission: Sendable { case granted, denied, notDetermined }
+
+    public static func micCheck(permission: Permission, deviceCount: Int, running: Bool, error: String?,
+                                listenedSeconds: Double, peakLevel: Float) -> MicCheck {
+        switch permission {
+        case .notDetermined: return .needsPermission
+        case .denied: return .denied
+        case .granted: break
+        }
+        if deviceCount == 0 { return .noDevice }
+        if let error { return .failed(error) }
+        guard running else { return peakLevel >= speechLevel ? .hearing : .idle }
+        if peakLevel >= speechLevel { return .hearing }
+        return listenedSeconds >= silenceSeconds ? .silent : .listening
+    }
+
+    // MARK: Checklist
+
+    /// One line of the finish checklist and Home's first-use card.
+    public struct ChecklistItem: Equatable, Sendable, Identifiable {
+        public enum Kind: String, Sendable { case microphone, accessibility, model, micHeard }
+        public enum State: Equatable, Sendable { case done, pending(String), problem(String) }
+        public var kind: Kind
+        public var state: State
+        /// Dictation can't work without it.
+        public var required: Bool
+        public var id: String { kind.rawValue }
+        public var isDone: Bool { state == .done }
+    }
+
+    /// What is set up, from live state. Nothing is claimed that isn't so.
+    public static func checklist(microphone: Permission, accessibility: Bool, model: ModelProgress,
+                                 micHeard: Bool?) -> [ChecklistItem] {
+        var items: [ChecklistItem] = []
+        items.append(.init(kind: .microphone, state: {
+            switch microphone {
+            case .granted: .done
+            case .notDetermined: .pending("Not allowed yet")
+            case .denied: .problem("Turned off in System Settings")
+            }
+        }(), required: true))
+        items.append(.init(kind: .model, state: {
+            switch model {
+            case .ready, .remote: .done
+            case .preparing(let f): .pending(f.map { "Downloading, \(Int(($0 * 100).rounded()))%" } ?? "Getting ready")
+            case .failed(let message): .problem(message)
+            case .notStarted: .pending("Not downloaded")
+            }
+        }(), required: true))
+        items.append(.init(kind: .accessibility, state: accessibility ? .done : .pending("Dictations are copied for you to paste"),
+                           required: false))
+        if let micHeard {
+            items.append(.init(kind: .micHeard, state: micHeard ? .done : .pending("Not tested"), required: false))
+        }
+        return items
+    }
+
+    /// Every required item is done.
+    public static func isReady(_ items: [ChecklistItem]) -> Bool {
+        items.allSatisfy { !$0.required || $0.isDone }
+    }
+
+    // MARK: Key hints
+
+    /// One hint in the recording pill: "Stop ⇧⌘1", "Cancel esc", "Release to finish".
+    public struct KeyHint: Equatable, Sendable {
+        public var action: String
+        public var keys: String?
+        public init(action: String, keys: String?) {
+            self.action = action
+            self.keys = keys
+        }
+    }
+
+    public enum Trigger: Sendable { case shortcut, fn, button }
+
+    /// What ends the recording, then what cancels it, from the person's own keys.
+    public static func listeningHints(mode: RecordingShortcutMode, trigger: Trigger, shortcut: String,
+                                      cancel: String?) -> [KeyHint] {
+        var hints: [KeyHint] = []
+        switch (trigger, mode) {
+        case (.fn, _): hints.append(.init(action: "Release fn to finish", keys: nil))
+        case (.shortcut, .pushToTalk): hints.append(.init(action: "Release to finish", keys: nil))
+        case (.shortcut, .toggle), (.button, .toggle):
+            hints.append(.init(action: "Stop", keys: shortcut.isEmpty ? nil : shortcut))
+        case (.button, .pushToTalk): hints.append(.init(action: "Click stop to finish", keys: nil))
+        }
+        if let cancel, !cancel.isEmpty { hints.append(.init(action: "Cancel", keys: keyLabel(cancel))) }
+        return hints
+    }
+
+    /// Spells a key the way a keycap shows it: "⎋" and "Escape" become "esc".
+    public static func keyLabel(_ key: String) -> String {
+        switch key {
+        case "⎋", "Escape", "escape", "Esc": "esc"
+        case "␣", "Space": "space"
+        default: key
+        }
+    }
+}
+
+extension Array where Element == TranscriptHistoryItem {
+    /// How many different apps these dictations went into (by bundle id, else name). Dictations
+    /// kept in Fairspoken's own window count as no app.
+    public var appsUsed: Int {
+        Set(compactMap { item -> String? in
+            if let id = item.appBundleId, !id.isEmpty { return id.lowercased() }
+            if let name = item.appName, !name.isEmpty { return name.lowercased() }
+            return nil
+        }).count
+    }
+}

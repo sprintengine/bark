@@ -8,6 +8,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     private let model: AppModel
     private(set) var dashboard: NSWindow?
     private(set) var onboarding: NSWindow?
+    private var hideObserver: NSObjectProtocol?
 
     init(model: AppModel) {
         self.model = model
@@ -18,17 +19,15 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         if let section { model.section = section }
         if dashboard == nil {
             let hosting = NSHostingController(rootView: DashboardView().environment(model))
-            hosting.sceneBridgingOptions = [.toolbars]
             let window = NSWindow(contentViewController: hosting)
+            // A hidden, transparent title bar: the traffic lights sit on the sidebar's frost.
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.title = AppInfo.displayName
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
-            window.toolbar = NSToolbar(identifier: "dashboard")
-            window.toolbarStyle = .unified
             window.isReleasedWhenClosed = false
-            window.setContentSize(NSSize(width: 1280, height: 900))
-            window.minSize = NSSize(width: 1080, height: 740)
+            window.setContentSize(NSSize(width: 1180, height: 820))
+            window.minSize = NSSize(width: 960, height: 640)
             window.setFrameAutosaveName("Dashboard")
             if !window.setFrameUsingName("Dashboard") { window.center() }
             window.delegate = self
@@ -38,26 +37,48 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         present(dashboard!)
     }
 
+    /// Opens the setup guide at its first step, every time (a guide reopened half-way through
+    /// would start from stale state).
     func showOnboarding() {
-        if onboarding == nil {
-            let view = OnboardingView { [weak self] in
-                self?.onboarding?.close()
-                self?.showDashboard(.home)
-            }
-            .environment(model)
-            let hosting = NSHostingController(rootView: view)
-            let window = NSWindow(contentViewController: hosting)
-            window.styleMask = [.titled, .closable, .fullSizeContentView]
-            window.title = "Welcome to \(AppInfo.displayName)"
+        let view = OnboardingView { [weak self] in
+            self?.onboarding?.close()
+            self?.showDashboard(.home)
+        }
+        .environment(model)
+        if let window = onboarding {
+            stopOnboardingAudio()
+            window.contentViewController = NSHostingController(rootView: view)
+            window.setContentSize(OnboardingView.size)
+        } else {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+            window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+            window.title = "Set up \(AppInfo.displayName)"
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.isMovableByWindowBackground = true
             window.isReleasedWhenClosed = false
+            window.setContentSize(OnboardingView.size)
             window.center()
             window.delegate = self
             onboarding = window
         }
+        if hideObserver == nil {
+            hideObserver = NotificationCenter.default.addObserver(forName: NSApplication.didHideNotification, object: nil,
+                                                                  queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if self?.onboarding != nil { self?.stopOnboardingAudio() } }
+            }
+        }
         present(onboarding!)
+    }
+
+    /// Closing, minimising or hiding the guide stops its microphone test and any dictation it started.
+    private func stopOnboardingAudio() {
+        model.micTest.stop()
+        if model.dictation.phase.isActive { model.dictation.cancel() }
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) {
+        if (notification.object as? NSWindow) == onboarding { stopOnboardingAudio() }
     }
 
     /// Screenshot harness: swap in a fresh hosting controller so the next frame reflects the
@@ -66,7 +87,6 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         guard let window = dashboard else { return }
         let frame = window.frame
         let hosting = NSHostingController(rootView: DashboardView().environment(model))
-        hosting.sceneBridgingOptions = [.toolbars]
         window.contentViewController = hosting
         window.setFrame(frame, display: true)
     }
@@ -79,7 +99,10 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        if window == onboarding { onboarding = nil }
+        if window == onboarding {
+            stopOnboardingAudio()
+            onboarding = nil
+        }
         DispatchQueue.main.async { [weak self] in self?.updatePolicy() }
     }
 

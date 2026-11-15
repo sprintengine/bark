@@ -1,14 +1,16 @@
 import FairspokenUI
 import SwiftUI
 
-/// Crystal layout constants for the client (design/crystal/README.md): 20 for cards, 12 for
-/// rows and fields, one rhythm of spacing.
+/// Crystal layout constants for the client (design/crystal/README.md): 12 for cards, 8 for rows
+/// and fields, one compact rhythm of spacing.
 enum Layout {
-    static let card: CGFloat = 20
-    static let row: CGFloat = 12
-    static let gap: CGFloat = 16
-    static let pageH: CGFloat = 32
-    static let pageTop: CGFloat = 24
+    static let card: CGFloat = CardMetrics.radius
+    static let row: CGFloat = 8
+    static let gap: CGFloat = 12
+    static let pageH: CGFloat = 28
+    static let pageTop: CGFloat = 22
+    /// The content column's width cap, so lines never run the width of a big window.
+    static let readable: CGFloat = 980
 }
 
 /// A screen title: semibold, slightly tight, with at most one quiet line under it.
@@ -24,14 +26,14 @@ struct PageTitle<Trailing: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .lastTextBaseline) {
+        HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 28, weight: .semibold))
-                    .tracking(-0.4)
+                    .font(TypeScale.title)
+                    .tracking(-0.2)
                     .foregroundStyle(Crystal.ink)
                 if let subtitle {
-                    Text(subtitle).font(.callout).foregroundStyle(Crystal.ink2)
+                    Text(subtitle).font(TypeScale.meta).foregroundStyle(Crystal.ink2)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -43,19 +45,19 @@ struct PageTitle<Trailing: View>: View {
 }
 
 extension View {
-    /// The flat fill for things that sit inside a glass card (glass can't sit on glass).
+    /// The flat fill for things that sit inside a card: fields, results, code.
     func well(cornerRadius: CGFloat = Layout.row) -> some View {
         background(Crystal.well, in: .rect(cornerRadius: cornerRadius))
     }
 
-    /// A secondary button inside a glass card: a flat capsule, so it isn't glass on glass.
+    /// A secondary button inside a card.
     func cardButton() -> some View {
         buttonStyle(.bordered).buttonBorderShape(.capsule)
     }
 
-    /// A small, title-style card heading.
+    /// A small, title-style card heading (13 pt semibold).
     func cardHeading() -> some View {
-        font(.headline).foregroundStyle(Crystal.ink)
+        font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
     }
 }
 

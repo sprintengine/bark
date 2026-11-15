@@ -20,15 +20,19 @@ final class AppModel {
         }
         var symbol: String {
             switch self {
-            case .home: "waveform"
-            case .models: "square.stack.3d.up"
-            case .training: "graduationcap"
-            case .settings: "gearshape"
+            case .home: "house.fill"
+            case .models: "square.stack.3d.up.fill"
+            case .training: "waveform.badge.mic"
+            case .settings: "gearshape.fill"
             }
         }
     }
 
-    var section: Section = .home
+    var section: Section = .home {
+        didSet { if section != .home { homeShowsAllDictations = false } }
+    }
+    /// Home's "See all": every kept dictation, searchable, instead of the overview.
+    var homeShowsAllDictations = false
     var settingsTab: SettingsView.Tab = .general
 
     let settings: SettingsStore
@@ -37,6 +41,7 @@ final class AppModel {
     let permissions: Permissions
     let models: ModelLibrary
     let dictation: DictationController
+    let micTest: MicTest
     let hostStatus: HostStatus
     let hostFinder: HostFinder
     let updates: UpdateController
@@ -55,6 +60,7 @@ final class AppModel {
         models = ModelLibrary()
         dictation = DictationController(settings: settings, models: models, history: history, permissions: permissions,
                                         training: training)
+        micTest = MicTest(capture: dictation.capture)
         hostStatus = HostStatus(settings: settings)
         hostFinder = HostFinder(settings: settings, hostStatus: hostStatus)
         var updateConfig = UpdateController.Configuration(appName: AppInfo.displayName, version: AppInfo.version, build: AppInfo.build)
@@ -146,6 +152,33 @@ final class AppModel {
 
     func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: "onboardingCompleted")
+    }
+
+    /// Where the speech model is, as the setup guide and Home show it.
+    var modelProgress: SetupGuide.ModelProgress {
+        if settings.settings.transcriptionLocation == .remoteHost { return .remote }
+        switch models.engineState {
+        case .ready: return .ready
+        case .failed(let message): return .failed(message)
+        case .downloading(let f): return .preparing(fraction: f)
+        case .unpacking, .compiling, .loading, .warming: return .preparing(fraction: nil)
+        case .idle: return .notStarted
+        }
+    }
+
+    static func permission(_ status: Permissions.Status) -> SetupGuide.Permission {
+        switch status {
+        case .granted: .granted
+        case .denied: .denied
+        case .notDetermined: .notDetermined
+        }
+    }
+
+    /// What is set up right now: the microphone, the model, typing into apps (and, in the guide,
+    /// whether the microphone test heard anything).
+    func setupChecklist(micHeard: Bool? = nil) -> [SetupGuide.ChecklistItem] {
+        SetupGuide.checklist(microphone: Self.permission(permissions.microphone), accessibility: permissions.accessibility.isGranted,
+                             model: modelProgress, micHeard: micHeard)
     }
 
     /// Engine summary used across the UI.

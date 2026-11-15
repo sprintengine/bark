@@ -59,7 +59,8 @@ final class DictationController {
     @ObservationIgnored private var session: (any TranscriptionSession)?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private var resetTask: Task<Void, Never>?
-    @ObservationIgnored private var trigger: Trigger = .button
+    /// What started the current recording (the pill says how to end it).
+    private(set) var trigger: Trigger = .button
     @ObservationIgnored private var targetApp: NSRunningApplication?
     @ObservationIgnored private var placement: ComputePlacement = .neuralEngine
     @ObservationIgnored private var liveGeneration = 0

@@ -3,77 +3,140 @@ import FairspokenCore
 import FairspokenUpdates
 import SwiftUI
 
-/// Main window: Liquid Glass sidebar (system NavigationSplitView) over the Crystal backdrop,
-/// which extends beneath it (`backgroundExtensionEffect`).
+/// Main window: the sidebar stands on the window's frost (the desktop blurred behind the window,
+/// tinted once); the content is one opaque card beside it, inset by `CardMetrics.gap` so a thin
+/// line of frost frames it.
 struct DashboardView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    static let sidebarWidth: CGFloat = 220
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 280)
-        } detail: {
-            ZStack {
-                CrystalBackground(accent: Crystal.clientAccent)
-                    .backgroundExtensionEffect()
-                detail
-                    .transition(.opacity)
-            }
-            .animation(.smooth(duration: 0.25), value: model.section)
-            .updateToast(model.updates, style: .client)
+        HStack(spacing: 0) {
+            Sidebar()
+                .frame(width: Self.sidebarWidth)
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Crystal.canvas)
+                .clipShape(.rect(cornerRadius: CardMetrics.radius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: CardMetrics.radius, style: .continuous).strokeBorder(Crystal.hairline))
+                .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
+                .updateToast(model.updates, style: .client)
+                .padding([.top, .bottom, .trailing], CardMetrics.gap + 2)
         }
-        .frame(minWidth: 1080, minHeight: 740)
+        .background(WindowFrost())
+        .ignoresSafeArea()
+        .frame(minWidth: 960, minHeight: 640)
         .onAppear { if model.settings.settings.transcriptionLocation == .remoteHost { model.hostStatus.refresh() } }
     }
 
-    private var sidebar: some View {
-        List(selection: Binding<AppModel.Section?>(get: { model.section }, set: { if let s = $0 { model.section = s } })) {
-            Section {
-                ForEach(AppModel.Section.allCases) { section in
-                    let updatePending = section == .settings && model.updates.isUpdatePending
-                    Label(section.title, systemImage: section.symbol)
-                        .badge(updatePending ? 1 : 0)
-                        .listItemTint(section == model.section ? Crystal.clientAccent : Crystal.ink2)
-                        .tag(section)
-                        .accessibilityLabel(updatePending ? "\(section.title), update available" : section.title)
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .safeAreaInset(edge: .top) {
-            HStack(spacing: 10) {
-                BrandMark(size: 28)
-                Text(AppInfo.displayName).font(.headline).foregroundStyle(Crystal.ink)
-                Spacer()
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 6)
-            .padding(.bottom, 8)
-        }
-        .safeAreaInset(edge: .bottom) {
-            VStack(alignment: .leading, spacing: 12) {
-                SidebarStatus()
-                UpdateSidebarButton(updates: model.updates, style: .client)
-                    .padding(.horizontal, 4)
-            }
-            .padding(12)
-        }
-    }
-
     @ViewBuilder private var detail: some View {
-        switch model.section {
-        case .home: HomeView()
-        case .models: ModelsView()
-        case .training: PostTrainingView()
-        case .settings: SettingsView()
+        Group {
+            switch model.section {
+            case .home: HomeView()
+            case .models: ModelsView()
+            case .training: PostTrainingView()
+            case .settings: SettingsView()
+            }
+        }
+        .id(model.section)
+        .transition(.opacity)
+        .animation(Motion.unlessReduced(Motion.normal, reduceMotion), value: model.section)
+    }
+}
+
+extension AppModel.Section {
+    /// The section's tile colour in the sidebar.
+    var tile: Color {
+        switch self {
+        case .home: Crystal.Tile.orange
+        case .models: Crystal.Tile.indigo
+        case .training: Crystal.Tile.purple
+        case .settings: Crystal.Tile.gray
         }
     }
 }
 
+/// Brand, the sections as rows with coloured icon tiles, and the engine status at the bottom.
+private struct Sidebar: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Room for the traffic lights, then the brand.
+            HStack(spacing: 8) {
+                BrandMark(size: 22)
+                Text(AppInfo.displayName).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 44)
+            .padding(.bottom, 14)
+            .accessibilityElement(children: .combine)
+
+            VStack(spacing: 2) {
+                ForEach(Array(AppModel.Section.allCases.enumerated()), id: \.element) { index, section in
+                    SidebarRow(section: section, index: index)
+                }
+            }
+            Spacer(minLength: 12)
+            VStack(alignment: .leading, spacing: 6) {
+                SidebarStatus()
+                UpdateSidebarButton(updates: model.updates, style: .client)
+                    .padding(.horizontal, 4)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.bottom, 12)
+    }
+}
+
+private struct SidebarRow: View {
+    var section: AppModel.Section
+    var index: Int
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hovered = false
+
+    var body: some View {
+        let selected = model.section == section
+        let updatePending = section == .settings && model.updates.isUpdatePending
+        Button {
+            model.section = section
+        } label: {
+            HStack(spacing: 9) {
+                IconTile(section.symbol, color: section.tile, size: 22)
+                Text(section.title)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(Crystal.ink)
+                Spacer(minLength: 4)
+                if updatePending {
+                    Circle().fill(Crystal.clientAccent).frame(width: 7, height: 7).accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, 6)
+            .frame(height: 32)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(selected ? Crystal.chromeSelected : hovered ? Crystal.chromeHover : .clear)
+            }
+            .contentShape(.rect(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hovered)
+        .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+        .help("\(section.title) (⌘\(index + 1))")
+        .accessibilityLabel(updatePending ? "\(section.title), update available" : section.title)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+    }
+}
+
 /// The one engine status in the window: what transcribes, whether it's ready, and the shortcut.
-/// Sits on the glass sidebar, so it is a flat well, not more glass.
+/// It sits on the frost, so it is one translucent step, not a card.
 private struct SidebarStatus: View {
     @Environment(AppModel.self) private var model
+    @State private var hovered = false
 
     var body: some View {
         let state = model.models.engineState
@@ -82,36 +145,33 @@ private struct SidebarStatus: View {
         Button {
             if remote { model.settingsTab = .transcription; model.section = .settings } else { model.section = .models }
         } label: {
-            content(state: state, remote: remote, host: host)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    StatusDot(color: remote ? host.tint : state.tint, pulsing: remote ? host.state == .checking : state.isBusy)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(remote ? "Network device" : model.models.activeModel.shortName)
+                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
+                        Text(remote ? host.stateLabel : state.label)
+                            .font(.system(size: 11)).foregroundStyle(Crystal.ink2).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 4) {
+                    Text(model.settings.settings.recordingShortcutMode == .pushToTalk ? "Hold to dictate" : "Dictate")
+                        .font(.system(size: 11)).foregroundStyle(Crystal.ink2)
+                    Spacer(minLength: 0)
+                    ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
+                }
+            }
+            .padding(10)
+            .background(hovered ? Crystal.chromeSelected : Crystal.chromeHover, in: .rect(cornerRadius: 10, style: .continuous))
+            .contentShape(.rect(cornerRadius: 10))
+            .accessibilityElement(children: .combine)
         }
         .buttonStyle(.plain)
+        .onHover { hovered = $0 }
         .help(remote ? "Host settings" : "Models")
         .accessibilityHint(remote ? "Opens host settings" : "Opens Models")
-    }
-
-    private func content(state: ModelLibrary.EngineState, remote: Bool, host: HostStatus) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                StatusDot(color: remote ? host.tint : state.tint, pulsing: remote ? host.state == .checking : state.isBusy)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(remote ? "Network device" : model.models.activeModel.shortName)
-                        .font(.callout.weight(.semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
-                    Text(remote ? host.stateLabel : state.label)
-                        .font(.caption).foregroundStyle(Crystal.ink2).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-            }
-            HStack(spacing: 4) {
-                Text("Dictate").font(.caption).foregroundStyle(Crystal.ink2)
-                Spacer(minLength: 0)
-                ShortcutCaps(description: HotkeyController.currentShortcutSymbols).scaleEffect(0.85, anchor: .trailing)
-            }
-        }
-        .padding(12)
-        .well()
-        .overlay(RoundedRectangle(cornerRadius: Layout.row).strokeBorder(Crystal.hairline))
-        .contentShape(.rect(cornerRadius: Layout.row))
-        .accessibilityElement(children: .combine)
     }
 }
 
