@@ -42,8 +42,14 @@ final class DictationController {
     }
 
     private(set) var phase: Phase = .idle {
-        didSet { if phase != oldValue { onPhaseChange?(phase) } }
+        didSet {
+            guard phase != oldValue else { return }
+            if !phase.isActive { liveText = "" }
+            onPhaseChange?(phase)
+        }
     }
+    /// The words so far while listening (local transcription with "Show text while speaking").
+    private(set) var liveText = ""
     /// Latest transcript produced while our own window was frontmost ("Try dictation").
     private(set) var lastInAppResult: Result?
 
@@ -56,6 +62,7 @@ final class DictationController {
     @ObservationIgnored private var trigger: Trigger = .button
     @ObservationIgnored private var targetApp: NSRunningApplication?
     @ObservationIgnored private var placement: ComputePlacement = .neuralEngine
+    @ObservationIgnored private var liveGeneration = 0
     @ObservationIgnored private let postProcessor: any TranscriptPostProcessor = BasicPostProcessor()
 
     private let settings: SettingsStore
@@ -130,7 +137,7 @@ final class DictationController {
             }
         } else {
             if !models.engineState.isReady && !models.engineState.isBusy { models.prepare(s.model) }
-            newSession = LocalBatchSession(engine: models.engine, options: options)
+            newSession = s.showTextWhileSpeaking ? liveSession(options: options) : LocalBatchSession(engine: models.engine, options: options)
             placement = .neuralEngine
         }
 
@@ -236,6 +243,17 @@ final class DictationController {
 
     // MARK: Helpers
 
+    private func liveSession(options: TranscriptionRequestOptions) -> any TranscriptionSession {
+        liveGeneration += 1
+        let generation = liveGeneration
+        return LiveTranscriptionSession(engine: models.engine, options: options) { [weak self] text in
+            Task { @MainActor in
+                guard let self, self.liveGeneration == generation, self.phase.isActive else { return }
+                self.liveText = text
+            }
+        }
+    }
+
     private func deliver(_ text: String, settings s: AppSettings, target: NSRunningApplication?) async -> Delivery {
         // Our own window is frontmost (dashboard "Try dictation", onboarding): show it there.
         if target == nil || (NSApp.isActive && NSApp.keyWindow != nil) {
@@ -275,9 +293,10 @@ final class DictationController {
 
     // MARK: Demo/screenshot support
 
-    func showcase(_ phase: Phase, inAppResult: Result? = nil) {
+    func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "") {
         resetTask?.cancel()
         self.phase = phase
+        self.liveText = liveText
         if let inAppResult { lastInAppResult = inAppResult }
     }
 }
