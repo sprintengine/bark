@@ -7,6 +7,13 @@
 Fast, private, local-first desktop dictation. Press a shortcut, speak, and the
 text lands in whatever app you're typing in.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
+    <img src="docs/images/home-light.png" width="800" alt="Bark's Home window: today's pace, words and time saved, the last dictation, and recent dictations with the app each went into">
+  </picture>
+</p>
+
 Bark transcribes **on your machine** by default with NVIDIA's Parakeet
 TDT model: no account, no network, and no audio ever leaves your computer. On
 Apple Silicon a typical dictation is transcribed in a few hundred milliseconds.
@@ -35,11 +42,32 @@ without it.
   (filler-word and self-correction cleanup with one-click "Undo AI edit"), and
   app-aware tone. Polish and context awareness are off unless you turn them on.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/pill-dark.png">
+    <img src="docs/images/pill-light.png" width="600" alt="The pill while you dictate: the words so far, the recording level and time, and the shortcuts to stop or cancel">
+  </picture>
+</p>
+
 ### First run and models
 
 A setup window walks through permissions, a microphone check, a speech model
 and a first dictation. Models is a library of every speech and polish model,
 with ratings, sizes and one-click downloads.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/setup-dark.png">
+    <img src="docs/images/setup-light.png" width="480" alt="The setup guide's speech model step, with Parakeet v3 recommended and ready">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/models-dark.png">
+    <img src="docs/images/models-light.png" width="800" alt="The Models library: every Parakeet and Whisper model with its engine, speed, accuracy and size, one in use and one downloading">
+  </picture>
+</p>
 
 ## Install
 
