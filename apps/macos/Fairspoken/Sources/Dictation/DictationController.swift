@@ -136,7 +136,7 @@ final class DictationController {
                 return
             }
         } else {
-            if !models.engineState.isReady && !models.engineState.isBusy { models.prepare(s.model) }
+            if !models.engineState.isReady && !models.engineState.isBusy { models.use(s.model) }
             newSession = s.showTextWhileSpeaking ? liveSession(options: options) : LocalBatchSession(engine: models.engine, options: options)
             placement = .neuralEngine
         }

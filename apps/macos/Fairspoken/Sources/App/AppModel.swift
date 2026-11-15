@@ -59,6 +59,7 @@ final class AppModel {
         hostStatus = HostStatus(settings: settings)
         // A model that failed to load leaves the previous one in use; the saved choice follows it.
         models.onFallback = { [weak settings] id in settings?.update { $0.model = id } }
+        models.isDictating = { [weak dictation] in dictation?.phase.isActive ?? false }
         hostFinder = HostFinder(settings: settings, hostStatus: hostStatus)
         var updateConfig = UpdateController.Configuration(appName: AppInfo.displayName, version: AppInfo.version, build: AppInfo.build)
         #if DEBUG
@@ -81,7 +82,7 @@ final class AppModel {
     /// Launch-time work: warm the engine so the first dictation is instant, start Fn if enabled.
     func startServices() {
         if settings.settings.transcriptionLocation != .remoteHost || SpeechModels.isInstalled(settings.settings.model) {
-            models.prepare(settings.settings.model)
+            models.use(settings.settings.model)
         }
         applyFnSetting()
         if settings.settings.transcriptionLocation == .remoteHost { hostStatus.refresh() }
@@ -102,7 +103,27 @@ final class AppModel {
         }
     }
 
-    /// The model card whose "Download from Link…" field is open, and what it holds.
+    /// The model whose detail sheet is open in the Models library.
+    var modelDetailID: String?
+
+    /// Makes `id` the dictation model: saved in settings, then downloaded if needed (a tracked,
+    /// cancellable library download) and loaded once no dictation is running
+    /// (`ModelLibrary.use`). With a network device chosen it is still loaded, ready for when
+    /// dictation is local again.
+    func useModel(_ id: String) {
+        guard SpeechModelCatalog.model(id: id) != nil else { return }
+        settings.update { $0.model = id }
+        models.use(id)
+    }
+
+    /// Stars or unstars a model in the Models library (favourites are listed first).
+    func toggleFavourite(_ id: String) {
+        settings.update { s in
+            if let i = s.favoriteModels.firstIndex(of: id) { s.favoriteModels.remove(at: i) } else { s.favoriteModels.append(id) }
+        }
+    }
+
+    /// The model whose "Download from Link…" field is open, and what it holds.
     var linkEditorModel: String?
     var linkDraft = ""
 
@@ -121,7 +142,7 @@ final class AppModel {
         linkEditorModel = nil
         models.clearDownloadError(id)
         if id == models.activeModelID, case .failed = models.engineState, settings.settings.transcriptionLocation == .local {
-            models.prepare(id)
+            models.use(id)
         } else {
             models.download(id)
         }
