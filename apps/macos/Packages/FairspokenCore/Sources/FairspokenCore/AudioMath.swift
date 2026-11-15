@@ -46,11 +46,4 @@ public enum PCM {
             return Int16((v * 32767).rounded())
         }
     }
-
-    /// Perceptual 0…1 meter value from an RMS amplitude (-55 dBFS floor).
-    public static func meterLevel(rms: Float) -> Float {
-        guard rms > 0 else { return 0 }
-        let db = 20 * log10(rms)
-        return max(0, min(1, (db + 55) / 50))
-    }
 }

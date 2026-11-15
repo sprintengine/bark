@@ -76,8 +76,8 @@ final class DictationController {
     /// Which of this app's windows the recording is for (Home, the setup guide), or nil when it
     /// is for another app.
     @ObservationIgnored private(set) var startedInWindow: NSUserInterfaceItemIdentifier?
-    /// What started the current recording (the pill says how to end it).
-    private(set) var trigger: Trigger = .button
+    /// What started the current recording (a held key's release ends only its own recording).
+    @ObservationIgnored private(set) var trigger: Trigger = .button
     @ObservationIgnored private var targetApp: NSRunningApplication?
     @ObservationIgnored private var placement: ComputePlacement = .neuralEngine
     @ObservationIgnored private var liveGeneration = 0
@@ -96,8 +96,6 @@ final class DictationController {
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "dictation")
 
     var meter: LevelMeter { capture.meter }
-    /// Hold or toggle, for the pill's key hints.
-    var shortcutMode: RecordingShortcutMode { settings.settings.recordingShortcutMode }
 
     init(settings: SettingsStore, models: ModelLibrary, history: HistoryStore, permissions: Permissions, pending: PendingDictations) {
         self.settings = settings
