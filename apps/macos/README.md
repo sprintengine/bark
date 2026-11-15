@@ -169,6 +169,18 @@ connection button and a status line such as "Using host: practice-mini.local:481
 (one `GET /v1/health` when Settings or Home opens, or on Test; no background polling). Monitoring a
 host is Fairspoken Server's job (or the web dashboard at the host's `/`); the client has no Server view.
 
+## Where the text goes
+
+With **Paste into the current app** on, a dictation is put on the clipboard and pasted with ⌘V; with **Restore
+clipboard afterwards** on, the previous clipboard comes back shortly after. Before pasting, the app asks
+Accessibility what has focus in the frontmost app (`PasteTarget` in FairspokenCore). When there is
+clearly no text field (a button, a list, an image, the Finder desktop, an app with no window), it
+does not paste or restore: the dictation stays on the clipboard and the pill says "Copied — no text
+field. Press ⌘V to paste." for about 4 s. Anything unclear (apps that report little to
+Accessibility, such as terminals and web-view apps) is pasted as before. If a different app is in
+front than when recording started, the text is pasted but the old clipboard is not restored, so the
+dictation can still be pasted again.
+
 ## Post-training recordings
 
 **Post-training › Save recordings for post-training** (`trainingCapture`, off by default) keeps each
@@ -327,7 +339,7 @@ Fairspoken/                      Fairspoken
   Sources/Audio/                 AVAudioEngine capture → 16 kHz mono Float32, device selection, level meter
   Sources/Engine/                ModelLibrary, local/remote sessions, HostStatus (network device reachability)
   Sources/Dictation/             DictationController state machine
-  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore), hotkeys + Fn tap, sounds
+  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, copy-only with no text field), hotkeys + Fn tap, sounds
   Sources/Storage/               settings.json / transcript-history.json / usage-stats.json (Rust schemas), Keychain
   Sources/UI/                    Home, Models, Settings, Onboarding, Pill
 FairspokenServer/                Fairspoken Server

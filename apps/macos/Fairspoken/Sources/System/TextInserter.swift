@@ -1,11 +1,14 @@
 import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
+import FairspokenCore
 import OSLog
 
 /// Delivers text to the frontmost app: clipboard + synthetic ⌘V after the hotkey's
 /// modifiers are released (plan §2.7), then optionally restores the previous clipboard.
-/// Respects secure input (password fields, some terminals) by copying only.
+/// Respects secure input (password fields, some terminals) by copying only, and copies only
+/// when the focused element is clearly not a text target (`PasteTarget`), so the dictation is
+/// never pasted into nothing and then taken off the clipboard.
 @MainActor
 enum TextInserter {
     enum Outcome: Equatable {
@@ -17,7 +20,12 @@ enum TextInserter {
     /// Marks our temporary clipboard write so clipboard managers skip it (nspasteboard.org).
     private static let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
 
-    static func deliver(_ text: String, paste: Bool, restoreClipboard: Bool) async -> Outcome {
+    static let noTextTargetReason = "Copied — no text field. Press ⌘V to paste."
+
+    /// `expectedApp` is the app that was frontmost when recording started. If another app is in
+    /// front now, the text is still pasted but the old clipboard is not put back, so the
+    /// dictation stays recoverable if it landed somewhere unexpected.
+    static func deliver(_ text: String, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?) async -> Outcome {
         let pasteboard = NSPasteboard.general
         guard paste else {
             write(text, to: pasteboard, transient: false)
@@ -32,8 +40,15 @@ enum TextInserter {
             return .copied(reason: "Copied — secure field")
         }
 
-        let saved = restoreClipboard ? snapshot(pasteboard) : nil
-        write(text, to: pasteboard, transient: restoreClipboard)
+        let front = NSWorkspace.shared.frontmostApplication
+        if PasteTarget.decide(focus(of: front), appBundleID: front?.bundleIdentifier) == .copyOnly {
+            write(text, to: pasteboard, transient: false)
+            return .copied(reason: noTextTargetReason)
+        }
+
+        let switchedApps = expectedApp != nil && front?.processIdentifier != expectedApp
+        let saved = restoreClipboard && !switchedApps ? snapshot(pasteboard) : nil
+        write(text, to: pasteboard, transient: saved != nil)
         let ourChange = pasteboard.changeCount
 
         await waitForModifierRelease(timeout: .milliseconds(800))
@@ -96,6 +111,47 @@ enum TextInserter {
         up?.flags = .maskCommand
         down?.post(tap: .cghidEventTap)
         up?.post(tap: .cghidEventTap)
+    }
+
+    /// What the app says has focus, read with a short messaging timeout. Any error is `.unknown`
+    /// (which pastes); only an explicit "nothing focused" is `.none`.
+    private static func focus(of app: NSRunningApplication?) -> PasteTarget.Focus {
+        guard let app else { return .unknown }
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(appElement, 0.25)
+        var focused: CFTypeRef?
+        switch AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focused) {
+        case .success:
+            guard let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return .unknown }
+            return .element(describe(focused as! AXUIElement))
+        case .noValue:
+            var window: CFTypeRef?
+            let hasWindow: Bool? = switch AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &window) {
+            case .success: window != nil
+            case .noValue: false
+            default: nil
+            }
+            return .none(appHasFocusedWindow: hasWindow)
+        default:
+            return .unknown
+        }
+    }
+
+    private static func describe(_ element: AXUIElement) -> PasteTarget.Element {
+        AXUIElementSetMessagingTimeout(element, 0.25)
+        func value(_ attribute: String) -> CFTypeRef? {
+            var value: CFTypeRef?
+            return AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success ? value : nil
+        }
+        var settable = DarwinBoolean(false)
+        let valueIsSettable: Bool? =
+            AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success ? settable.boolValue : nil
+        return PasteTarget.Element(
+            role: value(kAXRoleAttribute) as? String,
+            subrole: value(kAXSubroleAttribute) as? String,
+            isEditable: value("AXIsEditable") as? Bool,
+            hasEditableAncestor: value("AXEditableAncestor") != nil,
+            valueIsSettable: valueIsSettable)
     }
 
     /// `AXSecureTextField` focus check with a short messaging timeout (AX is cross-process IPC).
