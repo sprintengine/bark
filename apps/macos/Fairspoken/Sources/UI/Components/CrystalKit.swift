@@ -1,15 +1,16 @@
 import FairspokenUI
 import SwiftUI
 
-/// Layout constants for the client: large plain cards (`Plain.radius`), 8 for rows and fields,
-/// generous spacing.
+/// Layout constants for the client: 12 pt cards, 8 pt rows and fields.
 enum Layout {
     static let card: CGFloat = Plain.radius
     static let row: CGFloat = 8
     static let gap: CGFloat = 16
     static let pageH: CGFloat = 32
-    /// Below the toolbar band, which the content starts under.
+    /// Below the top bar.
     static let pageTop: CGFloat = 16
+    /// The top bar over the content (and the sidebar's header beside it), as tall as the toolbar.
+    static let topBar: CGFloat = 52
     /// The content column's width cap, so lines never run the width of a big window.
     static let readable: CGFloat = 1120
 }
@@ -22,7 +23,7 @@ extension Font {
     }
 }
 
-/// A screen title: large and bold, with at most one quiet line under it.
+/// A screen title (22 pt semibold), with at most one quiet line under it.
 struct PageTitle<Trailing: View>: View {
     var title: String
     var subtitle: String?
@@ -38,11 +39,11 @@ struct PageTitle<Trailing: View>: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 30, weight: .bold))
-                    .tracking(-0.4)
+                    .font(TypeScale.title)
+                    .tracking(-0.3)
                     .foregroundStyle(Crystal.ink)
                 if let subtitle {
-                    Text(subtitle).font(.system(size: 15)).foregroundStyle(Crystal.ink2)
+                    Text(subtitle).font(.system(size: 14)).foregroundStyle(Crystal.ink2)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -65,9 +66,9 @@ extension View {
         background(Crystal.well, in: .rect(cornerRadius: cornerRadius))
     }
 
-    /// A secondary button inside a card.
+    /// A secondary button inside a card: the outline button.
     func cardButton() -> some View {
-        buttonStyle(.bordered).buttonBorderShape(.capsule)
+        buttonStyle(OutlineButtonStyle())
     }
 
     /// A small, title-style card heading (13 pt semibold).

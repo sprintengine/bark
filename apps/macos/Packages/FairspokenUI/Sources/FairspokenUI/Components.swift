@@ -1,10 +1,8 @@
 import FairspokenCore
 import SwiftUI
 
-/// A content card. Solid (`SurfaceStyle.solid`, Bark Server): opaque fill, 12 pt corners, a
-/// hairline edge, a 1 pt highlight along the top and a tight, soft shadow, on `Crystal.canvas`.
-/// Plain (Bark): one grey step off the ground (`Plain.card`), 22 pt corners and a faint hairline,
-/// no shadow and no gradient. Neither is glass, so cards hold rows, fields and controls directly.
+/// A content card: an opaque `Crystal.card` one step off the ground, 12 pt corners and a hairline
+/// edge. No shadow, no gradient, no glass, so cards hold rows, fields and controls directly.
 /// `tint` washes the card faintly (a highlighted choice); `fillHeight` stretches it to its row's height.
 public struct Card<Content: View>: View {
     var cornerRadius: CGFloat?
@@ -34,15 +32,15 @@ public struct Card<Content: View>: View {
 public typealias GlassCard = Card
 
 public enum CardMetrics {
-    /// One radius for every solid content card (Bark's plain cards use `Plain.radius`).
-    public static let radius: CGFloat = 12
-    /// The gap between cards (and between the content column and the window's frost).
+    /// One radius for every content card.
+    public static let radius: CGFloat = Radius.card
+    /// The gap between cards.
     public static let gap: CGFloat = 4
 }
 
 extension View {
-    /// The card material on any shape-sized view, in the environment's `SurfaceStyle`. The
-    /// radius defaults to the style's. `selected` draws an accent edge instead of the hairline.
+    /// The card material on any shape-sized view. The radius defaults to `Radius.card`.
+    /// `selected` draws an accent edge instead of the hairline.
     public func cardSurface(cornerRadius: CGFloat? = nil, tint: Color? = nil, selected: Color? = nil) -> some View {
         modifier(CardSurface(cornerRadius: cornerRadius, tint: tint, selected: selected))
     }
@@ -53,39 +51,17 @@ private struct CardSurface: ViewModifier {
     var tint: Color?
     var selected: Color?
     @Environment(\.colorScheme) private var scheme
-    @Environment(\.surfaceStyle) private var style
 
     func body(content: Content) -> some View {
-        if style == .plain { plain(content) } else { solid(content) }
-    }
-
-    private func plain(_ content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius ?? Plain.radius, style: .continuous)
-        return content
-            .background {
-                shape.fill(Plain.card)
-                    .overlay { if let tint { shape.fill(tint.opacity(scheme == .dark ? 0.10 : 0.06)) } }
-            }
-            .overlay {
-                shape.strokeBorder(selected ?? Plain.edge, lineWidth: selected == nil ? 1 : 1.5)
-            }
-    }
-
-    private func solid(_ content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius ?? CardMetrics.radius, style: .continuous)
+        // Older call sites ask for the large radii of the previous look; cards are 12 pt now.
+        let shape = RoundedRectangle(cornerRadius: min(cornerRadius ?? Radius.card, Radius.composer), style: .continuous)
         return content
             .background {
                 shape.fill(Crystal.card)
                     .overlay { if let tint { shape.fill(tint.opacity(scheme == .dark ? 0.10 : 0.06)) } }
-                    .shadow(color: .black.opacity(scheme == .dark ? 0.30 : 0.05), radius: 1, y: 0.5)
-                    .shadow(color: .black.opacity(scheme == .dark ? 0.22 : 0.045), radius: 6, y: 2)
             }
             .overlay {
                 shape.strokeBorder(selected ?? Crystal.hairline, lineWidth: selected == nil ? 1 : 1.5)
-                // The inner top highlight: a 1 pt line that fades out down the sides.
-                shape.inset(by: 1).stroke(LinearGradient(colors: [Crystal.cardHighlight, .clear],
-                                                         startPoint: .top, endPoint: .init(x: 0.5, y: 0.12)), lineWidth: 1)
-                    .allowsHitTesting(false)
             }
     }
 }
@@ -102,43 +78,25 @@ public struct IconTile: View {
         self.size = size
     }
 
-    @Environment(\.surfaceStyle) private var style
-
     public var body: some View {
+        // A soft tile: the symbol in its colour on a faint wash of it.
         let shape = RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
-        if style == .plain {
-            // A soft tile: the symbol in its colour on a faint wash of it.
-            Image(systemName: symbol)
-                .font(.system(size: size * 0.5, weight: .semibold))
-                .foregroundStyle(color)
-                .frame(width: size, height: size)
-                .background(color.opacity(0.13), in: shape)
-                .accessibilityHidden(true)
-        } else {
-            solidTile(shape)
-        }
-    }
-
-    private func solidTile(_ shape: RoundedRectangle) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: size * 0.52, weight: .semibold))
-            .foregroundStyle(.white)
+            .font(.system(size: size * 0.5, weight: .semibold))
+            .foregroundStyle(color)
             .frame(width: size, height: size)
-            .background {
-                shape.fill(LinearGradient(colors: [color.mix(with: .white, by: 0.12), color],
-                                          startPoint: .top, endPoint: .bottom))
-            }
-            .overlay(shape.strokeBorder(Color.black.opacity(0.08), lineWidth: 0.5))
+            .background(color.opacity(0.14), in: shape)
             .accessibilityHidden(true)
     }
 }
 
-/// The one primary action of a screen: a solid accent capsule with `Crystal.onAccent` text. Drawn with an explicit
-/// fill, so it keeps its colour in a window that isn't key.
+/// The one primary action of a screen: the primary blue, 8 pt corners, white text, with a 1 pt
+/// highlight along its top. Drawn with an explicit fill, so it keeps its colour in a window that
+/// isn't key.
 public struct PrimaryButtonStyle: ButtonStyle {
     var tint: Color
     var large: Bool
-    public init(tint: Color = Crystal.clientAccent, large: Bool = false) {
+    public init(tint: Color = Crystal.primary, large: Bool = false) {
         self.tint = tint
         self.large = large
     }
@@ -156,24 +114,85 @@ public struct PrimaryButtonStyle: ButtonStyle {
         @State private var hovered = false
 
         var body: some View {
+            let shape = RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
             configuration.label
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(isEnabled ? Crystal.onAccent : Crystal.ink3.opacity(0.7))
-                .padding(.horizontal, large ? 18 : 12)
-                .frame(minHeight: large ? 32 : 26)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isEnabled ? Crystal.onAccent : Crystal.ink3)
+                .padding(.horizontal, large ? 14 : 10)
+                .frame(minHeight: large ? 32 : 28)
                 .background {
                     if isEnabled {
-                        // A solid fill, no gradient or glow.
-                        Capsule().fill(tint.mix(with: .black, by: configuration.isPressed ? 0.18 : hovered ? 0.08 : 0))
+                        shape.fill(tint.mix(with: .black, by: configuration.isPressed ? 0.16 : hovered ? 0.07 : 0))
+                            .overlay(alignment: .top) {
+                                shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.16), .clear],
+                                                                  startPoint: .top, endPoint: .init(x: 0.5, y: 0.08)))
+                            }
                     } else {
-                        // Unavailable reads as neutral and flat: no edge, so it never looks like a
-                        // secondary button.
-                        Capsule().fill(Crystal.well)
+                        // Unavailable reads as neutral and flat.
+                        shape.fill(Crystal.well).overlay(shape.strokeBorder(Crystal.hairlineSoft))
                     }
                 }
-                .contentShape(.capsule)
+                .contentShape(shape)
                 .onHover { hovered = $0 }
                 .animation(reduceMotion ? nil : Motion.fast, value: configuration.isPressed)
+        }
+    }
+}
+
+/// A secondary action: an outline button, 28 pt high, 8 pt corners, on a faint fill.
+public struct OutlineButtonStyle: ButtonStyle {
+    var compact: Bool
+    public init(compact: Bool = false) { self.compact = compact }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        OutlineBody(configuration: configuration, compact: compact)
+    }
+
+    private struct OutlineBody: View {
+        var configuration: ButtonStyleConfiguration
+        var compact: Bool
+        @Environment(\.isEnabled) private var isEnabled
+        @State private var hovered = false
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+            configuration.label
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isEnabled ? Crystal.ink : Crystal.ink3)
+                .padding(.horizontal, compact ? 8 : 10)
+                .frame(minHeight: compact ? 24 : 28)
+                .background(shape.fill(configuration.isPressed ? Crystal.selected : hovered && isEnabled ? Crystal.rowHover : Crystal.well))
+                .overlay(shape.strokeBorder(Crystal.input))
+                .contentShape(shape)
+                .onHover { hovered = $0 }
+        }
+    }
+}
+
+/// A quiet action: muted text, a fill only under the pointer.
+public struct GhostButtonStyle: ButtonStyle {
+    var selected: Bool
+    public init(selected: Bool = false) { self.selected = selected }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        GhostBody(configuration: configuration, selected: selected)
+    }
+
+    private struct GhostBody: View {
+        var configuration: ButtonStyleConfiguration
+        var selected: Bool
+        @State private var hovered = false
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+            configuration.label
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(selected || hovered ? Crystal.ink : Crystal.ink2)
+                .padding(.horizontal, 9)
+                .frame(minHeight: 28)
+                .background(shape.fill(selected || configuration.isPressed ? Crystal.selected : hovered ? Crystal.rowHover : .clear))
+                .contentShape(shape)
+                .onHover { hovered = $0 }
         }
     }
 }
@@ -213,25 +232,39 @@ public struct Eyebrow: View {
     }
 }
 
-/// A keyboard key cap: `⌘` `⇧` `1`. `large` for the shortcut on its own (onboarding).
+/// A keyboard hint: `⌘K`, `fn`, `esc`. Flat on a faint fill (11 pt medium, 20 pt high, 4 pt
+/// corners); `outline` draws a physical key so it stands apart inside a sentence; `large` is the
+/// shortcut on its own (onboarding).
 public struct Keycap: View {
     var label: String
     var large: Bool
-    public init(label: String, large: Bool = false) { self.label = label; self.large = large }
+    var outline: Bool
+    public init(label: String, large: Bool = false, outline: Bool = false) {
+        self.label = label
+        self.large = large
+        self.outline = outline
+    }
+
     public var body: some View {
-        let radius: CGFloat = large ? 8 : 5
+        let radius: CGFloat = large ? 8 : 4
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         Text(label)
-            .font(.system(size: large ? 20 : 11, weight: .medium, design: .rounded))
-            .padding(.horizontal, large ? 12 : 5)
-            .frame(minWidth: large ? 44 : 20, minHeight: large ? 40 : 18)
-            .foregroundStyle(Crystal.ink)
-            .background(Crystal.well, in: .rect(cornerRadius: radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Crystal.hairline))
-            .overlay(alignment: .bottom) {
-                // The key's lower lip.
-                RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Crystal.hairline)
-                    .frame(height: 1).padding(.horizontal, radius / 2).allowsHitTesting(false)
+            .font(.system(size: large ? 20 : 11, weight: .medium))
+            .padding(.horizontal, large ? 12 : outline ? 6 : 5)
+            .frame(minWidth: large ? 44 : 20, minHeight: large ? 40 : 20)
+            .foregroundStyle(large ? Crystal.ink : Crystal.ink2)
+            .background {
+                if outline || large {
+                    shape.strokeBorder(Crystal.input)
+                        .overlay(alignment: .bottom) {
+                            // The key's lower lip: the bottom edge drawn twice as thick.
+                            shape.fill(Crystal.input).frame(height: 2).padding(.horizontal, radius / 2)
+                        }
+                } else {
+                    shape.fill(Crystal.keyFill)
+                }
             }
+            .fixedSize()
             .accessibilityLabel(label)
     }
 }
@@ -243,7 +276,12 @@ public struct ShortcutCaps: View {
     public init(description: String, large: Bool = false) { self.description = description; self.large = large }
     public var body: some View {
         HStack(spacing: large ? 6 : 3) {
-            ForEach(Array(Self.split(description).enumerated()), id: \.offset) { _, part in Keycap(label: part, large: large) }
+            if large {
+                ForEach(Array(Self.split(description).enumerated()), id: \.offset) { _, part in Keycap(label: part, large: true) }
+            } else {
+                // One hint for the whole chord, as keyboard hints are written: ⇧⌘1.
+                Keycap(label: description)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Shortcut \(description)")
@@ -285,8 +323,7 @@ public struct StatusDot: View {
     }
 }
 
-/// Capsule chip. Glass where it floats over a backdrop (Bark Server's window); `flat` on a
-/// solid card, where glass would sit on an opaque surface.
+/// A small labelled control-like chip: an outline control on a card (`flat`), or a small card.
 public struct Chip: View {
     var text: String
     var symbol: String? = nil
@@ -306,14 +343,14 @@ public struct Chip: View {
             Text(text).lineLimit(1)
         }
         if flat && style == .plain {
-            // A raised capsule, one step off the card, with a hairline.
+            // An outline control: 8 pt corners on a faint fill.
             label
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Crystal.ink)
-                .padding(.horizontal, 13)
-                .frame(height: 30)
-                .background(Capsule().fill(Plain.raised))
-                .overlay(Capsule().strokeBorder(Crystal.hairline))
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .background(Crystal.well, in: .rect(cornerRadius: Radius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).strokeBorder(Crystal.input))
         } else if flat {
             label
                 .font(.system(size: 12, weight: .medium))
@@ -324,10 +361,12 @@ public struct Chip: View {
                 .overlay(Capsule().strokeBorder(Crystal.hairline))
         } else {
             label
-                .font(.callout.weight(.medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .glassEffect(.regular, in: .capsule)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Crystal.ink)
+                .padding(.horizontal, 10)
+                .frame(height: 26)
+                .background(Crystal.card, in: .rect(cornerRadius: Radius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).strokeBorder(Crystal.hairline))
         }
     }
 }
@@ -344,11 +383,11 @@ public struct Tag: View {
             if let symbol { Image(systemName: symbol).imageScale(.small) }
             Text(text).lineLimit(1)
         }
-        .font(.system(size: 11, weight: .semibold))
+        .font(.system(size: 12, weight: .medium))
         .foregroundStyle(color)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 2.5)
-        .background(color.opacity(0.12), in: .capsule)
+        .padding(.horizontal, 5)
+        .frame(height: 18)
+        .background(color.opacity(0.14), in: .rect(cornerRadius: 4, style: .continuous))
     }
 }
 
@@ -390,8 +429,8 @@ public struct DotMeter: View {
 }
 
 extension ComputePlacement {
-    /// Neutral for your host, the accent for this Mac's Neural Engine.
-    public var tint: Color { self == .remoteHost ? Crystal.ink2 : Crystal.clientAccent }
+    /// Neutral wherever it runs: the brand keeps its blue for actions.
+    public var tint: Color { Crystal.ink2 }
 }
 
 public enum Format {
