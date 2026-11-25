@@ -36,6 +36,20 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
     public var model: String?
     public var appName: String?
     public var appBundleId: String?
+    /// What cleanup changed, in transcript order (nil for dictations kept before cleanup recorded it).
+    public var cleanupEdits: [CleanupEdit]?
+    /// The style it was formatted in: a `DictationStyle.ID` raw value ("verbatim", "email"…).
+    public var style: String?
+    /// Why that style: "Mail rule", "You chose this", a website's host.
+    public var styleReason: String?
+    /// The website it went to, when the target was a browser.
+    public var destinationHost: String?
+    /// A note written or dictated in Bark itself rather than into another app.
+    public var isNote: Bool?
+    /// How long cleanup and styling took.
+    public var cleanupMs: Int?
+    /// True when nothing could take the paste and the text went to the clipboard instead.
+    public var clipboardOnly: Bool?
 
     public init(id: String, createdAt: Int64, text: String, backend: String, location: String, durationSeconds: Double,
                 timings: DictationTimings? = nil, model: String? = nil, appName: String? = nil, appBundleId: String? = nil) {
@@ -65,14 +79,24 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
         model = c.lenient(String.self, .model)
         appName = c.lenient(String.self, .appName)
         appBundleId = c.lenient(String.self, .appBundleId)
+        cleanupEdits = c.lenient([CleanupEdit].self, .cleanupEdits)
+        style = c.lenient(String.self, .style)
+        styleReason = c.lenient(String.self, .styleReason)
+        destinationHost = c.lenient(String.self, .destinationHost)
+        isNote = c.lenient(Bool.self, .isNote)
+        cleanupMs = c.lenientInt(.cleanupMs)
+        clipboardOnly = c.lenient(Bool.self, .clipboardOnly)
     }
 
     public var date: Date { Date(timeIntervalSince1970: Double(createdAt) / 1000) }
     public var wordCount: Int { WordCounter.count(text) }
+    /// A note written in Bark, not a dictation into another app.
+    public var isBarkNote: Bool { isNote == true }
 }
 
 public enum TranscriptHistory {
-    public static let maxItems = 50
+    /// History is the main window's navigation, so it keeps much more than the Rust app's 50.
+    public static let maxItems = 1_000
 
     /// Inserts newest-first, de-duplicating on normalised text and capping like the Rust service.
     public static func adding(_ item: TranscriptHistoryItem, to items: [TranscriptHistoryItem]) -> [TranscriptHistoryItem] {
