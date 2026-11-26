@@ -34,12 +34,16 @@ public struct DictationLifecycle<Session> {
         case idle
         case listening(DictationTrigger)
         case transcribing
+        /// The transcript is being pasted or copied: past the point of no return, so Escape and
+        /// the deadline leave it alone.
+        case delivering
 
         public var label: String {
             switch self {
             case .idle: "idle"
             case .listening(let trigger): "listening (\(trigger.rawValue))"
             case .transcribing: "transcribing"
+            case .delivering: "delivering"
             }
         }
     }
@@ -63,7 +67,7 @@ public struct DictationLifecycle<Session> {
     /// transcribing nothing starts or stops; Escape cancels.
     public func action(for event: DictationTriggerEvent, shortcutMode: RecordingShortcutMode) -> DictationTriggerAction {
         switch stage {
-        case .transcribing:
+        case .transcribing, .delivering:
             return .ignore
         case .listening(let trigger):
             switch event {
@@ -109,20 +113,32 @@ public struct DictationLifecycle<Session> {
     /// its transcription may deliver, or change what the user sees.
     public func isTranscribing(_ id: Int) -> Bool { stage == .transcribing && self.id == id }
 
+    /// Dictation `id`'s transcript is about to be written somewhere (the last moment Escape
+    /// could have stopped it). False, changing nothing, unless `id` is being transcribed (or is
+    /// delivering already).
+    public mutating func beginDelivering(_ id: Int) -> Bool {
+        guard self.id == id, stage == .transcribing || stage == .delivering else { return false }
+        stage = .delivering
+        return true
+    }
+
+    public var isDelivering: Bool { stage == .delivering }
+
     /// Dictation `id` is over (delivered, failed, kept to retry, timed out). False, changing
-    /// nothing, when it is no longer the one being transcribed: cancelled, already finished, or
-    /// a newer dictation has started.
+    /// nothing, when it is no longer the one being transcribed or delivered: cancelled, already
+    /// finished, or a newer dictation has started.
     @discardableResult
     public mutating func finish(_ id: Int) -> Bool {
-        guard isTranscribing(id) else { return false }
+        guard self.id == id, stage == .transcribing || stage == .delivering else { return false }
         stage = .idle
         return true
     }
 
-    /// Abandons the current dictation at whatever stage it is (Escape, a fault). Returns its id,
-    /// the stage it was at, and the session if it was still listening; nil when idle.
+    /// Abandons the current dictation (Escape, a fault). Returns its id, the stage it was at,
+    /// and the session if it was still listening. Nil when idle, and while delivering: by then
+    /// the text is being pasted and can't be taken back.
     public mutating func cancel() -> (id: Int, stage: Stage, session: Session?)? {
-        guard isActive else { return nil }
+        guard isActive, stage != .delivering else { return nil }
         let was = stage
         let session = self.session
         self.session = nil

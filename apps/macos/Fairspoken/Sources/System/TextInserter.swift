@@ -15,6 +15,8 @@ enum TextInserter {
     enum Outcome: Equatable {
         case pasted
         case copied(reason: String)
+        /// `commit` said no: nothing was written or pasted.
+        case withdrawn
     }
 
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "insert")
@@ -27,13 +29,19 @@ enum TextInserter {
     /// `expectedApp` is the app that was frontmost when recording started. If another app is in
     /// front now, the text is still pasted but the old clipboard is not put back, so the
     /// dictation stays recoverable if it landed somewhere unexpected.
-    static func deliver(_ text: String, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?) async -> Outcome {
+    /// `commit` is asked just before the text is first written anywhere (after the waits for
+    /// the keys and the focus): false when the dictation was cancelled meanwhile (Escape), and
+    /// then nothing lands anywhere. Once it says yes the dictation can no longer be cancelled.
+    static func deliver(_ text: String, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?,
+                        commit: () -> Bool = { true }) async -> Outcome {
         let pasteboard = NSPasteboard.general
         guard paste else {
+            guard commit() else { return .withdrawn }
             write(text, to: pasteboard, transient: false)
             return .copied(reason: "Copied to clipboard")
         }
         guard AXIsProcessTrusted() else {
+            guard commit() else { return .withdrawn }
             write(text, to: pasteboard, transient: false)
             return .copied(reason: "Copied — allow Accessibility to paste")
         }
@@ -41,12 +49,15 @@ enum TextInserter {
         // the shortcut, and ⌘V goes to whatever is in front once it is up.
         await waitForModifierRelease(timeout: .milliseconds(800))
         if IsSecureEventInputEnabled() || focusedElementIsSecure() {
+            guard commit() else { return .withdrawn }
             write(text, to: pasteboard, transient: false)
             return .copied(reason: "Copied — secure field")
         }
 
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let focus = await probeFocus(of: front)
+        // Everything below writes the text somewhere.
+        guard commit() else { return .withdrawn }
         // The probe described an app that is no longer in front: don't paste blind.
         if NSWorkspace.shared.frontmostApplication?.processIdentifier != front {
             write(text, to: pasteboard, transient: false)

@@ -142,6 +142,30 @@ private final class Harness {
         #expect(h.lifecycle.id == 2)
     }
 
+    /// Once the transcript is being pasted, Escape and the deadline can no longer say it was
+    /// cancelled or saved to retry: it is delivered.
+    @Test func escapeWhileDeliveringIsTooLate() {
+        let h = Harness()
+        h.press(.button)
+        h.press(.button)
+        let delivering = h.lifecycle.beginDelivering(1)
+        #expect(delivering)
+        #expect(h.lifecycle.stage == .delivering)
+        #expect(h.escape() == nil)
+        #expect(!h.lifecycle.isTranscribing(1), "the deadline only ends a dictation still transcribing")
+        h.press(.fnDown)
+        #expect(h.lifecycle.stage == .delivering)
+        let finished = h.lifecycle.finish(1)
+        #expect(finished)
+        #expect(h.lifecycle.stage == .idle)
+        // A dictation cancelled before it got there can't begin delivering.
+        h.press(.button)
+        h.press(.button)
+        _ = h.escape()
+        let late = h.lifecycle.beginDelivering(2)
+        #expect(!late)
+    }
+
     @Test func escapeWhileListeningHandsBackTheSessionToCancel() {
         let h = Harness()
         h.press(.fnDown)
