@@ -8,6 +8,7 @@ import { addEvent, addEventWithId, eventSeverity, type EventLevel } from "./even
 import { required } from "./dom";
 import { errorMessage } from "./errors";
 import { deliveryNotice, type DictationDelivery, type DictationOutcome } from "./delivery";
+import { holdAction, toggleAction, type TriggerAction } from "./dictationTriggers";
 
 // The pill window: the recording state machine and its capsule layout. The
 // wave meter, global shortcuts and the AI polish undo offer live in
@@ -19,6 +20,19 @@ type AppState = "idle" | "starting" | "recording" | "transcribing" | "error";
 
 interface BackendStatus {
   state: AppState;
+  message: string;
+  dictationId?: number | null;
+}
+
+// The backend numbers each dictation from its confirmed start; cancels and
+// events carry that number so late ones for an earlier dictation are ignored.
+interface RecordingStarted {
+  maxRecordingSeconds: number;
+  dictationId: number;
+}
+
+interface DictationTimedOutEvent {
+  dictationId: number;
   message: string;
 }
 
@@ -49,6 +63,7 @@ interface AudioLevelEvent {
 }
 
 interface RecordingAutoStoppedEvent {
+  dictationId: number;
   committed: boolean;
   message: string;
   delivery: DictationDelivery | null;
@@ -75,7 +90,19 @@ let recordingSeconds = 0;
 let startRecordingRequestPending = false;
 let stopRecordingRequestPending = false;
 let cancelTranscriptionRequestPending = false;
-let pushToTalkReleasePending = false;
+// A stop that arrived while the recording was still starting; honoured as
+// soon as capture is confirmed, so no stop is ever dropped.
+let stopAfterStart = false;
+// Bumped whenever a dictation starts or the pill ends one itself (cancel,
+// deadline, backend auto-stop). Work begun for an earlier value finds it
+// changed and leaves the pill alone, so a late result for one dictation can
+// never overwrite the next one's state.
+let dictationToken = 0;
+let backendDictationId: number | null = null;
+let cancelGraceTimer: ReturnType<typeof setTimeout> | null = null;
+// How long a cancelled dictation may take to unwind before the pill stops
+// waiting for it; anything it returns later is dropped.
+const CANCEL_GRACE_MS = 3000;
 
 function setState(state: AppState, message?: string): void {
   if (copiedStatusTimer !== null && state !== "idle") {
@@ -185,12 +212,9 @@ function shortErrorMessage(message: string): string {
   if (lower.includes("model files are missing")) return "Model not downloaded";
   if (lower.includes("allowance used")) return "Cloud allowance used — see Settings";
   if (lower.includes("cloud sign-in expired")) return "Cloud sign-in expired — see Settings";
+  if (lower.includes("took too long")) return "Took too long, try again";
   if (!normalized) return "Error";
   return normalized.length <= 40 ? normalized : `${normalized.slice(0, 39)}…`;
-}
-
-function currentAppState(): AppState {
-  return appState;
 }
 
 function canStartRecording(): boolean {
@@ -330,40 +354,80 @@ function updateSettingsEventBadge(): void {
 
 async function loadBackendStatus(): Promise<void> {
   const status = await invoke<BackendStatus>("get_app_status");
+  backendDictationId = status.dictationId ?? null;
   setState(status.state, status.message);
 }
 
+function triggerState() {
+  return {
+    phase: appState,
+    stopPending: stopRecordingRequestPending,
+    cancelPending: cancelTranscriptionRequestPending,
+  };
+}
+
+async function runTrigger(action: TriggerAction): Promise<void> {
+  if (action === "start") await startRecording();
+  else if (action === "stop") await stopAndTranscribe();
+  else if (action === "cancel") await cancelTranscription();
+  else if (action === "stopAfterStart") stopAfterStart = true;
+}
+
 async function toggleRecording(): Promise<void> {
-  if (appState === "transcribing") {
-    await cancelTranscription();
-    return;
-  }
-  if (stopRecordingRequestPending) return;
+  await runTrigger(toggleAction(triggerState()));
+}
 
-  if (appState === "recording") {
-    await stopAndTranscribe();
-    return;
-  }
+async function pushToTalk(pressed: boolean): Promise<void> {
+  await runTrigger(holdAction(pressed, triggerState()));
+}
 
-  await startRecording();
+// The pill has finished with the current dictation, ahead of the backend:
+// whatever the backend still returns for it is dropped.
+function endDictationInUi(): void {
+  dictationToken += 1;
+  stopRecordingRequestPending = false;
+  cancelTranscriptionRequestPending = false;
+  stopAfterStart = false;
+  if (cancelGraceTimer !== null) {
+    clearTimeout(cancelGraceTimer);
+    cancelGraceTimer = null;
+  }
 }
 
 async function startRecording(): Promise<boolean> {
   if (!canStartRecording()) return false;
+  const token = ++dictationToken;
+  stopAfterStart = false;
+  backendDictationId = null;
 
   try {
     startRecordingRequestPending = true;
     // The start click plays from the backend once capture is confirmed live.
     setState("starting");
-    const maxRecordingSeconds = await invoke<number>("start_recording");
+    const started = await invoke<RecordingStarted>("start_recording");
     startRecordingRequestPending = false;
+    if (token !== dictationToken) {
+      // Nothing should end a dictation while it starts, but if something did,
+      // the recording it opened must not be left running unseen.
+      addEvent("warning", `Dictation ${started.dictationId} started after the pill had moved on; discarding it`);
+      void invoke("cancel_transcription", { dictationId: started.dictationId }).catch((error) => addEvent("warning", errorMessage(error)));
+      return false;
+    }
     cancelTranscriptionRequestPending = false;
+    backendDictationId = started.dictationId;
     setState("recording");
-    scheduleMaxRecordingStop(maxRecordingSeconds);
+    scheduleMaxRecordingStop(started.maxRecordingSeconds);
+    if (stopAfterStart) {
+      stopAfterStart = false;
+      addEvent("info", "The stop came while the recording was starting; stopping now");
+      await stopAndTranscribe();
+    }
     return true;
   } catch (error) {
     startRecordingRequestPending = false;
+    if (token !== dictationToken) return false;
     stopRecordingRequestPending = false;
+    stopAfterStart = false;
     const message = errorMessage(error);
     addEvent("error", message);
     await refreshStateAfterStartError(message);
@@ -371,31 +435,11 @@ async function startRecording(): Promise<boolean> {
   }
 }
 
-async function startPushToTalkRecording(): Promise<void> {
-  if (!canStartRecording()) return;
-  pushToTalkReleasePending = false;
-  const started = await startRecording();
-  if (started && pushToTalkReleasePending && currentAppState() === "recording") {
-    pushToTalkReleasePending = false;
-    await stopAndTranscribe();
-  }
-}
-
-async function stopPushToTalkRecording(): Promise<void> {
-  if (startRecordingRequestPending) {
-    pushToTalkReleasePending = true;
-    return;
-  }
-  pushToTalkReleasePending = false;
-  if (appState === "recording" && !stopRecordingRequestPending) {
-    await stopAndTranscribe();
-  }
-}
-
 async function refreshStateAfterStartError(message: string): Promise<void> {
   try {
     const status = await invoke<BackendStatus>("get_app_status");
     if (status.state === "recording") {
+      backendDictationId = status.dictationId ?? null;
       setState("recording", status.message);
       addEvent("warning", "Recovered recording state after a UI error");
     } else {
@@ -408,6 +452,7 @@ async function refreshStateAfterStartError(message: string): Promise<void> {
 
 async function stopAndTranscribe(): Promise<void> {
   if (stopRecordingRequestPending) return;
+  const token = dictationToken;
   stopRecordingRequestPending = true;
   cancelTranscriptionRequestPending = false;
   clearMaxRecordingTimer();
@@ -419,6 +464,10 @@ async function stopAndTranscribe(): Promise<void> {
 
   try {
     const { transcript, delivery } = await invoke<DictationOutcome>("stop_and_transcribe");
+    if (token !== dictationToken) {
+      addEvent("info", "A dictation finished after the pill had ended it; its result was not shown");
+      return;
+    }
     if (cancelTranscriptionRequestPending) {
       setState("idle", "Ready");
       return;
@@ -432,6 +481,7 @@ async function stopAndTranscribe(): Promise<void> {
     }
   } catch (error) {
     const message = errorMessage(error);
+    if (token !== dictationToken) return;
     if (message === "Transcription was cancelled") {
       addEvent("info", "Transcription cancelled");
       setState("idle", "Ready");
@@ -443,18 +493,35 @@ async function stopAndTranscribe(): Promise<void> {
       setState("error", shortErrorMessage(message));
     }
   } finally {
-    stopRecordingRequestPending = false;
-    cancelTranscriptionRequestPending = false;
+    if (token === dictationToken) {
+      stopRecordingRequestPending = false;
+      cancelTranscriptionRequestPending = false;
+      if (cancelGraceTimer !== null) {
+        clearTimeout(cancelGraceTimer);
+        cancelGraceTimer = null;
+      }
+    }
   }
 }
 
+// Works for as long as the pill shows "Transcribing". The stop usually
+// returns "cancelled" at once; if it does not within CANCEL_GRACE_MS, the
+// pill ends the dictation itself and drops whatever arrives later.
 async function cancelTranscription(): Promise<void> {
-  if (cancelTranscriptionRequestPending || !stopRecordingRequestPending) return;
+  if (appState !== "transcribing" || cancelTranscriptionRequestPending) return;
   cancelTranscriptionRequestPending = true;
-  setState("transcribing", "Canceling");
+  const token = dictationToken;
+  setState("transcribing", "Cancelling");
+  cancelGraceTimer = setTimeout(() => {
+    cancelGraceTimer = null;
+    if (token !== dictationToken || appState !== "transcribing") return;
+    addEvent("warning", "The cancelled dictation is still unwinding; the pill is ready again");
+    endDictationInUi();
+    setState("idle", "Ready");
+  }, CANCEL_GRACE_MS);
 
   try {
-    await invoke("cancel_transcription");
+    await invoke("cancel_transcription", { dictationId: backendDictationId });
   } catch (error) {
     addEvent("warning", errorMessage(error));
   }
@@ -538,11 +605,7 @@ void listen<ShortcutSettings>("settings-updated", (event) => {
 
 // Emitted by the Rust CGEventTap when hold-Fn push-to-talk is enabled.
 void listen<{ pressed: boolean }>("fn-push-to-talk", (event) => {
-  if (event.payload.pressed) {
-    void startPushToTalkRecording();
-  } else {
-    void stopPushToTalkRecording();
-  }
+  void pushToTalk(event.payload.pressed);
 }).catch((error) => addEvent("warning", errorMessage(error)));
 
 // Real capture levels for the recording meter (~25 Hz while recording).
@@ -554,8 +617,10 @@ void listen<AudioLevelEvent>("audio-level", (event) => {
 // through the normal pipeline so whatever audio was captured is preserved.
 void listen<string>("recording-stream-error", (event) => {
   addEvent("error", `Microphone stream failed: ${event.payload}`);
-  if (appState === "recording" || appState === "starting") {
+  if (appState === "recording") {
     void stopAndTranscribe();
+  } else if (appState === "starting") {
+    stopAfterStart = true;
   }
 }).catch((error) => addEvent("warning", errorMessage(error)));
 
@@ -563,14 +628,23 @@ void listen<string>("recording-stream-error", (event) => {
 // stopped; resync the pill instead of showing a stuck recording state.
 void listen<RecordingAutoStoppedEvent>("recording-auto-stopped", (event) => {
   addEvent(event.payload.committed ? "info" : "warning", event.payload.message);
+  if (event.payload.dictationId !== backendDictationId) return;
   if (appState !== "recording" && appState !== "transcribing") return;
-  stopRecordingRequestPending = false;
-  cancelTranscriptionRequestPending = false;
+  endDictationInUi();
   if (event.payload.committed) {
     showCopiedStatus(deliveryNotice(event.payload.delivery, PASTE_KEYS));
   } else {
     setState("idle", "Ready");
   }
+}).catch((error) => addEvent("warning", errorMessage(error)));
+
+// The backend's last resort for a finish that hung: end the dictation here
+// too, even if its stop request never returns.
+void listen<DictationTimedOutEvent>("dictation-timed-out", (event) => {
+  if (event.payload.dictationId !== backendDictationId || appState !== "transcribing") return;
+  addEvent("error", event.payload.message);
+  endDictationInUi();
+  setState("error", shortErrorMessage(event.payload.message));
 }).catch((error) => addEvent("warning", errorMessage(error)));
 
 void loadBackendStatus().catch((error) => {
@@ -579,7 +653,7 @@ void loadBackendStatus().catch((error) => {
 });
 initPillShortcuts(pillHint, {
   toggleRecording: () => void toggleRecording(),
-  pushToTalk: (pressed) => void (pressed ? startPushToTalkRecording() : stopPushToTalkRecording()),
+  pushToTalk: (pressed) => void pushToTalk(pressed),
   toggleStack: () => void toggleTranscriptStack(),
 });
 void loadShortcutSettings()
