@@ -16,7 +16,7 @@ Two ways to use it in other apps:
   to move. An accessibility service puts the text in the focused field
   (`ACTION_SET_TEXT` at the cursor, or paste for rich editors) and shows the
   bubble only while a keyboard is open. Without the service the dock copies
-  the text to the clipboard. This is the same design as Wispr Flow on Android.
+  the text to the clipboard.
 
 The app screen finds a host by its Tailscale machine name, pairs with the
 host's pairing password (`POST /v1/pair`), lets you try a dictation, and
