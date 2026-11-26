@@ -34,16 +34,14 @@ struct PillView: View {
     private var reduceMotion: Bool { systemReduceMotion || showcaseReduceMotion }
 
     /// Width of the pill while it shows live text, and of the text in it.
-    static let liveWidth: CGFloat = 432
+    /// Room for the listening row at its widest (the style chip at `StyleChip.maxWidth`).
+    static let liveWidth: CGFloat = 468
     static let liveTextWidth: CGFloat = liveWidth - 28
     static let liveTextFont = Font.system(size: 14)
     /// One line of `liveTextFont`, with its leading.
     static let liveTextLineHeight: CGFloat = 20
     static let defaultMaxLines = 4
     static let height: CGFloat = 36
-    /// The cancel button and its hint stay while transcribing: the controller drops a transcript
-    /// still on its way (until the moment it is pasted) and keeps the recording to retry.
-    static let cancelsWhileTranscribing = true
 
     private var showsLiveText: Bool {
         switch dictation.phase {
@@ -108,7 +106,7 @@ struct PillView: View {
     private var takesMouse: Bool {
         switch dictation.phase {
         case .listening: true
-        case .transcribing: Self.cancelsWhileTranscribing || showsLiveText
+        case .transcribing: true
         case .failed: failure?.canRetry ?? false
         default: false
         }
@@ -157,15 +155,14 @@ struct PillView: View {
                               target: dictation.alwaysUseTarget)
     }
 
+    /// Cancel stays while transcribing: the controller drops a transcript still on its way
+    /// (until the moment it is pasted) and keeps the recording to retry.
     private var transcribingRow: some View {
-        let cancels = Self.cancelsWhileTranscribing
         let label = dictation.transcribingNote ?? "Transcribing"
         return HStack(spacing: 6) {
-            if cancels {
-                PillIconButton(symbol: "xmark", label: "Cancel", help: "Cancel (\(Self.cancelKey ?? "esc"))") { dictation.cancel() }
-                cancelHint.padding(.leading, -4)
-            }
-            PillSpinner(reduceMotion: reduceMotion).padding(.leading, cancels ? 2 : 0)
+            PillIconButton(symbol: "xmark", label: "Cancel", help: "Cancel (\(Self.cancelKey ?? "esc"))") { dictation.cancel() }
+            cancelHint.padding(.leading, -4)
+            PillSpinner(reduceMotion: reduceMotion).padding(.leading, 2)
             // "Retrying the host (1 of 2)", "Transcribing on this Mac" once the first try failed.
             Text(label + "…")
                 .font(.system(size: 13))
@@ -175,7 +172,7 @@ struct PillView: View {
                 .accessibilityLabel(label)
             if showsLiveText { Spacer(minLength: 0) }
         }
-        .padding(.leading, cancels ? 4 : 12)
+        .padding(.leading, 4)
         .padding(.trailing, 14)
         .frame(height: Self.height)
     }

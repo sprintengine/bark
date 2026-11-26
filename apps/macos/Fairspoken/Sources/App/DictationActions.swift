@@ -48,7 +48,7 @@ extension AppModel {
     /// goes, and only into a text field; otherwise it is left on the clipboard. From Bark's own
     /// window it goes back to the app it was dictated into. The pill says what happened.
     func pasteLast() {
-        guard !dictation.phase.isActive else { return }
+        guard !dictation.phase.isActive, !pastingLast else { return }
         guard let item = lastDictation else {
             NSSound.beep()
             return
@@ -59,7 +59,9 @@ extension AppModel {
         }
         let s = settings.settings
         let name = front.localizedName
+        pastingLast = true
         Task { @MainActor in
+            defer { pastingLast = false }
             let outcome = await TextInserter.deliver(item.text, paste: true, restoreClipboard: s.restoreClipboard,
                                                      expectedApp: front.processIdentifier, requireExpectedApp: true)
             let delivery: DictationController.Delivery

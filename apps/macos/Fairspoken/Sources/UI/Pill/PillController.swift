@@ -199,8 +199,15 @@ final class PillController {
         }) {
             mouseMonitors.append(global)
         }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: events, handler: { [weak self] event in
-            MainActor.assumeIsolated { self?.updateMouse() }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: events.union(.leftMouseDown), handler: { [weak self] event in
+            MainActor.assumeIsolated {
+                // A click in one of Bark's own windows closes the menu too (the pill and the
+                // menu handle their own clicks).
+                if event.type == .leftMouseDown, let self, event.window !== self.panel, event.window !== self.menuPanel {
+                    self.interaction.closeMenu()
+                }
+                self?.updateMouse()
+            }
             return event
         }) {
             mouseMonitors.append(local)
@@ -236,6 +243,8 @@ final class PillController {
     }
 
     private func updateMouse() {
+        // The pill grows as words arrive and the chip moves with it: the open menu follows.
+        if interaction.menuOpen { placeMenu() }
         let mouse = pointer
         let tracking = !mouseMonitors.isEmpty && panel.isVisible
         let capsule = onScreen(interaction.capsuleFrame)
@@ -286,21 +295,10 @@ final class PillController {
             }
             return
         }
-        guard let chipFrame = interaction.chipFrame else { interaction.closeMenu(); return }
-        let root = StyleMenuRoot(dictation: dictation, interaction: interaction)
-        menuHost.rootView = root
-        // The hosting view doesn't size itself (`sizingOptions` is empty), so measure the content.
-        let size = NSHostingController(rootView: root).sizeThatFits(in: NSSize(width: 600, height: 2000))
-        guard size.width > 0, size.height > 0 else { interaction.closeMenu(); return }
-        let chip = onScreen(chipFrame)
-        let capsule = onScreen(interaction.capsuleFrame)
-        let screen = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
-        // Above the pill, its left edge under the chip's.
-        var x = chip.minX - 4 - Self.menuShadowRoom
-        x = min(max(x, screen.minX), screen.maxX - size.width)
-        let y = capsule.maxY + 6 - Self.menuShadowRoom
-        menuPanel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
-        menuHost.frame = NSRect(origin: .zero, size: size)
+        menuHost.rootView = StyleMenuRoot(dictation: dictation, interaction: interaction)
+        menuPlacement = nil
+        placeMenu()
+        guard interaction.menuOpen else { return }
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         menuPanel.alphaValue = reduceMotion ? 1 : 0
         panel.addChildWindow(menuPanel, ordered: .above)
@@ -312,6 +310,30 @@ final class PillController {
             }
         }
         NSAccessibility.post(element: menuPanel, notification: .created)
+    }
+
+    /// What the menu was last placed for: where the chip and the pill were, and its rows.
+    private var menuPlacement: (chip: CGRect, capsule: CGRect, entries: [StyleChipState.Entry])?
+
+    /// Above the pill, its left edge under the chip's, sized to its rows; again whenever the
+    /// pill or the rows change (words arriving grow the pill; a website read late adds a row).
+    private func placeMenu() {
+        guard let chipFrame = interaction.chipFrame else { interaction.closeMenu(); return }
+        let entries = StyleChipState(resolution: dictation.currentStyle, rulesResolution: dictation.rulesStyle,
+                                     target: dictation.alwaysUseTarget)?.entries ?? []
+        if let last = menuPlacement, last.chip == chipFrame, last.capsule == interaction.capsuleFrame, last.entries == entries { return }
+        menuPlacement = (chipFrame, interaction.capsuleFrame, entries)
+        // The hosting view doesn't size itself (`sizingOptions` is empty), so measure the content.
+        let size = NSHostingController(rootView: menuHost.rootView).sizeThatFits(in: NSSize(width: 600, height: 2000))
+        guard size.width > 0, size.height > 0 else { interaction.closeMenu(); return }
+        let chip = onScreen(chipFrame)
+        let capsule = onScreen(interaction.capsuleFrame)
+        let screen = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        var x = chip.minX - 4 - Self.menuShadowRoom
+        x = min(max(x, screen.minX), screen.maxX - size.width)
+        let y = capsule.maxY + 6 - Self.menuShadowRoom
+        menuPanel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
+        menuHost.frame = NSRect(origin: .zero, size: size)
     }
 
     #if DEBUG

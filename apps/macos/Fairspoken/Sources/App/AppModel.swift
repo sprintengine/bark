@@ -41,6 +41,8 @@ final class AppModel {
     /// Set by ⌘K; the sidebar's search field takes the focus and clears it (also when the sidebar
     /// was hidden and the field appears only now).
     var searchFocusPending = false
+    /// "Paste last dictation" is under way (a second press waits for it to finish).
+    @ObservationIgnored var pastingLast = false
     /// The ⌘K palette is open over the main window.
     var paletteOpen = false
     /// Screenshots: the palette opened with this query typed.

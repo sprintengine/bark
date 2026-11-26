@@ -122,7 +122,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         guard menu === self.menu else { return }
+        // The menu shows these shortcuts as its own key equivalents; while it tracks, the global
+        // hot keys would be held and fire again once it closes.
+        KeyboardShortcuts.disable(.dictation); KeyboardShortcuts.disable(.pasteLast)
         refresh()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu === self.menu else { return }
+        KeyboardShortcuts.enable(.dictation); KeyboardShortcuts.enable(.pasteLast)
     }
 
     /// Brings every item up to date (also before a screenshot).
@@ -231,10 +239,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
     @objc private func quit() { NSApp.terminate(nil) }
 
-    #if DEBUG
     /// Screenshots: the menu itself, to pop up in a window of Bark's own.
-    var debugMenu: NSMenu { menu }
-    #endif
+    var screenshotMenu: NSMenu { menu }
 }
 
 extension StatusItemController: NSMenuItemValidation {

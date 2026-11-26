@@ -492,7 +492,7 @@ final class ScreenshotHarness {
         window.center()
         window.makeKeyAndOrderFront(nil)
         try? await Task.sleep(for: .milliseconds(600))
-        let menu = statusItem.debugMenu
+        let menu = statusItem.screenshotMenu
         statusItem.refresh()
         let name = "menu-bar-\(suffix)"
         let timer = Timer(timeInterval: 1.0, repeats: false) { [weak self] _ in
@@ -525,7 +525,7 @@ final class ScreenshotHarness {
         if let png = Self.pngOfOwnMenuWindow() {
             try? png.write(to: output.appendingPathComponent("\(name).png"))
         }
-        statusItem?.debugMenu.cancelTracking()
+        statusItem?.screenshotMenu.cancelTracking()
     }
 
     /// The topmost window of this app at the menu level (an open menu), as PNG.

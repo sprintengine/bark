@@ -210,6 +210,7 @@ struct VoiceWaveform: View {
 /// "Email · Mail rule" on the listening pill. Resting the pointer on it (or clicking it) opens
 /// the style menu; a terminal or a secure field shows "Verbatim" with a lock and no menu.
 struct StyleChip: View {
+    static let maxWidth: CGFloat = 176
     var state: StyleChipState
     var interaction: PillInteraction?
     var showcaseHover = false
@@ -225,16 +226,19 @@ struct StyleChip: View {
                 } else {
                     TypeGlyph(size: 11, color: Crystal.ink2)
                 }
-                Text(state.style.displayName).foregroundStyle(Crystal.ink)
-                Text("· \(state.reason)").foregroundStyle(Crystal.ink2)
+                Text(state.style.displayName).foregroundStyle(Crystal.ink).fixedSize()
+                Text("· \(state.reason)").foregroundStyle(Crystal.ink2).truncationMode(.tail)
                 if !state.isLocked {
                     Image(systemName: "chevron.down").font(.system(size: 7.5, weight: .bold)).foregroundStyle(Crystal.ink3)
                 }
             }
             .font(.system(size: 12, weight: .medium))
             .lineLimit(1)
-            .fixedSize()
             .padding(.horizontal, 8)
+            // Never wider than this: a long reason ("Your rule for docs.google.com") truncates,
+            // so cancel and finish always stay inside the capsule.
+            .frame(maxWidth: StyleChip.maxWidth)
+            .fixedSize()
             .frame(height: 22)
             .background(raised && !state.isLocked ? Crystal.selected : Crystal.keyFill, in: Capsule())
             .overlay { if raised && !state.isLocked { Capsule().strokeBorder(Crystal.input) } }
@@ -276,17 +280,17 @@ struct StyleMenuView: View {
             ForEach(state.entries) { entry in
                 switch entry {
                 case .style(let style, let checked):
-                    StyleMenuRow(title: style.displayName, detail: nil, checked: checked, symbol: nil,
+                    StyleMenuRow(title: style.displayName, checked: checked, symbol: nil,
                                  help: style.summary, highlighted: showcaseHighlight == entry.id) { onStyle(style) }
                 case .useRules(let title):
                     Divider().padding(.vertical, 4).padding(.horizontal, -4)
-                    StyleMenuRow(title: title, detail: nil, checked: false, symbol: "arrow.uturn.backward",
+                    StyleMenuRow(title: title, checked: false, symbol: "arrow.uturn.backward",
                                  help: "Use what your rules give this app", highlighted: showcaseHighlight == entry.id) { onRules() }
                 case .alwaysUse(let title, let style):
                     if !state.entries.contains(where: { if case .useRules = $0 { true } else { false } }) {
                         Divider().padding(.vertical, 4).padding(.horizontal, -4)
                     }
-                    StyleMenuRow(title: title, detail: nil, checked: false, symbol: "pin",
+                    StyleMenuRow(title: title, checked: false, symbol: "pin",
                                  help: "Saves a rule; change it in Settings", highlighted: showcaseHighlight == entry.id) { onAlwaysUse(style) }
                 }
             }
@@ -311,7 +315,6 @@ struct StyleMenuView: View {
 
 private struct StyleMenuRow: View {
     var title: String
-    var detail: String?
     var checked: Bool
     var symbol: String?
     var help: String
