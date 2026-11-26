@@ -72,6 +72,10 @@ private struct Conversation: View {
             } else {
                 meta.frame(maxWidth: .infinity, alignment: .leading)
             }
+            // Letting go to pasted, step by step, so a slow one shows where the time went.
+            if let timeline = DictationTimeline(item) {
+                TimelineBar(timeline: timeline).padding(.top, 14)
+            }
 
             // The reply first; under it, the toggle and the changes it opens, so the two sit together.
             PastedText(item: item).padding(.top, item.isBarkNote ? 14 : 18)
@@ -134,8 +138,92 @@ private struct Conversation: View {
     private func headline(changed: Bool) -> String {
         let ms = item.cleanupMs ?? item.timings.map { $0.polishMs }.flatMap { $0 > 0 ? $0 : nil }
         if changed { return ms.map { $0 < 1 ? "Cleaned up in under 1 ms" : "Cleaned up in \($0) ms" } ?? "Cleaned up" }
-        if let total = item.timings?.totalMs, total > 0 { return "Pasted as heard, \(total) ms after you let go" }
+        // How long it took is the timeline's to say.
         return "Pasted as heard"
+    }
+}
+
+/// Where the time went after you let go: one line and one thin bar split by step. Resting on a
+/// step lifts it, dims the rest and swaps the line for that step's name and time; the line
+/// otherwise says the total, and the slowest step when it is most of a long wait.
+private struct TimelineBar: View {
+    var timeline: DictationTimeline
+    @State private var hovered: DictationTimeline.Kind?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let focus = timeline.steps.first { $0.kind == hovered }
+        VStack(alignment: .leading, spacing: 7) {
+            Group {
+                if let focus {
+                    HStack(spacing: 6) {
+                        Circle().fill(Self.color(focus.kind)).frame(width: 7, height: 7)
+                        Text(focus.title).foregroundStyle(Crystal.ink)
+                        Text(DictationTimeline.format(focus.ms)).monospacedDigit().foregroundStyle(Crystal.ink2)
+                    }
+                    .id(focus.kind)
+                } else {
+                    Text(headline).foregroundStyle(Crystal.ink2).id("total")
+                }
+            }
+            .font(.system(size: 13, weight: .medium))
+            .transition(.opacity)
+            GeometryReader { geo in
+                let gap: CGFloat = 2
+                let usable = max(geo.size.width - gap * CGFloat(max(timeline.steps.count - 1, 0)), 0)
+                HStack(spacing: gap) {
+                    ForEach(timeline.steps, id: \.kind) { step in
+                        let lit = hovered == nil || hovered == step.kind
+                        Capsule()
+                            .fill(Self.color(step.kind))
+                            .opacity(lit ? 1 : 0.35)
+                            .frame(height: hovered == step.kind ? 8 : 5)
+                            .frame(width: max(5, usable * CGFloat(step.ms) / CGFloat(max(timeline.totalMs, 1))))
+                            // A taller target than the bar, so a 5-point step can still be found.
+                            .frame(maxHeight: .infinity)
+                            .contentShape(.rect)
+                            .onHover { inside in
+                                if inside { hovered = step.kind } else if hovered == step.kind { hovered = nil }
+                            }
+                    }
+                }
+            }
+            .frame(height: 14)
+            .accessibilityHidden(true)
+        }
+        .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hovered)
+        .onAppear { hovered = model.showcaseTimelineStep.flatMap(DictationTimeline.Kind.init(rawValue:)) }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(headline)
+        .accessibilityValue(timeline.steps.map { "\($0.title) \(DictationTimeline.format($0.ms))" }.joined(separator: ", "))
+    }
+
+    private var headline: String {
+        let total = "Pasted \(DictationTimeline.format(timeline.totalMs)) after you let go"
+        // Only worth naming when the wait was long enough to notice.
+        guard timeline.totalMs >= 1500, let top = timeline.dominant else { return total }
+        // "…, mostly the speech model", "…, mostly the network", "…, mostly pasting".
+        let what = switch top.kind {
+        case .speechModel: "the " + top.title.prefix(1).lowercased() + top.title.dropFirst()
+        case .handover where top.title == "Network": "the network"
+        case .other: "steps not timed"
+        default: top.title.lowercased()
+        }
+        return "\(total), mostly \(what)"
+    }
+
+    /// One blue for the speech model, as the app's one accent; greys for the rest.
+    static func color(_ kind: DictationTimeline.Kind) -> Color {
+        switch kind {
+        case .speechModel: Crystal.primary
+        case .handover: Crystal.primary.opacity(0.45)
+        case .destination: Crystal.ink3.opacity(0.55)
+        case .cleanup: Crystal.ink2
+        case .paste: Crystal.ink3
+        case .other: Crystal.ink3.opacity(0.3)
+        }
     }
 }
 

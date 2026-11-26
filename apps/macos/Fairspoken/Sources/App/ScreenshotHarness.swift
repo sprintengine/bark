@@ -157,12 +157,23 @@ final class ScreenshotHarness {
         if let window = windows.dashboard { await capture(window, as: "home-row-hover-\(suffix)") }
         model.showcaseHoveredRow = nil
         let shots: [(String, String)] = [("demo-0", "email"), ("demo-2", "code"), ("demo-3", "clipboard"),
-                                         ("demo-4", "server"), ("demo-5", "note"), ("demo-10", "before-cleanup")]
+                                         ("demo-4", "server"), ("demo-5", "note"), ("demo-10", "before-cleanup"),
+                                         ("demo-9", "slow")]
         for (id, name) in shots {
             model.open(dictation: id)
             try? await Task.sleep(for: .milliseconds(1000))
             await freshFrame()
             if let window = windows.dashboard { await capture(window, as: "dictation-\(name)-\(suffix)") }
+            if name == "slow" {
+                // Resting on the timeline's speech-model step.
+                model.showcaseTimelineStep = DictationTimeline.Kind.speechModel.rawValue
+                model.open(dictation: nil)
+                model.open(dictation: id)
+                try? await Task.sleep(for: .milliseconds(800))
+                await freshFrame()
+                if let window = windows.dashboard { await capture(window, as: "dictation-slow-hover-\(suffix)") }
+                model.showcaseTimelineStep = nil
+            }
         }
         // Restyled from the actions card: the Slack message as Clean, by the real formatter.
         if let slack = model.history.item("demo-1") {
@@ -951,7 +962,8 @@ enum DemoHistory {
                raw: "Thanks, Declan, um, Tuesday at ten works for me.", style: .email, reason: "You chose this", seconds: 3.6, ms: 101),
         Sample(minutesAgo: 3 * 24 * 60, app: "Socrates", bundle: "com.socrates.pms",
                raw: "Patient reports, um, intermittent chest tightness on exertion for three weeks, no radiation, settles with rest.",
-               style: .clean, reason: "Default", seconds: 8.4, ms: 133),
+               // A slow one, as when the speech model came up degraded: the timeline shows where it went.
+               style: .clean, reason: "Default", seconds: 8.4, ms: 6870),
         Sample(minutesAgo: 9 * 24 * 60, app: "Outlook", bundle: "com.microsoft.Outlook", raw: nil,
                text: "Thanks for the update. I've attached the audit results and we can go through them on Friday.",
                seconds: 5.4, ms: 117),
@@ -975,7 +987,10 @@ enum DemoHistory {
             var item = TranscriptHistoryItem(
                 id: "demo-\(i)", createdAt: created, text: text, backend: s.note ? "typed" : "parakeet",
                 location: s.remote ? "remote-host" : "local", durationSeconds: s.seconds,
-                timings: s.note ? nil : DictationTimings(transcribeMs: s.ms - 20, speechModelMs: s.ms - 60, totalMs: s.ms),
+                // Letting go to pasted is `ms`: the model's pass, its hand-over, finding the app,
+                // cleanup and the paste, as a real dictation records them.
+                timings: s.note ? nil : DictationTimings(transcribeMs: s.ms - 34 - (cleanupMs ?? 0),
+                                                         speechModelMs: s.ms - (s.remote ? 74 : 52) - (cleanupMs ?? 0), totalMs: s.ms),
                 model: s.note ? nil : "parakeet-tdt-0.6b-v3", appName: s.app, appBundleId: s.bundle)
             item.rawText = s.raw
             item.cleanupEdits = edits
@@ -984,6 +999,7 @@ enum DemoHistory {
             item.destinationHost = s.host
             item.isNote = s.note ? true : nil
             item.cleanupMs = cleanupMs
+            if !s.note { item.destinationMs = 4; item.pasteMs = 30 }
             item.clipboardOnly = s.clipboard ? true : nil
             return item
         }
