@@ -77,6 +77,13 @@ final class AppModel {
         didSet { UserDefaults.standard.set(!sidebarVisible, forKey: "SidebarHidden") }
     }
     var settingsTab: SettingsView.Tab = .general
+    /// The settings sidebar's search: every matching row from every page.
+    var settingsQuery = ""
+    /// Set by ⌘F in Settings; the settings search field takes the focus and clears it.
+    var settingsSearchFocusPending = false
+    /// Settings › App styles: the app or site whose preview is open, and the add sheet.
+    var appStylesOpenRow: String?
+    var appStylesAddPresented = false
 
     let settings: SettingsStore
     let history: HistoryStore

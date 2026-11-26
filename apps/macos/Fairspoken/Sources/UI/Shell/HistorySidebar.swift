@@ -12,14 +12,7 @@ struct HistorySidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                SidebarToggle()
-                Wordmark()
-                Spacer(minLength: 0)
-            }
-            .padding(.leading, WindowChrome.afterLights)
-            .frame(height: Layout.topBar)
-            .background { Color.clear.contentShape(.rect).gesture(WindowDragGesture()) }
+            SidebarHeader()
 
             SearchField()
                 .padding(.horizontal, 8)
@@ -40,7 +33,7 @@ struct HistorySidebar: View {
 }
 
 /// Bark's glyph on a light tile, and its name in the system face.
-private struct Wordmark: View {
+struct Wordmark: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "waveform")
@@ -396,7 +389,7 @@ private struct ModelStatusRow: View {
         let state = model.models.engineState
         let listening = model.dictation.phase.isListening
         Button {
-            if remote { model.settingsTab = .transcription; model.section = .settings } else { model.section = .models }
+            if remote { model.settingsTab = .host; model.section = .settings } else { model.section = .models }
         } label: {
             HStack(spacing: 10) {
                 Circle()

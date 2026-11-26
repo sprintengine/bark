@@ -17,7 +17,9 @@ struct DashboardView: View {
     var body: some View {
         HStack(spacing: 0) {
             if model.sidebarVisible {
-                HistorySidebar()
+                Group {
+                    if model.section == .settings { SettingsSidebar() } else { HistorySidebar() }
+                }
                     .frame(width: Self.sidebarWidth)
                     .frame(maxHeight: .infinity)
                     .overlay(alignment: .trailing) {
@@ -26,7 +28,10 @@ struct DashboardView: View {
                     .transition(.move(edge: .leading))
             }
             VStack(spacing: 0) {
+                // Above the page, on the ground colour: a page scrolled up passes under it.
                 TopBar()
+                    .background(Crystal.canvas)
+                    .zIndex(1)
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -45,17 +50,38 @@ struct DashboardView: View {
             // ⌘K: the search field for now; the search-and-commands palette takes it later.
             Button("Search") {
                 if !model.sidebarVisible { model.sidebarVisible = true }
+                if model.section == .settings { model.open(dictation: nil) }
                 model.searchFocusPending = true
             }
             .keyboardShortcut("k", modifiers: .command)
             .hidden()
             .accessibilityHidden(true)
+            // In Settings: ⌘F searches the settings, esc goes back to the dictations.
+            if model.section == .settings {
+                Button("Search Settings") {
+                    if !model.sidebarVisible { model.sidebarVisible = true }
+                    model.settingsSearchFocusPending = true
+                }
+                .keyboardShortcut("f", modifiers: .command)
+                .hidden()
+                .accessibilityHidden(true)
+                Button("Back") {
+                    model.settingsQuery = ""
+                    model.open(dictation: nil)
+                }
+                .keyboardShortcut(.cancelAction)
+                .hidden()
+                .accessibilityHidden(true)
+            }
         }
         .onAppear { if model.settings.settings.transcriptionLocation == .remoteHost { model.hostStatus.refresh() } }
         // On the dashboard rather than Home, so moving to another section never drops the test
         // without ending it.
         .sheet(isPresented: Binding(get: { model.speedTest.isPresented }, set: { model.speedTest.isPresented = $0 })) {
             SpeedTestSheet().environment(model)
+        }
+        .sheet(isPresented: Binding(get: { model.appStylesAddPresented }, set: { model.appStylesAddPresented = $0 })) {
+            AddStyleRuleSheet().environment(model)
         }
     }
 
@@ -163,9 +189,10 @@ private struct Breadcrumb: View {
                     current("Home")
                 }
             case .settings:
-                Button("Settings") { model.settingsTab = .general }.buttonStyle(.plain).foregroundStyle(Crystal.ink2)
+                Button("Settings") { model.settingsQuery = ""; model.settingsTab = .general }
+                    .buttonStyle(.plain).foregroundStyle(Crystal.ink2)
                 separator
-                current(model.settingsTab.title)
+                current(model.settingsQuery.trimmingCharacters(in: .whitespaces).isEmpty ? model.settingsTab.title : "Search")
             default:
                 current(model.section.title)
             }
@@ -212,7 +239,7 @@ struct MicPicker: View {
             }
             .pickerStyle(.inline)
             Divider()
-            Button("Audio Settings…") { model.settingsTab = .audio; model.section = .settings }
+            Button("Microphone Settings…") { model.settingsTab = .general; model.section = .settings }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "mic").font(.system(size: 12)).foregroundStyle(Crystal.ink2)

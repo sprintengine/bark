@@ -166,6 +166,12 @@ enum DictationText {
         return item.appName ?? AppInfo.displayName
     }
 
+    /// A website's own name, for its monogram: "docs.google.com" → "google".
+    static func siteName(_ host: String) -> String {
+        let labels = host.split(separator: ".")
+        return labels.count >= 2 ? String(labels[labels.count - 2]) : host
+    }
+
     /// "now", "2m", "3h", "1d", "3w": compact, for the thread list.
     static func age(_ date: Date, now: Date = .now) -> String {
         let s = max(0, now.timeIntervalSince(date))
