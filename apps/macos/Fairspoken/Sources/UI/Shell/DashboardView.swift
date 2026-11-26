@@ -45,7 +45,7 @@ struct DashboardView: View {
             // ⌘K: the search field for now; the search-and-commands palette takes it later.
             Button("Search") {
                 if !model.sidebarVisible { model.sidebarVisible = true }
-                model.searchFocusRequest += 1
+                model.searchFocusPending = true
             }
             .keyboardShortcut("k", modifiers: .command)
             .hidden()

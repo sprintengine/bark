@@ -38,8 +38,13 @@ final class AppModel {
     /// The thread list's search text and filter.
     var historyQuery = ""
     var historyFilter: HistoryFilter = .all
-    /// Bumped to move the keyboard focus to the sidebar's search field (⌘K).
-    var searchFocusRequest = 0
+    /// Set by ⌘K; the sidebar's search field takes the focus and clears it (also when the sidebar
+    /// was hidden and the field appears only now).
+    var searchFocusPending = false
+    /// Home's composer: what's typed there and the dictations made into it, kept while you look
+    /// at other screens.
+    var homeDraft = ""
+    var homeDraftSources: [String] = []
     /// Screenshots: the thread row drawn as if under the pointer.
     var showcaseHoveredRow: String?
     /// Bumped to start editing the open dictation's text (⏎ in the thread list).
@@ -128,6 +133,12 @@ final class AppModel {
 
         // Every recording takes the microphone from the setup guide's test.
         dictation.onWillStart = { [weak self] in self?.micTest.stop() }
+        // In Bark's own window, a dictation is a note only on Home, where its composer takes it.
+        dictation.shownInAppIsNote = { [weak self] in
+            guard let self else { return false }
+            return self.section == .home && self.selectedDictationID == nil
+                && NSApp.keyWindow?.identifier == NSUserInterfaceItemIdentifier("dashboard")
+        }
         hotkeys.onPress = { [weak self] in self?.dictation.hotkeyPressed() }
         hotkeys.onRelease = { [weak self] in self?.dictation.hotkeyReleased() }
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }

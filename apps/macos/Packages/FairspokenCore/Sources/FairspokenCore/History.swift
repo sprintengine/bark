@@ -50,6 +50,8 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
     public var cleanupMs: Int?
     /// True when nothing could take the paste and the text went to the clipboard instead.
     public var clipboardOnly: Bool?
+    /// The post-training recording kept for it (`TrainingEntry.id`), so it can be transcribed again.
+    public var recordingID: String?
 
     public init(id: String, createdAt: Int64, text: String, backend: String, location: String, durationSeconds: Double,
                 timings: DictationTimings? = nil, model: String? = nil, appName: String? = nil, appBundleId: String? = nil) {
@@ -86,6 +88,7 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
         isNote = c.lenient(Bool.self, .isNote)
         cleanupMs = c.lenientInt(.cleanupMs)
         clipboardOnly = c.lenient(Bool.self, .clipboardOnly)
+        recordingID = c.lenient(String.self, .recordingID)
     }
 
     public var date: Date { Date(timeIntervalSince1970: Double(createdAt) / 1000) }

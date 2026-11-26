@@ -90,6 +90,8 @@ final class DictationController {
     /// Called as any recording starts (shortcut, fn, the menu bar, a button), before it takes the
     /// microphone: the setup guide's test steps aside.
     @ObservationIgnored var onWillStart: (() -> Void)?
+    /// Whether a dictation shown in Bark's own window lands in Home's composer (and so is a note).
+    @ObservationIgnored var shownInAppIsNote: () -> Bool = { false }
     @ObservationIgnored let capture = AudioCapture()
     @ObservationIgnored private var session: (any TranscriptionSession)?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
@@ -451,14 +453,16 @@ final class DictationController {
             model: output.model, appName: item.appName, appBundleId: item.appBundleId)
         // What the model heard, for the dictation view's bubble and diff.
         entry.rawText = output.text
-        // Dictated into Bark's own window (Home's composer): a note.
-        if delivery == .shownInApp { entry.isNote = true }
-        if case .copied = delivery { entry.clipboardOnly = true }
-        history.add(entry)
-        if delivery == .shownInApp { lastInAppHistoryID = entry.id }
+        // Dictated into Home's composer: a note.
+        if delivery == .shownInApp, shownInAppIsNote() { entry.isNote = true }
+        // A paste was tried and nothing could take it (not a copy-only choice in Settings).
+        if case .copied = delivery, s.insertAtCursor { entry.clipboardOnly = true }
         // The recording already on disk moves to the post-training folder; nothing is written twice.
         let captureID = pending.keepForTraining(item.id, samples: samples, rawText: output.text, finalText: text, model: output.model,
                                                 appBundleID: item.appBundleId)
+        entry.recordingID = captureID
+        history.add(entry)
+        if entry.isNote == true { lastInAppHistoryID = entry.id }
         if case .pasted = delivery, let fieldRead, let editWatcher {
             let dictation = EditWatcher.Dictation(inserted: text, raw: output.text, speechModel: s.speechModelID, captureID: captureID)
             // Apart, so a read still running never holds up the result.

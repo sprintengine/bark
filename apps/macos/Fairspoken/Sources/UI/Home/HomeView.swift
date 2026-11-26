@@ -67,20 +67,24 @@ private struct HomeHeading: View {
 private struct HomeComposer: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var draft = ""
-    /// Dictations made into this composer, merged into the note when it's saved.
-    @State private var sources: [String] = []
     @State private var savedID: String?
     @FocusState private var focused: Bool
 
+    /// What's typed, kept on the app model so it survives moving to another screen.
+    private var draft: String {
+        get { model.homeDraft }
+        nonmutating set { model.homeDraft = newValue }
+    }
+
     var body: some View {
+        @Bindable var app = model
         let dictation = model.dictation
         let listening = dictation.phase.isListening
         let hasDraft = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topLeading) {
                 if !hasDraft && !listening && !focused { placeholder.allowsHitTesting(false) }
-                TextEditor(text: $draft)
+                TextEditor(text: $app.homeDraft)
                     .font(.system(size: 15))
                     .foregroundStyle(Crystal.ink)
                     .scrollContentBackground(.hidden)
@@ -161,10 +165,12 @@ private struct HomeComposer: View {
         .onChange(of: dictation.lastInAppHistoryID) { _, id in
             guard let id, let item = model.history.item(id) else { return }
             draft = draft.isEmpty ? item.text : draft.trimmingCharacters(in: .whitespacesAndNewlines) + " " + item.text
-            sources.append(id)
+            model.homeDraftSources.append(id)
             savedID = nil
         }
-        .onChange(of: draft) { if !draft.isEmpty { savedID = nil } }
+        .onChange(of: model.homeDraft) {
+            if model.homeDraft.isEmpty { model.homeDraftSources = [] } else { savedID = nil }
+        }
         .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hasDraft)
     }
 
@@ -205,9 +211,9 @@ private struct HomeComposer: View {
     }
 
     private func save() {
-        guard let id = model.saveNote(draft, replacing: sources) else { return }
+        guard let id = model.saveNote(draft, replacing: model.homeDraftSources) else { return }
         draft = ""
-        sources = []
+        model.homeDraftSources = []
         savedID = id
     }
 }
@@ -507,9 +513,9 @@ private struct SetupCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // No Return shortcut: the composer above takes Return for new lines.
                 Button("Continue Setup") { model.openOnboarding?() }
                     .buttonStyle(PrimaryButtonStyle())
-                    .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

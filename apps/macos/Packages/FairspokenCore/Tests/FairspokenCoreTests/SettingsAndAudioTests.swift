@@ -126,6 +126,7 @@ struct HistoryTests {
         item.isNote = false
         item.cleanupMs = 12
         item.clipboardOnly = true
+        item.recordingID = "rec-1"
         let back = try JSONDecoder().decode(TranscriptHistoryItem.self, from: JSONEncoder().encode(item))
         #expect(back == item)
         // Unknown edit kinds from a newer build don't lose the item.

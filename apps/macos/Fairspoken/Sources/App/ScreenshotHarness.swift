@@ -161,12 +161,10 @@ final class ScreenshotHarness {
 
     /// The thread list and the dictation view: an email with cleanup edits, code, a note, a
     /// clipboard fallback, one kept before cleanup was recorded and one run on Bark Server; then
-    /// the list searched, and filtered to notes. Also checks, once, that a click in the top bar
-    /// reaches the app's own controls rather than the title bar.
+    /// the list searched, and filtered to notes.
     private func dictationShots(suffix: String) async {
         model.history.showcase(DemoHistory.items())
         windows.showDashboard(.home)
-        if suffix == "light", let window = windows.dashboard { Self.probeTopBar(window) }
         // Home with a row under the pointer: copy in place of the time.
         model.showcaseHoveredRow = "demo-1"
         try? await Task.sleep(for: .milliseconds(900))
@@ -207,21 +205,6 @@ final class ScreenshotHarness {
         if let window = windows.dashboard { await capture(window, as: "sidebar-notes-\(suffix)") }
         model.historyFilter = .all
         model.open(dictation: nil)
-    }
-
-    /// Logs which view a click at the sidebar button and at the microphone picker would reach.
-    private static func probeTopBar(_ window: NSWindow) {
-        guard let frame = window.contentView?.superview else { return }
-        let h = frame.bounds.height
-        for (name, point) in [("sidebar button", NSPoint(x: 90, y: h - 26)),
-                              ("microphone picker", NSPoint(x: frame.bounds.width - 60, y: h - 26)),
-                              ("search field", NSPoint(x: 120, y: h - 74))] {
-            let hit = frame.hitTest(point)
-            var chain: [String] = []
-            var v: NSView? = hit
-            while let view = v, chain.count < 6 { chain.append(String(describing: type(of: view))); v = view.superview }
-            print("Top bar probe, \(name): \(chain.joined(separator: " < "))")
-        }
     }
 
     /// The Models library with a download in progress and a favourite, a model's detail sheet,

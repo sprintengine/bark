@@ -20,12 +20,21 @@ extension AppModel {
         }
         app.activate()
         let s = settings.settings
+        let name = app.localizedName ?? DictationText.appName(item)
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(350))
+            // Wait for the app to come forward; never paste into whatever else is in front.
+            for _ in 0..<15 where NSWorkspace.shared.frontmostApplication?.processIdentifier != app.processIdentifier {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else {
+                TextInserter.copy(item.text)
+                notify("Copied: \(name) didn't come forward")
+                return
+            }
             switch await TextInserter.deliver(item.text, paste: true, restoreClipboard: s.restoreClipboard,
-                                              expectedApp: app.processIdentifier) {
-            case .pasted: notify("Pasted into \(app.localizedName ?? DictationText.appName(item))")
-            case .copied: notify("Copied to the clipboard")
+                                              expectedApp: app.processIdentifier, requireExpectedApp: true) {
+            case .pasted: notify("Pasted into \(name)")
+            case .copied(let reason): notify(reason)
             }
         }
     }
@@ -44,13 +53,14 @@ extension AppModel {
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }
 
-    /// Saves a corrected text. The words as heard (`rawText`) are kept, so the diff shows the
-    /// correction too.
+    /// Saves a corrected text. The words as heard (`rawText`), when recorded, are kept, so the diff
+    /// shows the correction too.
     func correct(_ item: TranscriptHistoryItem, to text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != item.text else { return }
         history.update(item.id) { entry in
-            if entry.rawText == nil && !entry.isBarkNote { entry.rawText = entry.text }
+            // Before a correction loses the words that found it, keep its recording's id.
+            entry.recordingID = entry.recordingID ?? keptRecordingID(for: item)
             entry.text = trimmed
         }
         notify("Saved")
@@ -68,26 +78,35 @@ extension AppModel {
 
     // MARK: Retry
 
-    /// The kept recording of a dictation, when post-training kept one (matched by its text and
-    /// time).
-    func keptRecording(for item: TranscriptHistoryItem) -> URL? {
+    /// The id of a dictation's kept post-training recording: the one stored with it, or, for one
+    /// kept before that, found by its words and time. Nil when the recording isn't on disk.
+    func keptRecordingID(for item: TranscriptHistoryItem) -> String? {
         guard !item.isBarkNote else { return nil }
-        let created = item.createdAt / 1000
-        guard let entry = training.entries.first(where: { e in
-            abs(e.createdAt - created) <= 300 && (e.finalText == item.text || (item.rawText != nil && e.rawText == item.rawText))
-        }) else { return nil }
-        let url = training.audioURL(for: entry.id)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        let id: String
+        if let recordingID = item.recordingID {
+            id = recordingID
+        } else {
+            let created = item.createdAt / 1000
+            guard let entry = training.entries.first(where: { e in
+                abs(e.createdAt - created) <= 300 && (e.finalText == item.text || (item.rawText != nil && e.rawText == item.rawText))
+            }) else { return nil }
+            id = entry.id
+        }
+        return FileManager.default.fileExists(atPath: training.audioURL(for: id).path) ? id : nil
     }
 
-    func canRetry(_ item: TranscriptHistoryItem) -> Bool { keptRecording(for: item) != nil }
+    func canRetry(_ item: TranscriptHistoryItem) -> Bool { keptRecordingID(for: item) != nil }
 
     /// Transcribes the kept recording again with the model in use on this Mac, and replaces the
     /// dictation's text (it isn't pasted anywhere).
     func retry(_ item: TranscriptHistoryItem) {
-        guard !retryingDictations.contains(item.id), let url = keptRecording(for: item),
-              let data = try? Data(contentsOf: url), let wav = try? WAVFile.decode(data), wav.sampleRate == 16_000 else {
+        guard !retryingDictations.contains(item.id) else { return }
+        guard let recordingID = keptRecordingID(for: item) else {
             notify("No recording was kept for this one")
+            return
+        }
+        guard let data = try? Data(contentsOf: training.audioURL(for: recordingID)), let wav = try? WAVFile.decode(data), wav.sampleRate == 16_000 else {
+            notify("The kept recording couldn't be read")
             return
         }
         let samples = wav.samples.map { Float($0) / 32_768 }
@@ -104,10 +123,18 @@ extension AppModel {
                     corrections: s.postProcess ? s.transcriptCorrections : [], speechModel: s.speechModelID))
                 guard !text.isEmpty else { notify("No words this time"); return }
                 history.update(item.id) { entry in
+                    entry.recordingID = recordingID
                     entry.rawText = output.text
                     entry.text = text
                     entry.model = output.model
+                    entry.backend = output.backend
+                    entry.location = "local"
+                    entry.timings = DictationTimings(transcribeMs: output.modelMs, speechModelMs: output.modelMs, totalMs: 0)
+                    // Tidied again with the basic pass only: the earlier cleanup and style no longer describe it.
                     entry.cleanupEdits = nil
+                    entry.cleanupMs = nil
+                    entry.style = nil
+                    entry.styleReason = nil
                 }
                 notify("Transcribed again with \(models.activeModel.shortName)")
             } catch {
@@ -129,11 +156,12 @@ extension AppModel {
 }
 
 extension AppModel {
-    /// Saves Home's composer as a note. Dictations made into it (`replacing`) are folded into the
-    /// note rather than kept twice. Returns the note's id.
+    /// Saves Home's composer as a note. Dictations made into it (`replacing`) whose words are still
+    /// in it are folded into the note rather than kept twice. Returns the note's id.
     func saveNote(_ text: String, replacing sources: [String]) -> String? {
+        let folded = sources.compactMap { history.item($0) }.filter { $0.isBarkNote && text.contains($0.text) }
         guard let id = history.addNote(text) else { return nil }
-        for source in sources where source != id { history.delete(source) }
+        for source in folded where source.id != id { history.delete(source.id) }
         return id
     }
 }

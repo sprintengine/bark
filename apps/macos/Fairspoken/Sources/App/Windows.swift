@@ -15,8 +15,10 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         super.init()
     }
 
+    /// Opens the main window, at `section` when given. Home means the new-dictation screen, so it
+    /// closes an opened dictation.
     func showDashboard(_ section: AppModel.Section? = nil) {
-        if let section { model.section = section }
+        if section == .home { model.open(dictation: nil) } else if let section { model.section = section }
         if dashboard == nil {
             let hosting = NSHostingController(rootView: DashboardView().environment(model))
             let window = DashboardWindow(contentViewController: hosting)

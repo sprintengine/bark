@@ -97,7 +97,14 @@ private struct SearchField: View {
         .contentShape(.rect)
         .onTapGesture { focused = true }
         .onHover { hovered = $0 }
-        .onChange(of: model.searchFocusRequest) { focused = true }
+        .onChange(of: model.searchFocusPending) { takeFocusIfAsked() }
+        .onAppear { takeFocusIfAsked() }
+    }
+
+    private func takeFocusIfAsked() {
+        guard model.searchFocusPending else { return }
+        model.searchFocusPending = false
+        focused = true
     }
 }
 
@@ -105,6 +112,7 @@ private struct SearchField: View {
 private struct FilterMenu: View {
     @Environment(AppModel.self) private var model
     @State private var hovered = false
+    @State private var confirmClear = false
 
     var body: some View {
         let active = model.historyFilter != .all
@@ -113,6 +121,9 @@ private struct FilterMenu: View {
                 ForEach(AppModel.HistoryFilter.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.inline)
+            Divider()
+            Button("Delete All Dictations…", role: .destructive) { confirmClear = true }
+                .disabled(model.history.items.isEmpty)
         } label: {
             Image(systemName: "line.3.horizontal.decrease")
                 .font(.system(size: 12.5, weight: .medium))
@@ -129,6 +140,14 @@ private struct FilterMenu: View {
         .onHover { hovered = $0 }
         .help("Show: \(model.historyFilter.title)")
         .accessibilityLabel("Filter, \(model.historyFilter.title)")
+        .confirmationDialog("Delete all \(model.history.items.count) dictations and notes?", isPresented: $confirmClear) {
+            Button("Delete All", role: .destructive) {
+                model.open(dictation: nil)
+                model.history.deleteAll()
+            }
+        } message: {
+            Text("Their text is removed from this Mac. Your usage stats and any kept recordings stay. This can't be undone.")
+        }
     }
 }
 
@@ -290,10 +309,16 @@ private struct ThreadRow: View {
         .onTapGesture(perform: onOpen)
         .onHover { hovered = $0 }
         .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hovered)
+        // Built with every row, so only cheap checks here; Transcribe Again says so when no
+        // recording was kept.
         .contextMenu {
             Button("Copy") { model.copy(item) }
-            if model.canRetry(item) { Button("Transcribe Again") { model.retry(item) } }
-            if model.canOpenApp(item) { Button("Open \(DictationText.appName(item))") { model.openApp(item) } }
+            if !item.isBarkNote {
+                if model.settings.settings.trainingCapture || item.recordingID != nil {
+                    Button("Transcribe Again") { model.retry(item) }
+                }
+                if item.appBundleId != nil { Button("Open \(DictationText.appName(item))") { model.openApp(item) } }
+            }
             Divider()
             Button("Delete…", role: .destructive, action: onDelete)
         }

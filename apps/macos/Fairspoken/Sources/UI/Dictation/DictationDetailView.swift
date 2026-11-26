@@ -1,3 +1,4 @@
+import AppKit
 import FairspokenCore
 import FairspokenUI
 import SwiftUI
@@ -541,7 +542,8 @@ private struct CorrectionComposer: View {
                     .frame(minHeight: 24, maxHeight: 180)
                     .fixedSize(horizontal: false, vertical: true)
                     .onKeyPress(.return, phases: .down) { press in
-                        if press.modifiers.contains(.shift) { return .ignored }
+                        // ⇧⏎ is a new line; ⏎ while an input method is composing commits the text.
+                        if press.modifiers.contains(.shift) || Self.isComposing { return .ignored }
                         save()
                         return .handled
                     }
@@ -603,7 +605,11 @@ private struct CorrectionComposer: View {
         .background(Crystal.canvas.padding(.top, 20).padding(.bottom, -16))
         .onChange(of: focused) { _, now in if now { begin() } }
         .onChange(of: model.editRequest) { begin(); focused = true }
-        .onChange(of: item.id) { cancel() }
+    }
+
+    /// An input method has marked text in the focused field (a candidate not yet committed).
+    private static var isComposing: Bool {
+        (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() ?? false
     }
 
     private func begin() {

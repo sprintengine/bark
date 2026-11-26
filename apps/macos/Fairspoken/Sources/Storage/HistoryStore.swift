@@ -66,6 +66,12 @@ final class HistoryStore {
         save()
     }
 
+    /// Every dictation and note, gone (usage stats stay).
+    func deleteAll() {
+        items = []
+        save()
+    }
+
     func item(_ id: String?) -> TranscriptHistoryItem? {
         guard let id else { return nil }
         return items.first { $0.id == id }
