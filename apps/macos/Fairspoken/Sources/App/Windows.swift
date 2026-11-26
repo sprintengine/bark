@@ -22,8 +22,9 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
             let window = DashboardWindow(contentViewController: hosting)
             window.onToggleSidebar = { [weak self] in self?.model.sidebarVisible.toggle() }
             window.isSidebarVisible = { [weak self] in self?.model.sidebarVisible ?? true }
-            // A hidden, transparent title bar over a full-height sidebar. The unified toolbar holds
-            // the system's sidebar button, beside the traffic lights.
+            // A hidden, transparent title bar over a full-height sidebar. The empty unified toolbar
+            // makes the title bar as tall as the app's top bar (52 pt), so the traffic lights sit
+            // centred beside the sidebar's own button and name.
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.title = AppInfo.displayName
             window.titleVisibility = .hidden
@@ -144,34 +145,34 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
 }
 
 extension WindowCoordinator: NSToolbarDelegate {
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.toggleSidebar] }
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.toggleSidebar] }
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [] }
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [] }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? { nil }
 }
 
-/// The main window. It answers `toggleSidebar:` (the toolbar's sidebar button and View › Show or
-/// Hide Sidebar, ⌃⌘S), as a split view controller would, and names the menu item for the state.
+/// The main window. It answers `toggleDashboardSidebar:` (View › Show or Hide Sidebar, ⌃⌘S) and
+/// names the menu item for the state. Not `toggleSidebar:`, which SwiftUI's hosting view takes on
+/// its way up the responder chain once a view inside it has the keyboard focus.
 final class DashboardWindow: AppWindow {
     var onToggleSidebar: (() -> Void)?
     var isSidebarVisible: (() -> Bool)?
 
-    @objc func toggleSidebar(_ sender: Any?) {
+    @objc func toggleDashboardSidebar(_ sender: Any?) {
         onToggleSidebar?()
     }
 
     override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(toggleSidebar(_:)) {
+        if menuItem.action == #selector(toggleDashboardSidebar(_:)) {
             menuItem.title = isSidebarVisible?() ?? true ? "Hide Sidebar" : "Show Sidebar"
             return true
         }
         return super.validateMenuItem(menuItem)
     }
 
-    // The toolbar's sidebar button is validated here, not in `validateMenuItem`, and NSWindow
-    // turns down an action it doesn't implement itself, which would leave the button disabled.
+    // Validated here too, as NSWindow turns down an action it doesn't implement itself.
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
-        if item.action == #selector(toggleSidebar(_:)) { return true }
+        if item.action == #selector(toggleDashboardSidebar(_:)) { return true }
         return super.validateUserInterfaceItem(item)
     }
 }

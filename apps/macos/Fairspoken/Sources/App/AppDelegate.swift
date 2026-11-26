@@ -110,10 +110,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         edit.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         main.addItem(submenu(edit))
 
-        // View: the sidebar (the main window answers toggleSidebar:) and the sections, so ⌘1…⌘4
+        // View: the sidebar (the main window answers toggleDashboardSidebar:) and the sections, so ⌘1…⌘4
         // work with the sidebar hidden too.
         let view = NSMenu(title: "View")
-        let sidebar = NSMenuItem(title: "Hide Sidebar", action: #selector(DashboardWindow.toggleSidebar(_:)), keyEquivalent: "s")
+        let sidebar = NSMenuItem(title: "Hide Sidebar", action: #selector(DashboardWindow.toggleDashboardSidebar(_:)), keyEquivalent: "s")
         sidebar.keyEquivalentModifierMask = [.control, .command]
         view.addItem(sidebar)
         view.addItem(.separator())
