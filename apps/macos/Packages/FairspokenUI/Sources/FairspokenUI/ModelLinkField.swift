@@ -26,13 +26,19 @@ public struct ModelLinkEditor: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Download link", text: $text, prompt: Text(Self.prompt))
+            TextField("Download link", text: $text, prompt: Text(Self.prompt).foregroundStyle(Crystal.ink3))
                 .labelsHidden()
-                .textFieldStyle(.roundedBorder)
-                .font(.fsData(.callout))
+                .textFieldStyle(.plain)
+                .font(.mono(12.5))
+                .foregroundStyle(Crystal.ink)
                 .focused($focused)
                 .onSubmit(download)
                 .onChange(of: text) { problem = nil }
+                .padding(.horizontal, 9)
+                .frame(height: 30)
+                .background(Crystal.well, in: .rect(cornerRadius: Radius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                    .strokeBorder(focused ? Crystal.primary : Crystal.input, lineWidth: focused ? 1.5 : 1))
             // One row when it fits; on a narrow card, Choose File… above Cancel and Download.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) {
@@ -65,13 +71,13 @@ public struct ModelLinkEditor: View {
 
     private var chooseButton: some View {
         Button("Choose File…", action: chooseFile)
-            .buttonStyle(.bordered).buttonBorderShape(.capsule)
+            .buttonStyle(OutlineButtonStyle())
             .fixedSize()
     }
 
     private var cancelButton: some View {
         Button("Cancel", action: cancel)
-            .buttonStyle(.bordered).buttonBorderShape(.capsule)
+            .buttonStyle(OutlineButtonStyle())
             .fixedSize()
     }
 

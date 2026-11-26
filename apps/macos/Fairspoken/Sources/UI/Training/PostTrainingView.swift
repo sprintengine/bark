@@ -14,27 +14,14 @@ struct PostTrainingView: View {
 
     var body: some View {
         let training = model.training
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: Layout.gap) {
-                    PageTitle("Post-training", subtitle: "Collect recordings of your voice now; training them arrives in a later update")
-                        .padding(.bottom, 4)
-                    SavingCard(training: training)
-                    HStack(alignment: .top, spacing: Layout.gap) {
-                        ProgressCard(summary: training.summary)
-                        TrainCard(summary: training.summary, capturing: model.settings.settings.trainingCapture)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    RecordingsCard(training: training, player: player, confirmDeleteAll: $confirmDeleteAll,
-                                   confirmDelete: $confirmDelete)
-                }
-                .frame(maxWidth: Layout.readable, alignment: .leading)
-                .padding(.horizontal, Layout.pageH)
-                .padding(.vertical, Layout.pageTop)
+        SettingsPage(title: "Post-training", subtitle: "Collect recordings of your voice now; training on them arrives in a later update.") {
+            SavingSection(training: training)
+            SettingsSection("Your recordings") {
+                ProgressRow(summary: training.summary)
             }
-            .frame(maxWidth: .infinity)
+            TrainSection(summary: training.summary, capturing: model.settings.settings.trainingCapture)
+            RecordingsSection(training: training, player: player, confirmDeleteAll: $confirmDeleteAll, confirmDelete: $confirmDelete)
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .onAppear { training.refresh() }
         .onDisappear { player.stop() }
         .confirmationDialog("Delete all \(Format.number(training.summary.count)) recordings?", isPresented: $confirmDeleteAll) {
@@ -71,84 +58,64 @@ struct PostTrainingView: View {
 }
 
 /// The opt-in and where recordings go.
-private struct SavingCard: View {
+private struct SavingSection: View {
     var training: TrainingLibrary
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let on = model.settings.settings.trainingCapture
-        Card(cornerRadius: Layout.card) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Save recordings to improve models").cardHeading()
-                        Text("Keeps the audio of each dictation and what the model heard, so it can learn your voice later. Nothing is uploaded.")
-                            .font(TypeScale.body).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 0)
-                    Toggle("Save recordings to improve models",
-                           isOn: Binding(get: { on }, set: { v in model.settings.update { $0.trainingCapture = v } }))
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .tint(Crystal.clientAccent)
-                }
-
-                Divider().overlay(Crystal.hairline)
-                HStack(spacing: 10) {
-                    Image(systemName: training.usesDefaultFolder ? "folder" : "externaldrive")
-                        .foregroundStyle(Crystal.ink2)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Saved to").font(.caption).foregroundStyle(Crystal.ink2)
-                        Text(training.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                            .font(.fsData(.callout)).foregroundStyle(Crystal.ink)
-                            .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
-                    }
-                    Spacer(minLength: 8)
-                    Button("Show in Finder") { training.revealInFinder() }
-                        .cardButton().disabled(!training.isAvailable)
-                    Button("Change…") { training.chooseFolder() }
+        SettingsSection("Recording", footer: "About 2 MB per minute of speech. Recordings can include anything you dictate, so keep them on a drive you control. Saved recordings stay until you delete them.",
+                        first: true) {
+            SettingsRow("Save recordings to improve models",
+                        detail: "Keeps the audio of each dictation and what the model heard, so it can learn your voice later. Nothing is uploaded.") {
+                SettingSwitch(label: "Save recordings to improve models", isOn: model.setting(\.trainingCapture))
+            }
+            SettingsRow("Saved to", detail: training.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"), mono: true) {
+                Button("Show in Finder") { training.revealInFinder() }.cardButton().disabled(!training.isAvailable)
+                Button("Change…") { training.chooseFolder() }.cardButton()
+                if !training.usesDefaultFolder {
+                    Button("Use Default") { training.useDefaultFolder() }
                         .cardButton()
-                    if !training.usesDefaultFolder {
-                        Button("Use Default") { training.useDefaultFolder() }
-                            .cardButton()
-                            .help("Save to \(TrainingLibrary.defaultFolder.path) on this Mac")
-                    }
+                        .help("Save to \(TrainingLibrary.defaultFolder.path) on this Mac")
                 }
-                if !training.isAvailable {
-                    Label("This folder isn't available. Connect its drive, or choose another folder. Dictation keeps working, but nothing is saved until then.",
-                          systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout).foregroundStyle(Crystal.warn)
-                } else if let error = training.lastError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout).foregroundStyle(Crystal.warn)
-                }
-                Text("About 2 MB per minute of speech. Recordings can include anything you dictate, so keep them on a drive you control. Saved recordings stay until you delete them.")
-                    .font(.caption).foregroundStyle(Crystal.ink3).fixedSize(horizontal: false, vertical: true)
+            }
+            if !training.isAvailable {
+                warning("This folder isn't available. Connect its drive, or choose another folder. Dictation keeps working, but nothing is saved until then.")
+            } else if let error = training.lastError {
+                warning(error)
             }
         }
+    }
+
+    private func warning(_ text: String) -> some View {
+        Label(text, systemImage: "exclamationmark.triangle.fill")
+            .font(.system(size: 12)).foregroundStyle(Crystal.warn)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, SettingsMetrics.rowH)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 /// How much has been kept, against what training wants.
-private struct ProgressCard: View {
+private struct ProgressRow: View {
     var summary: TrainingSummary
 
     var body: some View {
-        Card(cornerRadius: Layout.card, fillHeight: true) {
-            VStack(alignment: .leading, spacing: 14) {
-                Eyebrow(text: "Your recordings", symbol: "waveform")
-                HStack(alignment: .firstTextBaseline, spacing: 24) {
-                    stat(Format.duration(summary.seconds), "of speech")
-                    stat(Format.number(summary.count), summary.count == 1 ? "recording" : "recordings")
-                    stat(Format.bytes(summary.bytes), "on disk")
-                }
-                ProgressView(value: summary.progress)
-                    .tint(Crystal.clientAccent)
-                    .accessibilityLabel("Toward the recommended \(Int(TrainingReadiness.recommendedSeconds / 3600)) hours")
-                Text(caption)
-                    .font(.caption).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 32) {
+                stat(Format.duration(summary.seconds), "of speech")
+                stat(Format.number(summary.count), summary.count == 1 ? "recording" : "recordings")
+                stat(Format.bytes(summary.bytes), "on disk")
             }
+            ProgressView(value: summary.progress)
+                .tint(Crystal.ink2)
+                .accessibilityLabel("Toward the recommended \(Int(TrainingReadiness.recommendedSeconds / 3600)) hours")
+            Text(caption)
+                .font(.system(size: 12)).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
         }
+        .padding(.horizontal, SettingsMetrics.rowH)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var caption: String {
@@ -166,35 +133,25 @@ private struct ProgressCard: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value).font(.mvNumber(24)).foregroundStyle(Crystal.ink).monospacedDigit()
-            Text(label).font(.caption).foregroundStyle(Crystal.ink2)
+            Text(label).font(.system(size: 12)).foregroundStyle(Crystal.ink3)
         }
         .accessibilityElement(children: .combine)
     }
 }
 
 /// What post-training does, and its button.
-private struct TrainCard: View {
+private struct TrainSection: View {
     var summary: TrainingSummary
     var capturing: Bool
 
     var body: some View {
-        Card(cornerRadius: Layout.card, fillHeight: true) {
-            VStack(alignment: .leading, spacing: 12) {
-                Eyebrow(text: "Post-train", symbol: "graduationcap")
-                VStack(alignment: .leading, spacing: 8) {
-                    step(1, "Save your dictations as you work.", done: capturing)
-                    step(2, "Re-transcribe them with a larger, slower model and find where Parakeet went wrong.")
-                    step(3, "Fine-tune Parakeet on your voice and accent.")
-                    step(4, "Test it on recordings it never trained on, and switch only if it's better.")
-                }
-                Spacer(minLength: 0)
-                HStack(spacing: 12) {
-                    Button("Post-train") {}
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(true)
-                    Text(status)
-                        .font(.caption).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
-                }
+        SettingsSection("Post-train") {
+            step(1, "Save your dictations as you work.", done: capturing)
+            step(2, "Transcribe them again with a larger, slower model, and find where Parakeet went wrong.")
+            step(3, "Fine-tune Parakeet on your voice and accent.")
+            step(4, "Test it on recordings it never trained on, and switch only if it's better.")
+            SettingsRow("Post-train", detail: status) {
+                Button("Post-train") {}.buttonStyle(PrimaryButtonStyle()).disabled(true)
             }
         }
     }
@@ -208,17 +165,21 @@ private struct TrainCard: View {
     }
 
     private func step(_ n: Int, _ text: String, done: Bool = false) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: done ? "checkmark.circle.fill" : "\(n).circle")
-                .foregroundStyle(done ? Crystal.ok : Crystal.ink3)
-            Text(text).font(.callout).foregroundStyle(Crystal.ink).fixedSize(horizontal: false, vertical: true)
+                .font(.system(size: 14))
+                .foregroundStyle(done ? Crystal.ink : Crystal.ink3)
+            Text(text).font(.system(size: 14)).foregroundStyle(Crystal.ink).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, SettingsMetrics.rowH)
+        .padding(.vertical, 11)
         .accessibilityElement(children: .combine)
     }
 }
 
 /// The latest kept dictations: listen to one, or delete it.
-private struct RecordingsCard: View {
+private struct RecordingsSection: View {
     var training: TrainingLibrary
     var player: ClipPlayer
     @Binding var confirmDeleteAll: Bool
@@ -226,69 +187,53 @@ private struct RecordingsCard: View {
     private static let shown = 30
 
     var body: some View {
-        Card(cornerRadius: Layout.card) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Recent recordings").cardHeading()
-                    Spacer()
-                    Button("Delete All…", role: .destructive) { confirmDeleteAll = true }
-                        .cardButton()
-                        .disabled(training.entries.isEmpty || !training.isAvailable)
-                }
-                if training.entries.isEmpty {
-                    Text(training.isAvailable ? "Nothing saved yet. Turn on saving above, then dictate as usual." : "Connect the drive to see saved recordings.")
-                        .font(.callout).foregroundStyle(Crystal.ink2)
-                        .padding(.vertical, 8)
-                } else {
-                    ForEach(training.entries.prefix(Self.shown)) { entry in
-                        row(entry)
-                        if entry.id != training.entries.prefix(Self.shown).last?.id { Divider().overlay(Crystal.hairline) }
-                    }
-                    if training.entries.count > Self.shown {
-                        Text("and \(Format.number(training.entries.count - Self.shown)) more in the folder")
-                            .font(.caption).foregroundStyle(Crystal.ink3)
-                    }
-                }
+        SettingsSection("Recent recordings",
+                        footer: training.entries.count > Self.shown ? "And \(Format.number(training.entries.count - Self.shown)) more in the folder." : nil) {
+            Button("Delete All…", role: .destructive) { confirmDeleteAll = true }
+                .cardButton()
+                .disabled(training.entries.isEmpty || !training.isAvailable)
+        } content: {
+            if training.entries.isEmpty {
+                SettingsRow(training.isAvailable ? "Nothing saved yet" : "The folder isn't connected",
+                            detail: training.isAvailable ? "Turn on saving above, then dictate as usual." : "Connect the drive to see saved recordings.")
+            } else {
+                ForEach(training.entries.prefix(Self.shown)) { entry in row(entry) }
             }
         }
     }
 
     private func row(_ entry: TrainingEntry) -> some View {
         let playing = player.playingID == entry.id
-        return HStack(alignment: .top, spacing: 12) {
+        return HStack(alignment: .center, spacing: 12) {
             Button {
                 playing ? player.stop() : player.play(entry.id, url: training.audioURL(for: entry.id))
             } label: {
                 Image(systemName: playing ? "stop.fill" : "play.fill")
+                    .font(.system(size: 11))
                     .frame(width: 28, height: 28)
-                    .well(cornerRadius: 8)
+                    .background(Crystal.well, in: .circle)
+                    .overlay(Circle().strokeBorder(Crystal.input))
+                    .contentShape(.circle)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(playing ? Crystal.clientAccent : Crystal.ink2)
+            .foregroundStyle(playing ? Crystal.ink : Crystal.ink2)
             .accessibilityLabel(playing ? "Stop" : "Play recording")
             VStack(alignment: .leading, spacing: 3) {
-                Text(entry.rawText).font(.callout).foregroundStyle(Crystal.ink)
-                    .lineLimit(3).textSelection(.enabled)
+                Text(entry.rawText).font(.system(size: 14)).foregroundStyle(Crystal.ink)
+                    .lineLimit(2).textSelection(.enabled)
                 HStack(spacing: 6) {
                     Text("\(Format.relative(entry.date)) · \(Format.duration(entry.durationSeconds)) · \(SpeechModelCatalog.model(id: entry.speechModel)?.shortName ?? entry.speechModel)")
-                        .font(.caption).foregroundStyle(Crystal.ink3)
+                        .font(.system(size: 12)).foregroundStyle(Crystal.ink3)
                     if entry.appCategory != AppCategory.other.rawValue {
-                        Tag(text: entry.appCategory.capitalized, color: Crystal.ink2)
+                        Badge(entry.appCategory.capitalized)
                     }
                 }
             }
             Spacer(minLength: 8)
-            Button {
-                confirmDelete = entry
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Crystal.ink3)
-            .help("Move this recording to the Trash")
-            .accessibilityLabel("Delete recording")
+            RemoveButton(label: "Move this recording to the Trash") { confirmDelete = entry }
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, SettingsMetrics.rowH)
+        .padding(.vertical, 10)
     }
 }
 

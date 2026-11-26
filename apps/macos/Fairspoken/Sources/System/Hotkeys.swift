@@ -9,6 +9,8 @@ extension KeyboardShortcuts.Name {
     static let dictation = Self("dictation", default: .init(.one, modifiers: [.command, .shift]))
     /// Registered only while recording, so Esc is never stolen from other apps otherwise.
     static let cancelDictation = Self("cancelDictation", default: .init(.escape))
+    /// Pastes the last dictation again into the app in front (⌥⇧V by default).
+    static let pasteLast = Self("pasteLast", default: .init(.v, modifiers: [.option, .shift]))
 }
 
 /// Global dictation triggers: the KeyboardShortcuts combo (Carbon hot key, no permission)
@@ -20,6 +22,7 @@ final class HotkeyController {
     var onCancel: (() -> Void)?
     var onFnPress: (() -> Void)?
     var onFnRelease: (() -> Void)?
+    var onPasteLast: (() -> Void)?
 
     private let fnMonitor = FnKeyMonitor()
 
@@ -28,6 +31,7 @@ final class HotkeyController {
         KeyboardShortcuts.onKeyUp(for: .dictation) { [weak self] in self?.onRelease?() }
         KeyboardShortcuts.onKeyDown(for: .cancelDictation) { [weak self] in self?.onCancel?() }
         KeyboardShortcuts.disable(.cancelDictation)
+        KeyboardShortcuts.onKeyDown(for: .pasteLast) { [weak self] in self?.onPasteLast?() }
         fnMonitor.onChange = { [weak self] down in
             if down { self?.onFnPress?() } else { self?.onFnRelease?() }
         }
@@ -112,6 +116,11 @@ final class HotkeyController {
 
     static var currentShortcutSymbols: String {
         KeyboardShortcuts.getShortcut(for: .dictation)?.description ?? "Not set"
+    }
+
+    /// "Paste last dictation" ("⌥⇧V" unless changed), or nil when it has no shortcut.
+    static var pasteLastShortcutSymbols: String? {
+        KeyboardShortcuts.getShortcut(for: .pasteLast)?.description
     }
 
     /// The key that cancels a recording ("⎋" unless changed).

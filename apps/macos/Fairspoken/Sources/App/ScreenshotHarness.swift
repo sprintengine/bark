@@ -7,7 +7,7 @@ import SwiftUI
 /// `--screenshots <dir>`: renders the real windows (demo data)
 /// in light and dark, captures each window's own pixels and quits. `--screenshots <dir> --updates`
 /// captures the update UI instead: every update state, the toast and Settings › Updates; `--speed-test` captures
-/// Home's speed-test card and every step of the test (sample runs, nothing recorded). Capturing our *own*
+/// Home's time saved before and after a test, and every step of the test (sample runs, nothing recorded). Capturing our *own*
 /// windows needs no Screen Recording permission, so this works from the command line.
 @MainActor
 final class ScreenshotHarness {
@@ -15,10 +15,12 @@ final class ScreenshotHarness {
     private let windows: WindowCoordinator
     private let output: URL
     private var showcaseWindow: NSWindow?
+    private let statusItem: StatusItemController?
 
-    init(model: AppModel, windows: WindowCoordinator, output: URL) {
+    init(model: AppModel, windows: WindowCoordinator, statusItem: StatusItemController? = nil, output: URL) {
         self.model = model
         self.windows = windows
+        self.statusItem = statusItem
         self.output = output
     }
 
@@ -61,12 +63,24 @@ final class ScreenshotHarness {
             }
             for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)] {
                 NSApp.appearance = NSAppearance(named: appearance)
+                // `--stage3`: the pill, the menu-bar menu and the palette, for quick review.
+                if AppInfo.arguments.contains("--stage3") {
+                    await pillShots(suffix: name)
+                    await menuBarShots(suffix: name)
+                    await paletteShots(suffix: name)
+                    continue
+                }
                 // `--pill-only`: just the recording pill, for quick review of its states.
                 if !AppInfo.arguments.contains("--pill-only") {
                     await dashboardShots(suffix: name)
-                    await onboardingShots(suffix: name)
+                    // `--dashboard-only`: the main window alone, for quick review of the shell.
+                    if !AppInfo.arguments.contains("--dashboard-only") { await onboardingShots(suffix: name) }
                 }
-                await pillShots(suffix: name)
+                if !AppInfo.arguments.contains("--dashboard-only") {
+                    await pillShots(suffix: name)
+                    await menuBarShots(suffix: name)
+                }
+                if !AppInfo.arguments.contains("--pill-only") { await paletteShots(suffix: name) }
             }
             NSApp.terminate(nil)
         }
@@ -86,6 +100,7 @@ final class ScreenshotHarness {
             await freshFrame()
             if let window = windows.dashboard { await capture(window, as: "\(section.rawValue)-\(suffix)") }
         }
+        await dictationShots(suffix: suffix)
         await modelLinkShots(suffix: suffix)
         // Home's lower half: the recent dictations, the speech engine and the speed test.
         windows.showDashboard(.home)
@@ -101,19 +116,12 @@ final class ScreenshotHarness {
         if let window = windows.dashboard { await capture(window, as: "home-listening-\(suffix)") }
         feeder.cancel()
         model.dictation.showcase(.idle)
-        // The sidebar collapsed, through the action the toolbar's sidebar button and View › Hide
-        // Sidebar (⌃⌘S) send.
-        NSApp.sendAction(#selector(DashboardWindow.toggleSidebar(_:)), to: nil, from: nil)
+        // The sidebar collapsed, through the action View › Hide Sidebar (⌃⌘S) sends.
+        NSApp.sendAction(#selector(DashboardWindow.toggleDashboardSidebar(_:)), to: windows.dashboard, from: nil)
         try? await Task.sleep(for: .milliseconds(900))
         await freshFrame()
         if let window = windows.dashboard { await capture(window, as: "home-sidebar-hidden-\(suffix)") }
         model.sidebarVisible = true
-        // "See all": every dictation by day.
-        model.homeShowsAllDictations = true
-        try? await Task.sleep(for: .milliseconds(900))
-        await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "home-all-\(suffix)") }
-        model.homeShowsAllDictations = false
         // Before the first dictation.
         model.history.showcaseEmpty(true)
         model.dictation.showcaseClearResult()
@@ -132,20 +140,72 @@ final class ScreenshotHarness {
             }
             windows.dashboard?.setContentSize(NSSize(width: 1180, height: 800))
         }
-        model.settingsTab = .transcription
-        windows.showDashboard(.settings)
-        try? await Task.sleep(for: .milliseconds(1000))
+        await settingsShots(suffix: suffix)
+        windows.dashboard?.orderOut(nil)
+    }
+
+    /// The thread list and the dictation view: an email with cleanup edits, code, a note, a
+    /// clipboard fallback, one kept before cleanup was recorded and one run on Bark Server; then
+    /// the list searched, and filtered to notes.
+    private func dictationShots(suffix: String) async {
+        model.history.showcase(DemoHistory.items())
+        windows.showDashboard(.home)
+        // Home with a row under the pointer: copy in place of the time.
+        model.showcaseHoveredRow = "demo-1"
+        try? await Task.sleep(for: .milliseconds(900))
         await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "settings-transcription-\(suffix)") }
-        // The same tab with Network device chosen (the sample host; no tailnet scan, so no real machines).
-        let location = model.settings.settings.transcriptionLocation
-        model.settings.update { $0.transcriptionLocation = .remoteHost }
-        model.hostStatus.refresh(force: true)
-        try? await Task.sleep(for: .milliseconds(800))
+        if let window = windows.dashboard { await capture(window, as: "home-row-hover-\(suffix)") }
+        model.showcaseHoveredRow = nil
+        let shots: [(String, String)] = [("demo-0", "email"), ("demo-2", "code"), ("demo-3", "clipboard"),
+                                         ("demo-4", "server"), ("demo-5", "note"), ("demo-10", "before-cleanup")]
+        for (id, name) in shots {
+            model.open(dictation: id)
+            try? await Task.sleep(for: .milliseconds(1000))
+            await freshFrame()
+            if let window = windows.dashboard { await capture(window, as: "dictation-\(name)-\(suffix)") }
+        }
+        // Restyled from the actions card: the Slack message as Clean, by the real formatter.
+        if let slack = model.history.item("demo-1") {
+            model.restyle(slack, as: .clean)
+            model.open(dictation: "demo-1")
+            try? await Task.sleep(for: .milliseconds(1000))
+            await freshFrame()
+            if let window = windows.dashboard { await capture(window, as: "dictation-restyled-\(suffix)") }
+            model.history.showcase(DemoHistory.items())
+        }
+        // The changes folded away.
+        model.open(dictation: "demo-0")
+        UserDefaults.standard.set(false, forKey: "DictationChangesShown")
+        try? await Task.sleep(for: .milliseconds(900))
         await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "settings-host-\(suffix)") }
-        model.settings.update { $0.transcriptionLocation = location }
-        // Entries learned from corrections beside the user's own (screenshot settings are never saved).
+        if let window = windows.dashboard { await capture(window, as: "dictation-folded-\(suffix)") }
+        UserDefaults.standard.set(true, forKey: "DictationChangesShown")
+        // The actions card hidden from the top bar.
+        UserDefaults.standard.set(true, forKey: "DictationPanelHidden")
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "dictation-no-panel-\(suffix)") }
+        UserDefaults.standard.set(false, forKey: "DictationPanelHidden")
+        // Search and filter.
+        model.open(dictation: nil)
+        model.historyQuery = "quote"
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "sidebar-search-\(suffix)") }
+        model.historyQuery = ""
+        model.historyFilter = .notes
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "sidebar-notes-\(suffix)") }
+        model.historyFilter = .all
+        model.open(dictation: nil)
+    }
+
+    /// Every settings page, the search, App styles with a preview open and its add sheet, and
+    /// Transcription with Bark Server chosen. Screenshot settings are never saved.
+    private func settingsShots(suffix: String) async {
+        model.history.showcase(DemoHistory.items())
+        // Entries learned from corrections beside the user's own, and a few style rules.
         model.settings.update { s in
             for term in ["Beaumont", "Niamh"] where !s.vocabularyHints.contains(term) {
                 s.vocabularyHints.append(term)
@@ -156,12 +216,67 @@ final class ScreenshotHarness {
                 s.transcriptCorrections.append(TranscriptCorrection(from: "cloud code", to: "Claude Code", origin: .learned,
                                                                     models: ["parakeet-tdt-0.6b-v3"]))
             }
+            s.styleRules = StyleRules()
+            s.styleRules.setApp("com.apple.MobileSMS", appName: "Messages", style: .clean)
+            s.styleRules.setSite("docs.google.com", style: .document)
         }
-        model.settingsTab = .vocabulary
-        try? await Task.sleep(for: .milliseconds(800))
-        await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "settings-vocabulary-\(suffix)") }
-        windows.dashboard?.orderOut(nil)
+        func shoot(_ tab: SettingsView.Tab, as name: String, query: String = "", wait: Int = 900) async {
+            model.settingsTab = tab
+            windows.showDashboard(.settings)
+            model.settingsQuery = query
+            try? await Task.sleep(for: .milliseconds(wait))
+            await freshFrame()
+            if let window = windows.dashboard { await capture(window, as: "settings-\(name)-\(suffix)") }
+        }
+        model.settingsQuery = ""
+        for tab in SettingsView.Tab.allCases where tab != .appStyles {
+            await shoot(tab, as: tab.rawValue)
+        }
+        await captureScrolledToBottom(as: "settings-general-lower-\(suffix)")
+        model.settingsTab = .transcription
+        try? await Task.sleep(for: .milliseconds(500))
+        await captureScrolledToBottom(as: "settings-transcription-lower-\(suffix)")
+        // App styles: closed, then Mail's preview open.
+        model.appStylesOpenRow = nil
+        await shoot(.appStyles, as: "app-styles")
+        model.appStylesOpenRow = "com.apple.mail"
+        await shoot(.appStyles, as: "app-styles-preview")
+        await captureScrolledToBottom(as: "settings-app-styles-lower-\(suffix)")
+        model.appStylesOpenRow = "com.tinyspeck.slackmacgap"
+        try? await Task.sleep(for: .milliseconds(700))
+        await captureScrolledToBottom(as: "settings-app-styles-preview-casual-\(suffix)")
+        model.appStylesOpenRow = nil
+        model.appStylesAddPresented = true
+        try? await Task.sleep(for: .milliseconds(1200))
+        await captureSheet(as: "settings-app-styles-add-\(suffix)")
+        model.appStylesAddPresented = false
+        try? await Task.sleep(for: .milliseconds(600))
+        // Cleanup with one switch off, so Reset to Defaults shows.
+        model.settings.update { $0.cleanupSelfCorrections = false }
+        model.settingsTab = .transcription
+        try? await Task.sleep(for: .milliseconds(600))
+        await captureScrolledToBottom(as: "settings-transcription-cleanup-off-\(suffix)")
+        model.settings.update { $0.cleanupSelfCorrections = true }
+        // Bark Server chosen (the sample host; no tailnet scan, so no real machines).
+        let location = model.settings.settings.transcriptionLocation
+        let url = model.settings.settings.remoteUrl
+        model.settings.update {
+            $0.transcriptionLocation = .remoteHost
+            if $0.remoteUrl.isEmpty { $0.remoteUrl = "http://practice-mini.local:48173" }
+        }
+        model.hostStatus.refresh(force: true)
+        await shoot(.transcription, as: "transcription-server")
+        await shoot(.host, as: "host-in-use")
+        model.settings.update {
+            $0.transcriptionLocation = location
+            $0.remoteUrl = url
+        }
+        model.hostStatus.refresh(force: true)
+        // Search across pages.
+        await shoot(.general, as: "search", query: "paste")
+        await shoot(.general, as: "search-empty", query: "zzz")
+        model.settingsQuery = ""
+        model.settingsTab = .general
     }
 
     /// The Models library with a download in progress and a favourite, a model's detail sheet,
@@ -205,7 +320,7 @@ final class ScreenshotHarness {
         model.models.refresh()
     }
 
-    /// Home's speed-test card (inviting, then with a result) and each step of the test: typing
+    /// Home's time saved (at the typical pace, then at a measured one) and each step of the test: typing
     /// part-way, speaking (ready, listening, transcribing), and the results of a clean run and of a
     /// rough one. Sample runs: nothing records and nothing is saved.
     private func speedTestShots(suffix: String) async {
@@ -343,37 +458,143 @@ final class ScreenshotHarness {
         }
     }
 
-    /// The pill states over a wallpaper-like backdrop (the real pill samples the desktop,
-    /// which a window capture can't include, so it is staged in a showcase window).
+    /// Every pill state, staged in a showcase window over a plain ground (the floating panel
+    /// can't be captured on its own): the listening family with the style chip, the outcomes, and
+    /// the style menu open. Then the levels and the live text scrolled.
     private func pillShots(suffix: String) async {
-        let phases: [(String, DictationController.Phase)] = [
-            ("listening", .listening(since: Date().addingTimeInterval(-12))),
-            ("listening-text", .listening(since: Date().addingTimeInterval(-9))),
-            ("transcribing", .transcribing),
-            ("inserted", .done(.init(text: "x", words: 38, delivery: .pasted(app: "Mail"), latencyMs: 68, placement: .neuralEngine))),
-            ("error", .failed("No speech detected")),
-        ]
-        var controllers: [DictationController] = []
-        var feeders: [Task<Void, Never>] = []
-        for (name, phase) in phases {
-            let c = DictationController(settings: model.settings, models: model.models, history: model.history, permissions: model.permissions,
-                                        pending: model.pending)
-            c.showcase(phase, liveText: name == "listening-text"
-                ? "The patient reports a dry cough for two weeks, with no fever, and mild shortness of breath when climbing stairs"
-                : "")
-            feeders.append(feedLevels(into: c.meter))
-            controllers.append(c)
+        let words = "The patient reports a dry cough for two weeks, with no fever, and mild shortness of breath when climbing stairs"
+        let mail = DictationDestination(bundleID: "com.apple.mail", appName: "Mail")
+        let slack = DictationDestination(bundleID: "com.tinyspeck.slackmacgap", appName: "Slack")
+        let terminal = DictationDestination(bundleID: "com.apple.Terminal", appName: "Terminal")
+        func done(_ delivery: DictationController.Delivery, words: Int, remote: Bool = false) -> DictationController.Phase {
+            .done(.init(text: "x", words: words, delivery: delivery, latencyMs: 68, placement: remote ? .remoteHost : .neuralEngine))
         }
-        let window = stageShowcase(PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols))
-        try? await Task.sleep(for: .milliseconds(1500))
-        window.contentViewController = NSHostingController(rootView: PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols))
-        window.setContentSize(NSSize(width: 760, height: 600))
-        try? await Task.sleep(for: .milliseconds(250))
-        await capture(window, as: "pill-\(suffix)")
-        feeders.forEach { $0.cancel() }
-        window.orderOut(nil)
+        let states: [PillShowcase.Row] = [
+            .init("1", "Ready", .idle),
+            .init("2", "Listening", .listening(since: Date().addingTimeInterval(-7)), destination: mail),
+            .init("2b", "Listening, with live words", .listening(since: Date().addingTimeInterval(-9)), liveText: words, destination: mail),
+            .init("2c", "A terminal: always verbatim", .listening(since: Date().addingTimeInterval(-4)), destination: terminal),
+            .init("3", "Transcribing", .transcribing),
+            .init("3b", "After the server failed", .transcribing, note: "Transcribing on this Mac"),
+        ]
+        let outcomes: [PillShowcase.Row] = [
+            .init("4", "Pasted", done(.pasted(app: "Mail"), words: 38)),
+            .init("4b", "Where it ran, said once", done(.pasted(app: "Slack"), words: 8, remote: true)),
+            .init("4c", "Nothing could take the paste", done(.copied("Copied to clipboard"), words: 9)),
+            .init("4d", "No text field", done(.copied(TextInserter.noTextTargetReason), words: 9)),
+            .init("5", "Nothing heard", .failed("No speech detected")),
+            .init("5b", "Too short", .failed("Too short — hold the shortcut while you speak")),
+            .init("5c", "Failed, saved to retry", .failed("Couldn't transcribe — saved to retry")),
+            .init("5d", "Microphone unavailable", .failed("Couldn't start the microphone: The operation couldn’t be completed.")),
+        ]
+        for (name, rows, height) in [("pill-states", states, 640.0), ("pill-outcomes", outcomes, 640.0)] {
+            let staged = rows.map { stage($0) }
+            let view = PillShowcase(rows: staged.map(\.0), shortcut: HotkeyController.currentShortcutSymbols)
+            let window = stageShowcase(view, size: NSSize(width: 760, height: height))
+            try? await Task.sleep(for: .milliseconds(1500))
+            window.contentViewController = NSHostingController(rootView: view)
+            window.setContentSize(NSSize(width: 760, height: height))
+            try? await Task.sleep(for: .milliseconds(300))
+            await capture(window, as: "\(name)-\(suffix)")
+            staged.forEach { $0.1.cancel() }
+            window.orderOut(nil)
+        }
+        await pillMenuShots(suffix: suffix, mail: mail, slack: slack)
         await pillLevelShots(suffix: suffix)
         await pillScrollShots(suffix: suffix)
+    }
+
+    /// A showcase row's controller, fed speech-like levels while it listens.
+    private func stage(_ row: PillShowcase.Row) -> (PillShowcase.Staged, Task<Void, Never>) {
+        let c = DictationController(settings: model.settings, models: model.models, history: model.history,
+                                    permissions: model.permissions, pending: model.pending)
+        c.showcase(row.phase, liveText: row.liveText)
+        if let destination = row.destination { c.showcaseStyle(destination, override: row.override) }
+        if let note = row.note { c.showcaseTranscribingNote(note) }
+        return (PillShowcase.Staged(row: row, controller: c), feedLevels(into: c.meter))
+    }
+
+    /// The style chip under the pointer with its menu open, as the floating panel shows it: first
+    /// with the rules' style ticked and Casual under the pointer, then after choosing Casual.
+    private func pillMenuShots(suffix: String, mail: DictationDestination, slack: DictationDestination) async {
+        let rows: [PillShowcase.Row] = [
+            .init("6", "Resting on the style", .listening(since: Date().addingTimeInterval(-6)), destination: mail,
+                  menu: true, highlight: "style-casual"),
+            .init("6b", "After choosing Casual", .listening(since: Date().addingTimeInterval(-8)), destination: mail,
+                  override: .casual, menu: true, highlight: "rules"),
+        ]
+        let staged = rows.map { stage($0) }
+        let view = PillMenuShowcase(rows: staged.map(\.0), shortcut: HotkeyController.currentShortcutSymbols)
+        let size = NSSize(width: 1040, height: 560)
+        let window = stageShowcase(view, size: size)
+        try? await Task.sleep(for: .milliseconds(1500))
+        window.contentViewController = NSHostingController(rootView: view)
+        window.setContentSize(size)
+        try? await Task.sleep(for: .milliseconds(400))
+        await capture(window, as: "pill-style-menu-\(suffix)")
+        staged.forEach { $0.1.cancel() }
+        window.orderOut(nil)
+    }
+
+    /// The menu-bar menu, popped up in a window of Bark's own (a status item's menu can't be
+    /// opened from code) and captured while it is open, with the demo history's last dictation.
+    private func menuBarShots(suffix: String) async {
+        guard let statusItem else { return }
+        model.history.showcase(DemoHistory.items())
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 560))
+        let window = AppWindow(contentViewController: NSViewController())
+        window.contentViewController?.view = host
+        window.styleMask = [.titled, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.setContentSize(host.frame.size)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        try? await Task.sleep(for: .milliseconds(600))
+        let menu = statusItem.screenshotMenu
+        statusItem.refresh()
+        let name = "menu-bar-\(suffix)"
+        let timer = Timer(timeInterval: 1.0, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.captureOpenMenu(as: name) }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        menu.popUp(positioning: nil, at: NSPoint(x: 40, y: host.frame.height - 30), in: host)
+        window.orderOut(nil)
+    }
+
+    /// The ⌘K palette over the main window: as it opens (recent dictations and actions), and
+    /// searching for "quote".
+    private func paletteShots(suffix: String) async {
+        model.history.showcase(DemoHistory.items())
+        windows.showDashboard(.home)
+        windows.dashboard?.setContentSize(NSSize(width: 1180, height: 800))
+        for (query, name) in [("", "palette"), ("quote", "palette-search"), ("transcr", "palette-settings")] {
+            model.showcasePaletteQuery = query
+            model.paletteOpen = true
+            try? await Task.sleep(for: .milliseconds(900))
+            await freshFrame()
+            try? await Task.sleep(for: .milliseconds(300))
+            if let window = windows.dashboard { await capture(window, as: "\(name)-\(suffix)") }
+        }
+        model.paletteOpen = false
+        model.showcasePaletteQuery = nil
+    }
+
+    private func captureOpenMenu(as name: String) {
+        if let png = Self.pngOfOwnMenuWindow() {
+            try? png.write(to: output.appendingPathComponent("\(name).png"))
+        }
+        statusItem?.screenshotMenu.cancelTracking()
+    }
+
+    /// The topmost window of this app at the menu level (an open menu), as PNG.
+    private static func pngOfOwnMenuWindow() -> Data? {
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        let pid = Int(ProcessInfo.processInfo.processIdentifier)
+        guard let menuWindow = info.first(where: {
+            ($0[kCGWindowOwnerPID as String] as? Int) == pid && (($0[kCGWindowLayer as String] as? Int) ?? 0) >= 101
+        }), let number = menuWindow[kCGWindowNumber as String] as? Int else { return nil }
+        return png(windowNumber: number)
     }
 
     /// The level indicator at a few voice levels (peak dBFS RMS), with and without Reduce Motion.
@@ -530,33 +751,241 @@ final class ScreenshotHarness {
     }
 
     /// The window's own pixels as PNG.
-    static func png(of window: NSWindow) -> Data? {
+    static func png(of window: NSWindow) -> Data? { png(windowNumber: window.windowNumber) }
+
+    static func png(windowNumber: Int) -> Data? {
+        guard windowNumber > 0 else { return nil }
         guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return nil }
         let create = unsafeBitCast(symbol, to: CreateImage.self)
         // includingWindow = 1 << 3; boundsIgnoreFraming = 1 << 0, bestResolution = 1 << 3
-        guard let image = create(.null, 1 << 3, UInt32(window.windowNumber), (1 << 0) | (1 << 3))?.takeRetainedValue() else { return nil }
+        guard let image = create(.null, 1 << 3, UInt32(windowNumber), (1 << 0) | (1 << 3))?.takeRetainedValue() else { return nil }
         return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
     }
 }
 
+/// Pills staged for screenshots, each under a small caption, over a plain ground like the
+/// desktop the real one floats above.
 private struct PillShowcase: View {
-    var controllers: [DictationController]
+    struct Row {
+        var number: String
+        var caption: String
+        var phase: DictationController.Phase
+        var liveText = ""
+        var destination: DictationDestination?
+        var override: DictationStyle.ID?
+        var note: String?
+        var menu = false
+        var highlight: String?
+
+        init(_ number: String, _ caption: String, _ phase: DictationController.Phase, liveText: String = "",
+             destination: DictationDestination? = nil, override: DictationStyle.ID? = nil, note: String? = nil,
+             menu: Bool = false, highlight: String? = nil) {
+            self.number = number
+            self.caption = caption
+            self.phase = phase
+            self.liveText = liveText
+            self.destination = destination
+            self.override = override
+            self.note = note
+            self.menu = menu
+            self.highlight = highlight
+        }
+    }
+
+    struct Staged {
+        var row: Row
+        var controller: DictationController
+    }
+
+    var rows: [Staged]
     var shortcut: String
 
-    @Environment(\.colorScheme) private var scheme
+    init(rows: [Staged], shortcut: String) {
+        self.rows = rows
+        self.shortcut = shortcut
+    }
+
+    /// Pills without captions (the levels and the scrolled text).
+    init(controllers: [DictationController], shortcut: String) {
+        rows = controllers.map { Staged(row: Row("", "", $0.phase), controller: $0) }
+        self.shortcut = shortcut
+    }
 
     var body: some View {
-        ZStack {
-            // A quiet, wallpaper-like backdrop in neutral greys: graphite in dark mode, pale in light.
-            LinearGradient(colors: scheme == .dark ? [Color(white: 0.11), Color(white: 0.24)] : [Color(white: 0.80), Color(white: 0.93)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-            VStack(spacing: 18) {
-                ForEach(Array(controllers.enumerated()), id: \.offset) { _, c in
-                    PillView(dictation: c, shortcut: shortcut).frame(width: 520).frame(minHeight: 76)
+        ZStack(alignment: .top) {
+            ShowcaseGround()
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, staged in
+                    HStack(alignment: .center, spacing: 0) {
+                        if !staged.row.caption.isEmpty {
+                            ShowcaseCaption(number: staged.row.number, caption: staged.row.caption).frame(width: 200, alignment: .leading)
+                        }
+                        PillView(dictation: staged.controller, shortcut: shortcut, serverName: "build-box")
+                        Spacer(minLength: 0)
+                    }
                 }
             }
-            .padding(.top, 20)
+            .padding(.horizontal, 28)
+            .padding(.top, 44)
         }
         .ignoresSafeArea()
+    }
+}
+
+/// The style menu open over the pill, placed as the floating panel places it: above the pill,
+/// its left edge under the chip's.
+private struct PillMenuShowcase: View {
+    var rows: [PillShowcase.Staged]
+    var shortcut: String
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            ShowcaseGround()
+            HStack(alignment: .bottom, spacing: 40) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, staged in
+                    MenuColumn(staged: staged, shortcut: shortcut)
+                }
+            }
+            .padding(.top, 44)
+            .padding(.horizontal, 28)
+        }
+        .ignoresSafeArea()
+    }
+
+    private struct MenuColumn: View {
+        var staged: PillShowcase.Staged
+        var shortcut: String
+        @State private var interaction = PillInteraction()
+
+        var body: some View {
+            let c = staged.controller
+            VStack(alignment: .leading, spacing: 10) {
+                ShowcaseCaption(number: staged.row.number, caption: staged.row.caption)
+                VStack(alignment: .leading, spacing: 6) {
+                    if let state = StyleChipState(resolution: c.currentStyle, rulesResolution: c.rulesStyle, target: c.alwaysUseTarget) {
+                        StyleMenuView(state: state, onStyle: { _ in }, onRules: {}, onAlwaysUse: { _ in },
+                                      showcaseHighlight: staged.row.highlight)
+                            .padding(.leading, max(0, chipOffset - 4))
+                    }
+                    PillView(dictation: c, shortcut: shortcut, interaction: interaction, showcaseChipHover: true)
+                }
+            }
+            .frame(minWidth: 460, alignment: .leading)
+        }
+
+        /// The chip's left edge within the pill.
+        private var chipOffset: CGFloat {
+            guard let chip = interaction.chipFrame else { return 0 }
+            return chip.minX - interaction.capsuleFrame.minX
+        }
+    }
+}
+
+private struct ShowcaseCaption: View {
+    var number: String
+    var caption: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(number).font(.system(size: 12, weight: .medium, design: .monospaced)).foregroundStyle(Crystal.ink3)
+            Text(caption).font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink)
+        }
+    }
+}
+
+/// A plain ground standing in for the desktop: near-black in dark mode, pale grey in light.
+private struct ShowcaseGround: View {
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        (scheme == .dark ? Color(white: 0.03) : Color(white: 0.94)).ignoresSafeArea()
+    }
+}
+
+// MARK: - Demo history
+
+/// The dictations screenshots and `--demo` show: varied apps and styles, a note written in Bark,
+/// a clipboard fallback, a website, a dictation run on Bark Server, a terminal, and one kept
+/// before cleanup was recorded. What was heard goes through the real pipeline in the sample's
+/// style, so the text, the edits and the timing are what Bark itself would produce.
+enum DemoHistory {
+    struct Sample {
+        var minutesAgo: Double
+        var app: String
+        var bundle: String
+        /// What the speech model heard (it punctuates as it goes); nil for a note or an old item.
+        var raw: String?
+        /// A note's text, or an old item's.
+        var text: String = ""
+        var style: DictationStyle.ID?
+        var reason: String?
+        var seconds: Double
+        var ms: Int
+        var host: String? = nil
+        var note = false
+        var clipboard = false
+        var remote = false
+    }
+
+    static let samples: [Sample] = [
+        Sample(minutesAgo: 2, app: "Mail", bundle: "com.apple.mail",
+               raw: "Hi Aoife, um, so could you send the revised quote by Thursday, no wait, Friday, and copy in Declan? He's sort of handling the kitchen side now. Thanks, Sam.",
+               style: .email, reason: "Mail rule", seconds: 11.4, ms: 182),
+        Sample(minutesAgo: 14, app: "Slack", bundle: "com.tinyspeck.slackmacgap",
+               raw: "Um, running ten minutes late, start without me.", style: .casual, reason: "Slack rule", seconds: 3.1, ms: 96),
+        Sample(minutesAgo: 41, app: "Xcode", bundle: "com.apple.dt.Xcode",
+               raw: "Rename fetchQuote to, uh, loadQuote everywhere.", style: .code, reason: "Xcode rule", seconds: 4.2, ms: 88),
+        Sample(minutesAgo: 70, app: "Messages", bundle: "com.apple.MobileSMS",
+               raw: "Um, on the train now, home by half six.", style: .casual, reason: "Messages rule", seconds: 2.9, ms: 91,
+               clipboard: true),
+        Sample(minutesAgo: 180, app: "Notes", bundle: "com.apple.Notes",
+               raw: "Kitchen quote. Bullet point worktop. Bullet point two wall units. Bullet point, uh, fitters the first week of March.",
+               style: .notes, reason: "Notes rule", seconds: 9.8, ms: 141, remote: true),
+        Sample(minutesAgo: 205, app: "Bark", bundle: "ie.fairspoken.mac", raw: nil,
+               text: "Ideas for the practice newsletter: flu clinic dates, the new nurse, parking.", seconds: 0, ms: 0, note: true),
+        Sample(minutesAgo: 26 * 60, app: "Safari", bundle: "com.apple.Safari",
+               raw: "Q4 review. Retention is up, you know, four points, I mean three points, on last quarter.",
+               style: .document, reason: "docs.google.com", seconds: 6.3, ms: 120, host: "docs.google.com"),
+        Sample(minutesAgo: 27 * 60, app: "Terminal", bundle: "com.apple.Terminal",
+               raw: "git checkout main", style: .verbatim, reason: "Terminal", seconds: 1.9, ms: 84),
+        Sample(minutesAgo: 29 * 60, app: "Mail", bundle: "com.apple.mail",
+               raw: "Thanks, Declan, um, Tuesday at ten works for me.", style: .email, reason: "You chose this", seconds: 3.6, ms: 101),
+        Sample(minutesAgo: 3 * 24 * 60, app: "Socrates", bundle: "com.socrates.pms",
+               raw: "Patient reports, um, intermittent chest tightness on exertion for three weeks, no radiation, settles with rest.",
+               style: .clean, reason: "Default", seconds: 8.4, ms: 133),
+        Sample(minutesAgo: 9 * 24 * 60, app: "Outlook", bundle: "com.microsoft.Outlook", raw: nil,
+               text: "Thanks for the update. I've attached the audit results and we can go through them on Friday.",
+               seconds: 5.4, ms: 117),
+    ]
+
+    static func items(now: Date = Date()) -> [TranscriptHistoryItem] {
+        samples.enumerated().map { i, s in
+            let created = Int64((now.timeIntervalSince1970 - s.minutesAgo * 60) * 1000)
+            var text = s.text
+            var edits: [CleanupEdit]?
+            var cleanupMs: Int?
+            if let raw = s.raw, let style = s.style {
+                let started = ContinuousClock.now
+                let r = DictationPipeline.process(raw, context: PostProcessContext(
+                    appBundleID: s.bundle, vocabulary: ["Aoife", "Declan"], style: style, styleReason: s.reason,
+                    allowsMultiline: style != .verbatim, allowsRichText: style != .verbatim))
+                text = r.plainText
+                edits = r.edits
+                cleanupMs = max(1, Int((ContinuousClock.now - started) / .milliseconds(1)))
+            }
+            var item = TranscriptHistoryItem(
+                id: "demo-\(i)", createdAt: created, text: text, backend: s.note ? "typed" : "parakeet",
+                location: s.remote ? "remote-host" : "local", durationSeconds: s.seconds,
+                timings: s.note ? nil : DictationTimings(transcribeMs: s.ms - 20, speechModelMs: s.ms - 60, totalMs: s.ms),
+                model: s.note ? nil : "parakeet-tdt-0.6b-v3", appName: s.app, appBundleId: s.bundle)
+            item.rawText = s.raw
+            item.cleanupEdits = edits
+            item.style = s.note ? DictationStyle.ID.notes.rawValue : s.style?.rawValue
+            item.styleReason = s.note ? "Note in Bark" : s.reason
+            item.destinationHost = s.host
+            item.isNote = s.note ? true : nil
+            item.cleanupMs = cleanupMs
+            item.clipboardOnly = s.clipboard ? true : nil
+            return item
+        }
     }
 }

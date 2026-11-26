@@ -13,6 +13,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "FairspokenCore"),
-        .testTarget(name: "FairspokenCoreTests", dependencies: ["FairspokenCore"]),
+        .testTarget(name: "FairspokenCoreTests", dependencies: ["FairspokenCore"], resources: [.copy("Fixtures")]),
     ]
 )

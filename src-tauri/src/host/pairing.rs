@@ -564,10 +564,10 @@ mod tests {
     #[test]
     fn pair_requests_reject_unknown_fields_and_tidy_the_client_name() {
         let parsed: PairRequest = serde_json::from_str(
-            r#"{"password":"123456","clientName":"  Conal's MacBook\u0007  "}"#,
+            r#"{"password":"123456","clientName":"  Dev's MacBook\u0007  "}"#,
         )
         .unwrap();
-        assert_eq!(parsed.client_name().as_deref(), Some("Conal's MacBook"));
+        assert_eq!(parsed.client_name().as_deref(), Some("Dev's MacBook"));
         let long: PairRequest = serde_json::from_value(serde_json::json!({
             "password": "123456", "clientName": "x".repeat(100)
         }))

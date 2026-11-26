@@ -267,7 +267,7 @@ impl TailscaleNode {
             .any(|os| self.os.eq_ignore_ascii_case(os))
     }
 
-    /// The human name ("Conal's Mac mini"), else the first MagicDNS label.
+    /// The human name ("Dev's Mac mini"), else the first MagicDNS label.
     fn machine(&self) -> String {
         let name = self.host_name.trim();
         if !name.is_empty() {
@@ -705,26 +705,26 @@ mod tests {
     const STATUS: &str = r#"{
       "Version": "1.90.0",
       "BackendState": "Running",
-      "TailscaleIPs": ["100.91.70.66", "fd7a:115c:a1e0::f03b:4643"],
+      "TailscaleIPs": ["100.64.0.10", "fd7a:115c:a1e0::10"],
       "Self": {
-        "HostName": "Conal’s Mac mini",
-        "DNSName": "conals-mac-mini.tail1b4c5c.ts.net.",
-        "TailscaleIPs": ["100.91.70.66", "fd7a:115c:a1e0::f03b:4643"],
+        "HostName": "Dev’s Mac mini",
+        "DNSName": "mac-mini.tail1234.ts.net.",
+        "TailscaleIPs": ["100.64.0.10", "fd7a:115c:a1e0::10"],
         "Online": true, "OS": "macOS"
       },
-      "MagicDNSSuffix": "tail1b4c5c.ts.net",
+      "MagicDNSSuffix": "tail1234.ts.net",
       "Peer": {
         "nodekey:aa": {
-          "HostName": "Studio", "DNSName": "studio.tail1b4c5c.ts.net.",
-          "TailscaleIPs": ["fd7a:115c:a1e0::1", "100.106.119.1"], "Online": true, "OS": "linux"
+          "HostName": "Studio", "DNSName": "studio.tail1234.ts.net.",
+          "TailscaleIPs": ["fd7a:115c:a1e0::1", "100.64.0.14"], "Online": true, "OS": "linux"
         },
         "nodekey:bb": {
-          "HostName": "DESKTOP-L03FA3T", "DNSName": "desktop-l03fa3t.tail1b4c5c.ts.net.",
-          "TailscaleIPs": ["100.107.254.41"], "Online": false, "OS": "windows"
+          "HostName": "DESKTOP-PC", "DNSName": "desktop-pc.tail1234.ts.net.",
+          "TailscaleIPs": ["100.64.0.15"], "Online": false, "OS": "windows"
         },
         "nodekey:cc": {
-          "HostName": "", "DNSName": "android-box.tail1b4c5c.ts.net.",
-          "TailscaleIPs": ["100.66.34.126"], "Online": true, "OS": "android"
+          "HostName": "", "DNSName": "android-box.tail1234.ts.net.",
+          "TailscaleIPs": ["100.64.0.12"], "Online": true, "OS": "android"
         }
       }
     }"#;
@@ -740,11 +740,11 @@ mod tests {
             candidates,
             vec![
                 Candidate {
-                    machine: "Conal’s Mac mini".to_string(),
+                    machine: "Dev’s Mac mini".to_string(),
                     urls: vec![
-                        "https://conals-mac-mini.tail1b4c5c.ts.net".to_string(),
-                        "http://conals-mac-mini.tail1b4c5c.ts.net".to_string(),
-                        "http://100.91.70.66:48173".to_string(),
+                        "https://mac-mini.tail1234.ts.net".to_string(),
+                        "http://mac-mini.tail1234.ts.net".to_string(),
+                        "http://100.64.0.10:48173".to_string(),
                     ],
                     is_self: true,
                 },
@@ -753,9 +753,9 @@ mod tests {
                     machine: "Studio".to_string(),
                     // The first IPv4, not the IPv6 listed before it.
                     urls: vec![
-                        "https://studio.tail1b4c5c.ts.net".to_string(),
-                        "http://studio.tail1b4c5c.ts.net".to_string(),
-                        "http://100.106.119.1:48173".to_string(),
+                        "https://studio.tail1234.ts.net".to_string(),
+                        "http://studio.tail1234.ts.net".to_string(),
+                        "http://100.64.0.14:48173".to_string(),
                     ],
                     is_self: false,
                 },
@@ -797,16 +797,16 @@ mod tests {
             })
         );
         assert_eq!(
-            parse_typed_address("studio.tail1b4c5c.ts.net:8080"),
+            parse_typed_address("studio.tail1234.ts.net:8080"),
             Ok(TypedAddress::Name {
-                host: "studio.tail1b4c5c.ts.net".to_string(),
+                host: "studio.tail1234.ts.net".to_string(),
                 port: Some(8080)
             })
         );
         assert_eq!(
-            parse_typed_address("https://studio.tail1b4c5c.ts.net/"),
+            parse_typed_address("https://studio.tail1234.ts.net/"),
             Ok(TypedAddress::Url(
-                "https://studio.tail1b4c5c.ts.net".to_string()
+                "https://studio.tail1234.ts.net".to_string()
             ))
         );
         assert!(parse_typed_address("").is_err());
@@ -815,11 +815,11 @@ mod tests {
 
         let bare = parse_typed_address("studio").unwrap();
         let full = magic_dns_name(&status(), "studio");
-        assert_eq!(full.as_deref(), Some("studio.tail1b4c5c.ts.net"));
+        assert_eq!(full.as_deref(), Some("studio.tail1234.ts.net"));
         assert_eq!(
             typed_candidate(&bare, full.as_deref()).urls,
             vec![
-                "https://studio.tail1b4c5c.ts.net",
+                "https://studio.tail1234.ts.net",
                 "http://studio",
                 "http://studio:48173"
             ]
@@ -834,17 +834,17 @@ mod tests {
             typed_candidate(&with_port, None).urls,
             vec!["http://studio:9000"]
         );
-        let full_with_port = parse_typed_address("studio.tail1b4c5c.ts.net:9000").unwrap();
+        let full_with_port = parse_typed_address("studio.tail1234.ts.net:9000").unwrap();
         assert_eq!(
             typed_candidate(&full_with_port, None).urls,
             vec![
-                "https://studio.tail1b4c5c.ts.net:9000",
-                "http://studio.tail1b4c5c.ts.net:9000"
+                "https://studio.tail1234.ts.net:9000",
+                "http://studio.tail1234.ts.net:9000"
             ]
         );
         assert_eq!(
-            magic_dns_name(&status(), "DESKTOP-l03fa3t").as_deref(),
-            Some("desktop-l03fa3t.tail1b4c5c.ts.net")
+            magic_dns_name(&status(), "DESKTOP-pc").as_deref(),
+            Some("desktop-pc.tail1234.ts.net")
         );
     }
 
@@ -868,18 +868,18 @@ mod tests {
         ]);
         let hosts = pick_answers(&candidates, &mut answers);
         assert_eq!(hosts.len(), 2);
-        assert_eq!(hosts[0].url, "https://conals-mac-mini.tail1b4c5c.ts.net");
+        assert_eq!(hosts[0].url, "https://mac-mini.tail1234.ts.net");
         assert!(hosts[0].is_self);
         assert_eq!(hosts[0].auth, "password");
         // HTTP on the MagicDNS name beats the IPv4 fallback.
-        assert_eq!(hosts[1].url, "http://studio.tail1b4c5c.ts.net");
+        assert_eq!(hosts[1].url, "http://studio.tail1234.ts.net");
         assert_eq!(hosts[1].machine, "Studio");
         assert_eq!(hosts[1].auth, "token");
     }
 
     #[test]
     fn hosts_on_this_computer_are_found_on_loopback_first() {
-        let mut candidates = loopback_candidates(&[48174, 48173], "Conal’s Mac mini");
+        let mut candidates = loopback_candidates(&[48174, 48173], "Dev’s Mac mini");
         candidates.extend(scan_candidates(&status()));
         // Loopback 48174 and 48173 answer; so does this Mac's tailnet IP
         // (the same host as loopback 48173) and Studio.
@@ -896,7 +896,7 @@ mod tests {
             vec![
                 "http://127.0.0.1:48174",
                 "http://127.0.0.1:48173",
-                "http://100.106.119.1:48173"
+                "http://100.64.0.14:48173"
             ]
         );
         assert!(hosts[0].is_self && hosts[1].is_self && !hosts[2].is_self);

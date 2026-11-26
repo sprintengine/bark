@@ -138,15 +138,15 @@ private struct ModelCard: View {
                         Label(model.assignedWorkers.isEmpty ? "Installed" : "Serving on \(workerList)", systemImage: "checkmark.circle.fill")
                             .font(.callout.weight(.medium)).foregroundStyle(model.assignedWorkers.isEmpty ? Crystal.ink2 : Crystal.ok)
                         Button("Delete…", role: .destructive, action: onDelete)
-                            .buttonStyle(.bordered).buttonBorderShape(.capsule)
+                            .buttonStyle(OutlineButtonStyle())
                             .disabled(actionsDisabled || !model.assignedWorkers.isEmpty)
                             .help(model.assignedWorkers.isEmpty ? "Remove the model's files" : "Assign its workers another model first")
                     } else {
                         Button(downloading ? "Downloading…" : "Download", systemImage: "arrow.down.circle", action: onDownload)
-                            .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Crystal.serverAccent)
+                            .buttonStyle(PrimaryButtonStyle())
                             .disabled(actionsDisabled || downloading)
                         Button("Download from Link…") { controller.openLinkEditor(for: model.id) }
-                            .buttonStyle(.bordered).buttonBorderShape(.capsule)
+                            .buttonStyle(OutlineButtonStyle())
                             .disabled(linkActionsDisabled || downloading || editing || linkFromEnvironment)
                             .help(linkFromEnvironment ? "\(HostEnvironment.modelLinksVariable) sets this model's link for this run."
                                 : "Download a .zip of this model from a link you give, for example your organisation's server")

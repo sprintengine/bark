@@ -81,7 +81,7 @@ cheaply; clients probe many addresses at once.
 
 Body (`deny_unknown_fields`, at most 4 KB, else `413`):
 `{"password": "<string>", "clientName": "<string>"?}`. `clientName` is
-informational, e.g. "Conal's MacBook"; the host trims it, strips control
+informational, e.g. "Dev's MacBook"; the host trims it, strips control
 characters and truncates it to 64 characters (never rejects it), and may show
 it in its client list.
 

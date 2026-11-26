@@ -166,7 +166,7 @@ DOSES = ["500", "20", "40", "10", "5", "2.5", "100", "250", "75", "1"]
 NAMES = ["Sam", "Sarah", "John", "Priya", "Marcus", "Tom", "Laura", "Declan", "Emma",
          "Michael", "Rachel", "Grace", "Fiona", "Kevin", "Orla", "Ravi", "Hannah", "David",
          "Anna", "Peter", "Lucy", "Brian", "Chloe", "Daniel"]
-SIGNERS = ["Conal", "Mary", "Paul", "Ellen", "James", "Nora", "Alex", "Kate"]
+SIGNERS = ["Dev", "Mary", "Paul", "Ellen", "James", "Nora", "Alex", "Kate"]
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",
           "September", "October", "November", "December"]

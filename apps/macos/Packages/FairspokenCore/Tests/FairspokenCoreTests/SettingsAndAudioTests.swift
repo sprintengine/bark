@@ -93,16 +93,17 @@ struct SettingsTests {
 struct HistoryTests {
     @Test func historyDedupesAndCaps() {
         var items: [TranscriptHistoryItem] = []
-        for i in 0..<60 {
+        let cap = TranscriptHistory.maxItems
+        for i in 0..<(cap + 10) {
             items = TranscriptHistory.adding(TranscriptHistoryItem(id: "\(i)", createdAt: Int64(i), text: "note \(i)", backend: "parakeet",
                                                                    location: "local", durationSeconds: 1), to: items)
         }
-        #expect(items.count == 50)
-        items = TranscriptHistory.adding(TranscriptHistoryItem(id: "x", createdAt: 99, text: "NOTE   59", backend: "parakeet",
+        #expect(items.count == cap)
+        items = TranscriptHistory.adding(TranscriptHistoryItem(id: "x", createdAt: 99, text: "NOTE   \(cap + 9)", backend: "parakeet",
                                                                location: "local", durationSeconds: 1), to: items)
-        #expect(items.count == 50)
+        #expect(items.count == cap)
         #expect(items.first?.id == "x")
-        #expect(!items.contains { $0.id == "59" })
+        #expect(!items.contains { $0.id == "\(cap + 9)" })
     }
 
     @Test func decodesRustHistoryItems() throws {
@@ -110,6 +111,28 @@ struct HistoryTests {
         let items = try JSONDecoder().decode([TranscriptHistoryItem].self, from: Data(json.utf8))
         #expect(items.first?.timings?.totalMs == 130)
         #expect(items.first?.polished == false)
+        #expect(items.first?.cleanupEdits == nil)
+        #expect(items.first?.isNote == nil)
+    }
+
+    @Test func roundTripsCleanupFields() throws {
+        var item = TranscriptHistoryItem(id: "a", createdAt: 1, text: "Could you send it by Friday?", backend: "parakeet",
+                                         location: "local", durationSeconds: 2)
+        item.rawText = "um could you send it by Thursday no wait Friday"
+        item.cleanupEdits = [CleanupEdit(kind: .filler, removed: "um"),
+                             CleanupEdit(kind: .selfCorrection, removed: "Thursday no wait Friday", inserted: "Friday")]
+        item.style = "email"
+        item.styleReason = "Mail rule"
+        item.isNote = false
+        item.cleanupMs = 12
+        item.clipboardOnly = true
+        item.recordingID = "rec-1"
+        let back = try JSONDecoder().decode(TranscriptHistoryItem.self, from: JSONEncoder().encode(item))
+        #expect(back == item)
+        // Unknown edit kinds from a newer build don't lose the item.
+        let json = #"{"id":"b","createdAt":1,"text":"x","cleanupEdits":[{"kind":"somethingNew","removed":"a","inserted":"b"}]}"#
+        let odd = try JSONDecoder().decode(TranscriptHistoryItem.self, from: Data(json.utf8))
+        #expect(odd.cleanupEdits == [CleanupEdit(kind: .formatting, removed: "a", inserted: "b")])
     }
 
     @Test func usageBucketsByUTCDay() {

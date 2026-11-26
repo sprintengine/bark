@@ -22,7 +22,8 @@ public struct DictationTimings: Codable, Equatable, Sendable {
 }
 
 /// One `transcript-history.json` entry, compatible with `TranscriptHistoryItem` in Rust.
-/// `model`, `appName` and `appBundleId` are Mac-only additions.
+/// `model`, `appName`, `appBundleId` and everything from `cleanupEdits` on are Mac-only
+/// additions: optional, omitted when nil, and ignored by the Rust app.
 public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable {
     public var id: String
     public var createdAt: Int64
@@ -36,9 +37,28 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
     public var model: String?
     public var appName: String?
     public var appBundleId: String?
+    /// What cleanup and the style changed, in transcript order.
+    public var cleanupEdits: [CleanupEdit]?
+    /// `DictationStyle.ID` raw value ("clean", "email"…).
+    public var style: String?
+    /// Why that style: "Mail rule", "You chose this", "mail.google.com".
+    public var styleReason: String?
+    /// The website's host when the dictation went to a browser.
+    public var destinationHost: String?
+    /// A note written or dictated in Bark itself.
+    public var isNote: Bool?
+    /// Time post-processing took.
+    public var cleanupMs: Int?
+    /// True when nothing could take the paste and the text went to the clipboard instead.
+    public var clipboardOnly: Bool?
+    /// The post-training recording kept for it (`TrainingEntry.id`), so it can be transcribed again.
+    public var recordingID: String?
 
     public init(id: String, createdAt: Int64, text: String, backend: String, location: String, durationSeconds: Double,
-                timings: DictationTimings? = nil, model: String? = nil, appName: String? = nil, appBundleId: String? = nil) {
+                timings: DictationTimings? = nil, model: String? = nil, appName: String? = nil, appBundleId: String? = nil,
+                rawText: String? = nil, cleanupEdits: [CleanupEdit]? = nil, style: String? = nil, styleReason: String? = nil,
+                destinationHost: String? = nil, isNote: Bool? = nil, cleanupMs: Int? = nil, clipboardOnly: Bool? = nil,
+                recordingID: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.text = text
@@ -49,6 +69,27 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
         self.model = model
         self.appName = appName
         self.appBundleId = appBundleId
+        self.rawText = rawText
+        self.cleanupEdits = cleanupEdits
+        self.style = style
+        self.styleReason = styleReason
+        self.destinationHost = destinationHost
+        self.isNote = isNote
+        self.cleanupMs = cleanupMs
+        self.clipboardOnly = clipboardOnly
+        self.recordingID = recordingID
+    }
+
+    /// A note typed (or dictated) into Bark itself, in the notes style.
+    public static func note(_ text: String, rawText: String? = nil, edits: [CleanupEdit]? = nil, durationSeconds: Double = 0,
+                            at date: Date = Date(), cleanupMs: Int? = nil, appName: String? = nil,
+                            appBundleId: String? = nil) -> TranscriptHistoryItem {
+        let ms = Int64(date.timeIntervalSince1970 * 1000)
+        return TranscriptHistoryItem(id: "note-\(ms)", createdAt: ms, text: text, backend: "typed", location: "local",
+                                     durationSeconds: durationSeconds, appName: appName, appBundleId: appBundleId,
+                                     rawText: rawText, cleanupEdits: edits,
+                                     style: DictationStyle.ID.notes.rawValue, styleReason: "Note in Bark", isNote: true,
+                                     cleanupMs: cleanupMs)
     }
 
     public init(from decoder: Decoder) throws {
@@ -65,19 +106,35 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
         model = c.lenient(String.self, .model)
         appName = c.lenient(String.self, .appName)
         appBundleId = c.lenient(String.self, .appBundleId)
+        cleanupEdits = c.lenient([LenientElement<CleanupEdit>].self, .cleanupEdits).map { $0.compactMap(\.value) }
+        style = c.lenient(String.self, .style)
+        styleReason = c.lenient(String.self, .styleReason)
+        destinationHost = c.lenient(String.self, .destinationHost)
+        isNote = c.lenient(Bool.self, .isNote)
+        cleanupMs = c.lenientInt(.cleanupMs)
+        clipboardOnly = c.lenient(Bool.self, .clipboardOnly)
+        recordingID = c.lenient(String.self, .recordingID)
     }
+
+    /// The style as a value, when it is one this build knows.
+    public var styleID: DictationStyle.ID? { style.flatMap(DictationStyle.ID.init(rawValue:)) }
 
     public var date: Date { Date(timeIntervalSince1970: Double(createdAt) / 1000) }
     public var wordCount: Int { WordCounter.count(text) }
+    /// A note written in Bark, not a dictation into another app.
+    public var isBarkNote: Bool { isNote == true }
 }
 
 public enum TranscriptHistory {
-    public static let maxItems = 50
+    /// History is the app's main navigation now, so it keeps far more than the Rust app's 50.
+    public static let maxItems = 1_000
 
     /// Inserts newest-first, de-duplicating on normalised text and capping like the Rust service.
     public static func adding(_ item: TranscriptHistoryItem, to items: [TranscriptHistoryItem]) -> [TranscriptHistoryItem] {
         let key = normalize(item.text)
-        var next = items.filter { normalize($0.text) != key }
+        // A length far off can't normalise to the same text: skips the work for most of 1,000 items.
+        let length = item.text.utf8.count
+        var next = items.filter { abs($0.text.utf8.count - length) > 64 || normalize($0.text) != key }
         next.insert(item, at: 0)
         if next.count > maxItems { next.removeLast(next.count - maxItems) }
         return next

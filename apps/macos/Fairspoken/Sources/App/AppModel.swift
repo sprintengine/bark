@@ -30,16 +30,72 @@ final class AppModel {
     }
 
     var section: Section = .home {
-        didSet { if section != .home { homeShowsAllDictations = false } }
+        didSet {
+            if section != .home { selectedDictationID = nil }
+            if section != .settings { settingsQuery = "" }
+        }
     }
-    /// Home's "See all": every kept dictation, searchable, instead of the overview.
-    var homeShowsAllDictations = false
+    /// The dictation open in the main area (a row of the sidebar's thread list). Nil is Home,
+    /// the new-dictation screen.
+    var selectedDictationID: String?
+    /// The thread list's search text and filter.
+    var historyQuery = ""
+    var historyFilter: HistoryFilter = .all
+    /// Set by ⌘K; the sidebar's search field takes the focus and clears it (also when the sidebar
+    /// was hidden and the field appears only now).
+    var searchFocusPending = false
+    /// "Paste last dictation" is under way (a second press waits for it to finish).
+    @ObservationIgnored var pastingLast = false
+    /// The ⌘K palette is open over the main window.
+    var paletteOpen = false
+    /// Screenshots: the palette opened with this query typed.
+    var showcasePaletteQuery: String?
+    /// Home's composer: what's typed there and the dictations made into it, kept while you look
+    /// at other screens.
+    var homeDraft = ""
+    var homeDraftSources: [String] = []
+    /// Screenshots: the thread row drawn as if under the pointer.
+    var showcaseHoveredRow: String?
+    /// Bumped to start editing the open dictation's text (⏎ in the thread list).
+    var editRequest = 0
+    /// Dictations being transcribed again from their kept recording.
+    var retryingDictations: Set<String> = []
+    /// What the last action on a dictation did ("Copied", "Pasted into Mail"), shown briefly.
+    var dictationNotice: String?
+
+    enum HistoryFilter: String, CaseIterable, Identifiable {
+        case all, notes, clipboard
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .all: "All dictations"
+            case .notes: "Notes"
+            case .clipboard: "Copied to the clipboard"
+            }
+        }
+    }
+
+    /// Opens a dictation from the thread list (or Home, with nil).
+    func open(dictation id: String?) {
+        if section != .home { section = .home }
+        selectedDictationID = id
+    }
     /// The main window's sidebar is shown (View › Show Sidebar, ⌃⌘S, or the toolbar's sidebar
     /// button). Remembered across launches.
     var sidebarVisible = !UserDefaults.standard.bool(forKey: "SidebarHidden") {
         didSet { UserDefaults.standard.set(!sidebarVisible, forKey: "SidebarHidden") }
     }
-    var settingsTab: SettingsView.Tab = .general
+    /// The settings page. Going to a page leaves any settings search.
+    var settingsTab: SettingsView.Tab = .general {
+        didSet { settingsQuery = "" }
+    }
+    /// The settings sidebar's search: every matching row from every page.
+    var settingsQuery = ""
+    /// Set by ⌘F in Settings; the settings search field takes the focus and clears it.
+    var settingsSearchFocusPending = false
+    /// Settings › App styles: the app or site whose preview is open, and the add sheet.
+    var appStylesOpenRow: String?
+    var appStylesAddPresented = false
 
     let settings: SettingsStore
     let history: HistoryStore
@@ -96,11 +152,18 @@ final class AppModel {
 
         // Every recording takes the microphone from the setup guide's test.
         dictation.onWillStart = { [weak self] in self?.micTest.stop() }
+        // In Bark's own window, a dictation is a note only on Home, where its composer takes it.
+        dictation.shownInAppIsNote = { [weak self] in
+            guard let self else { return false }
+            return self.section == .home && self.selectedDictationID == nil
+                && NSApp.keyWindow?.identifier == NSUserInterfaceItemIdentifier("dashboard")
+        }
         hotkeys.onPress = { [weak self] in self?.dictation.hotkeyPressed() }
         hotkeys.onRelease = { [weak self] in self?.dictation.hotkeyReleased() }
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
         hotkeys.onFnPress = { [weak self] in self?.dictation.fnPressed() }
         hotkeys.onFnRelease = { [weak self] in self?.dictation.fnReleased() }
+        hotkeys.onPasteLast = { [weak self] in self?.pasteLast() }
 
         pending.onRecovered = { [weak self] words, copied, placement in
             self?.dictation.announceRecovered(words: words, copied: copied, placement: placement)

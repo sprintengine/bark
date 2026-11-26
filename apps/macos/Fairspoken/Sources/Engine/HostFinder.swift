@@ -42,7 +42,7 @@ final class HostFinder {
         self.hostStatus = hostStatus
     }
 
-    /// This Mac's name as System Settings › Sharing shows it ("Conal's MacBook"), sent as `clientName`.
+    /// This Mac's name as System Settings › Sharing shows it ("Dev's MacBook"), sent as `clientName`.
     nonisolated static var computerName: String {
         (SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? ProcessInfo.processInfo.hostName
     }

@@ -12,7 +12,7 @@ pub(crate) fn computer_name() -> Option<String> {
 
 #[cfg(target_os = "macos")]
 fn platform_name() -> Option<String> {
-    // The name from System Settings ("Conal's MacBook Pro"), not the
+    // The name from System Settings ("Dev's MacBook Pro"), not the
     // `.local` host name.
     command_output("scutil", &["--get", "ComputerName"]).or_else(host_name)
 }
@@ -65,8 +65,8 @@ mod tests {
     fn names_are_trimmed_and_lose_the_mdns_suffix() {
         assert_eq!(clean_name("studio-mac.local\n"), "studio-mac");
         assert_eq!(
-            clean_name("  Conal's MacBook Pro \n"),
-            "Conal's MacBook Pro"
+            clean_name("  Dev's MacBook Pro \n"),
+            "Dev's MacBook Pro"
         );
         assert_eq!(clean_name(&"x".repeat(100)).len(), MAX_NAME_CHARS);
         assert_eq!(clean_name("\n"), "");

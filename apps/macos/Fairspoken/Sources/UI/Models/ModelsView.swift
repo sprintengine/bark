@@ -98,27 +98,60 @@ private struct ModelFilterBar: View {
     }
 
     private var sortPicker: some View {
-        Picker("Sort", selection: $query.sort) {
-            ForEach(ModelCatalogueQuery.Sort.allCases) { Text($0.label).tag($0) }
+        SelectMenu("Sort: \(query.sort.label)", label: "Sort", minWidth: 150) {
+            Picker("Sort", selection: $query.sort) {
+                ForEach(ModelCatalogueQuery.Sort.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.inline)
         }
-        .fixedSize()
     }
 
     @ViewBuilder private var filters: some View {
+        SelectMenu(query.engine?.label ?? "All engines", label: "Engine", minWidth: 120) {
             Picker("Engine", selection: $query.engine) {
                 Text("All engines").tag(SpeechEngineKind?.none)
                 ForEach(SpeechEngineKind.allCases) { kind in
                     Text(kind.label).tag(SpeechEngineKind?.some(kind))
                 }
             }
-            .fixedSize()
+            .pickerStyle(.inline)
+        }
+        SelectMenu(query.language.label, label: "Language", minWidth: 130) {
             Picker("Language", selection: $query.language) {
                 ForEach(ModelCatalogueQuery.LanguageFilter.allCases) { Text($0.label).tag($0) }
             }
-            .fixedSize()
-            Toggle("Downloaded", isOn: $query.downloadedOnly).toggleStyle(.button)
-            Toggle("On this Mac", isOn: $query.localOnly).toggleStyle(.button)
-                .help("Models that run on this Mac (remote endpoints are coming)")
+            .pickerStyle(.inline)
+        }
+        FilterChip(title: "Downloaded", isOn: $query.downloadedOnly)
+        FilterChip(title: "On this Mac", isOn: $query.localOnly)
+            .help("Models that run on this Mac (remote endpoints are coming)")
+    }
+}
+
+/// A filter that is on or off: an outline chip, filled when on.
+private struct FilterChip: View {
+    var title: String
+    @Binding var isOn: Bool
+    @State private var hovered = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+        Button { isOn.toggle() } label: {
+            HStack(spacing: 5) {
+                if isOn { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)) }
+                Text(title)
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(isOn || hovered ? Crystal.ink : Crystal.ink2)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(shape.fill(isOn ? Crystal.selected : hovered ? Crystal.rowHover : Crystal.well))
+            .overlay(shape.strokeBorder(isOn ? Crystal.hairline : Crystal.input))
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -274,6 +307,7 @@ struct ModelActionControl: View {
                         .help(library.downloadErrors[info.id] ?? "")
                 }
                 Button("Download") { library.download(info.id) }
+                    .buttonStyle(OutlineButtonStyle(compact: true))
                     .help("Download \(Format.bytes(info.approxBytes))")
             case .downloading(let fraction):
                 Text("\(Int(fraction * 100))%").font(.contentBody).monospacedDigit().foregroundStyle(Crystal.ink2)
@@ -288,7 +322,7 @@ struct ModelActionControl: View {
                     let engine = library.engineState
                     if engine.isReady {
                         Label("In use", systemImage: "checkmark.circle.fill")
-                            .font(.contentBody.weight(.medium)).foregroundStyle(Crystal.ok)
+                            .font(.contentBody.weight(.medium)).foregroundStyle(Crystal.ink2)
                     } else {
                         StatusDot(color: engine.tint, pulsing: engine.isBusy)
                         Text(engine.isBusy ? "Loading…" : "Failed").font(.contentBody).foregroundStyle(Crystal.ink2)
@@ -303,11 +337,10 @@ struct ModelActionControl: View {
                     .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.borderless).fixedSize()
                     .accessibilityLabel("More for \(info.name)")
                     Button("Use") { model.useModel(info.id) }
+                        .buttonStyle(OutlineButtonStyle(compact: true))
                 }
             }
         }
-        .controlSize(.small)
-        .buttonStyle(.bordered)
     }
 
     private func stop(_ library: ModelLibrary) { library.cancelDownload(info.id) }
@@ -337,46 +370,33 @@ struct ModelDetailSheet: View {
                     }
                 }
                 Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark") }
-                    .buttonStyle(.borderless).keyboardShortcut(.cancelAction)
-                    .accessibilityLabel("Close")
+                IconButton(symbol: "xmark", label: "Close", help: "Close (esc)") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
             }
             Text(info.summary + " " + info.details)
                 .font(.contentBody).foregroundStyle(Crystal.ink)
                 .fixedSize(horizontal: false, vertical: true)
 
-            ContentCard(padding: 14) {
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 9) {
-                    GridRow {
-                        label("Speed")
-                        ScoreBar(value: info.speed, label: "Speed")
-                        value(info.rtfx.map { String(format: "%.0f× real time", $0) } ?? "Not measured")
+            SettingsGroup {
+                figureRow("Speed", score: info.speed, value: info.rtfx.map { String(format: "%.0f× real time", $0) } ?? "Not measured")
+                figureRow("Accuracy", score: info.accuracy, value: info.wer.map { String(format: "%.1f%% word error rate", $0) } ?? "Not measured")
+                Text(sourceNote).font(.system(size: 12)).foregroundStyle(Crystal.ink3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                detailRow("Languages", info.languages)
+                detailRow("Download", Format.bytes(info.approxBytes))
+                detailRow("Memory", "About \(Format.bytes(info.memoryBytes)) while in use")
+                detailRow("Runs on", "\(info.placement.label) · on this Mac")
+                detailRow("Licence", info.license)
+                if let url = info.sourceURL {
+                    HStack(spacing: 12) {
+                        label("Source").frame(width: 92, alignment: .leading)
+                        Link(info.variant.map { "\(info.repository)/\($0)" } ?? info.repository, destination: url)
+                            .font(.contentBody).foregroundStyle(Crystal.info).lineLimit(1).truncationMode(.middle)
+                        Spacer(minLength: 0)
                     }
-                    GridRow {
-                        label("Accuracy")
-                        ScoreBar(value: info.accuracy, label: "Accuracy")
-                        value(info.wer.map { String(format: "%.1f%% word error rate", $0) } ?? "Not measured")
-                    }
-                    GridRow {
-                        Color.clear.frame(width: 1, height: 1)
-                        Text(sourceNote).font(.caption).foregroundStyle(Crystal.ink3)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .gridCellColumns(2)
-                    }
-                    Divider().gridCellUnsizedAxes(.horizontal)
-                    GridRow { label("Languages"); value(info.languages).gridCellColumns(2) }
-                    GridRow { label("Download"); value(Format.bytes(info.approxBytes)).gridCellColumns(2) }
-                    GridRow { label("Memory"); value("About \(Format.bytes(info.memoryBytes)) while in use").gridCellColumns(2) }
-                    GridRow { label("Runs on"); value("\(info.placement.label) · on this Mac").gridCellColumns(2) }
-                    GridRow { label("Licence"); value(info.license).gridCellColumns(2) }
-                    GridRow {
-                        label("Source")
-                        if let url = info.sourceURL {
-                            Link(info.variant.map { "\(info.repository)/\($0)" } ?? info.repository, destination: url)
-                                .font(.contentBody).lineLimit(1).truncationMode(.middle)
-                                .gridCellColumns(2)
-                        }
-                    }
+                    .padding(.horizontal, 14).frame(minHeight: 36)
                 }
             }
 
@@ -393,12 +413,15 @@ struct ModelDetailSheet: View {
                         dismiss()
                         delete()
                     }
+                    .buttonStyle(OutlineButtonStyle())
+                    .foregroundStyle(Crystal.error)
                 }
                 Spacer()
                 switch state {
                 case .downloading(let f):
-                    ProgressView(value: f).frame(width: 120).tint(Crystal.clientAccent)
-                    Button("Stop") { library.cancelDownload(info.id) }.disabled(!library.isDownloading(info.id))
+                    ProgressView(value: f).frame(width: 120).tint(Crystal.ink2)
+                    Button("Stop") { library.cancelDownload(info.id) }.buttonStyle(OutlineButtonStyle())
+                        .disabled(!library.isDownloading(info.id))
                 case .unpacking, .compiling:
                     ProgressView().controlSize(.small)
                     Text(state == .compiling ? "Optimising for this device…" : "Unpacking…").font(.contentBody).foregroundStyle(Crystal.ink2)
@@ -423,6 +446,8 @@ struct ModelDetailSheet: View {
         }
         .padding(22)
         .frame(width: 520)
+        .background(Crystal.card)
+        .presentationBackground(Crystal.card)
     }
 
     private var sourceNote: String {
@@ -435,6 +460,25 @@ struct ModelDetailSheet: View {
 
     private func label(_ text: String) -> some View {
         Text(text).font(.contentBody).foregroundStyle(Crystal.ink2)
+    }
+
+    private func figureRow(_ title: String, score: Int, value: String) -> some View {
+        HStack(spacing: 12) {
+            label(title).frame(width: 92, alignment: .leading)
+            ScoreBar(value: score, label: title).frame(width: 64, alignment: .leading)
+            self.value(value)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14).frame(minHeight: 36)
+    }
+
+    private func detailRow(_ title: String, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            label(title).frame(width: 92, alignment: .leading)
+            value(text).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 9).frame(minHeight: 36)
     }
 
     private func value(_ text: String) -> some View {
@@ -451,7 +495,7 @@ struct ModelDetailSheet: View {
         } else if saved != nil || state == .available {
             VStack(alignment: .leading, spacing: 6) {
                 if let saved { ModelLinkSummary(link: saved) }
-                HStack(spacing: 14) {
+                HStack(spacing: 8) {
                     if state == .available {
                         Button("Download from Link…") { model.openLinkEditor(for: info.id) }
                     }
@@ -460,7 +504,7 @@ struct ModelDetailSheet: View {
                             .help("Download this model the usual way instead of from the link")
                     }
                 }
-                .buttonStyle(.link).font(.caption)
+                .buttonStyle(OutlineButtonStyle(compact: true))
             }
         }
     }

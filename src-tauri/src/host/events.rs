@@ -414,14 +414,14 @@ mod tests {
             at: 3,
             kind: HostEventKind::Pairing {
                 client: Some("100.64.0.7".into()),
-                client_name: Some("Conal's MacBook".into()),
+                client_name: Some("Dev's MacBook".into()),
                 ok: true,
             },
         };
         assert_eq!(
             pairing.frame().unwrap(),
             "event: pairing\ndata: {\"at\":3,\"client\":\"100.64.0.7\",\
-             \"clientName\":\"Conal's MacBook\",\"ok\":true}\n\n"
+             \"clientName\":\"Dev's MacBook\",\"ok\":true}\n\n"
         );
         assert_eq!(sse_frame("snapshot", "{}"), "event: snapshot\ndata: {}\n\n");
     }

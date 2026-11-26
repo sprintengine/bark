@@ -30,12 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.dictation.onNeedsOnboarding = { [weak self] in self?.windows.showOnboarding(reset: false) }
 
         if let dir = AppInfo.screenshotDirectory {
-            harness = ScreenshotHarness(model: model, windows: windows, output: dir)
+            harness = ScreenshotHarness(model: model, windows: windows, statusItem: statusItem, output: dir)
             harness?.run()
             return
         }
         #if DEBUG
-        if AppInfo.arguments.contains("--pill-demo") {
+        if AppInfo.arguments.contains("--pill-demo") || AppInfo.arguments.contains("--pill-demo-paste") {
             PillDemo.run(model: model, pill: pill)
             return
         }
@@ -57,10 +57,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         model?.settings.saveNow()
+        model?.history.flush()
     }
 
     @objc func showAbout() {
         windows.showDashboard(.settings)
+        model.settingsQuery = ""
         model.settingsTab = .about
     }
 
@@ -110,10 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         edit.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         main.addItem(submenu(edit))
 
-        // View: the sidebar (the main window answers toggleSidebar:) and the sections, so ⌘1…⌘4
+        // View: the sidebar (the main window answers toggleDashboardSidebar:) and the sections, so ⌘1…⌘4
         // work with the sidebar hidden too.
         let view = NSMenu(title: "View")
-        let sidebar = NSMenuItem(title: "Hide Sidebar", action: #selector(DashboardWindow.toggleSidebar(_:)), keyEquivalent: "s")
+        let sidebar = NSMenuItem(title: "Hide Sidebar", action: #selector(DashboardWindow.toggleDashboardSidebar(_:)), keyEquivalent: "s")
         sidebar.keyEquivalentModifierMask = [.control, .command]
         view.addItem(sidebar)
         view.addItem(.separator())

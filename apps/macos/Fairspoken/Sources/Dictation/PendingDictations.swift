@@ -175,17 +175,25 @@ final class PendingDictations {
     /// False when post-processing left no words, so nothing was delivered.
     private func deliver(_ output: TranscriptionOutput, for item: PendingDictation, copy: Bool) async -> Bool {
         let s = settings.settings
-        let text = await BasicPostProcessor().process(output.text, context: PostProcessContext(
-            appBundleID: item.appBundleId, vocabulary: s.vocabularyHints,
-            corrections: s.postProcess ? s.transcriptCorrections : [], speechModel: s.speechModelID))
+        // Only the app is known by now: its rule (or Bark's default for it) picks the style.
+        let destination = DictationDestination(bundleID: item.appBundleId, appName: item.appName)
+        let resolution = s.styleRules.resolve(destination)
+        let started = ContinuousClock.now
+        let processed = DictationPipeline.process(output.text, context: PostProcessContext(settings: s, appBundleID: item.appBundleId,
+                                                                                            resolution: resolution))
+        let cleanupMs = Int((ContinuousClock.now - started) / .milliseconds(1))
+        let text = processed.plainText
         guard !text.isEmpty else { return false }
-        if copy { TextInserter.copy(text) }
-        keepForTraining(item.id, samples: nil, rawText: output.text, finalText: text, model: output.model, appBundleID: item.appBundleId)
+        if copy { TextInserter.copy(text, html: processed.html) }
+        let recordingID = keepForTraining(item.id, samples: nil, rawText: output.text, finalText: text, model: output.model,
+                                          appBundleID: item.appBundleId)
         history.add(TranscriptHistoryItem(
             id: "transcript-\(item.createdAt)", createdAt: item.createdAt, text: text, backend: output.backend,
             location: output.placement == .remoteHost ? "remote-host" : "local", durationSeconds: item.durationSeconds,
             timings: DictationTimings(transcribeMs: output.modelMs, speechModelMs: output.modelMs, totalMs: 0),
-            model: output.model, appName: item.appName, appBundleId: item.appBundleId))
+            model: output.model, appName: item.appName, appBundleId: item.appBundleId, rawText: output.text,
+            cleanupEdits: processed.edits, style: resolution.style.rawValue, styleReason: resolution.reason, cleanupMs: cleanupMs,
+            recordingID: recordingID))
         onRecovered?(WordCounter.count(text), copy, output.placement)
         return true
     }

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Colours the update UI borrows from the app: its Crystal accent and warning colour.
@@ -161,6 +162,11 @@ public struct UpdateSidebarButton: View {
 /// "Bark 0.3.0 is available" with Update / Later, bottom-trailing over the content.
 /// Shown once per version; "Up to date" only after a check the person asked for.
 public struct UpdateToastView: View {
+    /// The toast's opaque card: #111111 in dark mode, white in light (the shared card token).
+    static let surface = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0x11 / 255, green: 0x11 / 255, blue: 0x11 / 255, alpha: 1) : .white
+    })
     var updates: UpdateController
     var style: UpdateStyle
 
@@ -208,7 +214,10 @@ public struct UpdateToastView: View {
             }
             .padding(14)
             .frame(width: 340)
-            .glassEffect(.regular, in: .rect(cornerRadius: 20))
+            // Opaque, like every surface: a card with a hairline and a soft drop shadow.
+            .background(Self.surface, in: .rect(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.primary.opacity(0.1)))
+            .shadow(color: .black.opacity(0.35), radius: 22, y: 12)
             .accessibilityElement(children: .contain)
             .id(toast.id)
         }
@@ -247,86 +256,5 @@ private struct UpdateToastModifier: ViewModifier {
             .onChange(of: updates.toast) { _, toast in
                 if let toast { AccessibilityNotification.Announcement(toast.title).post() }
             }
-    }
-}
-
-// MARK: - Settings
-
-/// Settings › Updates, as one Form section: version and channel, the Stable/Nightly picker with
-/// a line on the chosen one, the move-to-Stable note, status, last check, and Check for Updates.
-public struct UpdateSettingsSection: View {
-    var updates: UpdateController
-    var style: UpdateStyle
-
-    public init(updates: UpdateController, style: UpdateStyle) {
-        self.updates = updates
-        self.style = style
-    }
-
-    public var body: some View {
-        let p = updates.presentation
-        Section {
-            LabeledContent("Current version") {
-                Text("\(updates.currentVersion) (\(updates.build))")
-                    .monospacedDigit()
-                    .textSelection(.enabled)
-            }
-            Picker("Channel", selection: Binding(get: { updates.channel }, set: { updates.setChannel($0) })) {
-                ForEach(UpdateChannel.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .tint(style.accent)
-            .fixedSize()
-            VStack(alignment: .leading, spacing: 4) {
-                Text(updates.channel.explanation).foregroundStyle(.secondary)
-                if updates.showsMoveToStableNote {
-                    Label("You'll move to Stable with the next stable release", systemImage: "info.circle")
-                        .foregroundStyle(style.accent)
-                        .padding(.top, 2)
-                }
-            }
-            .font(.caption)
-            LabeledContent("Status") {
-                HStack(spacing: 8) {
-                    UpdateGlyph(presentation: p, style: style, size: 20)
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text(p.title)
-                        if updates.state != .idle && updates.state != .checking {
-                            Text(p.detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                        }
-                    }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(p.accessibilityLabel)
-            }
-            LabeledContent("Last checked") {
-                if let date = updates.lastChecked {
-                    Text(date.formatted(date: .abbreviated, time: .shortened))
-                } else {
-                    Text("Never")
-                }
-            }
-            HStack {
-                Spacer()
-                switch updates.state {
-                case .available(let version):
-                    Button("Install \(version)") { updates.installUpdate() }
-                        .buttonStyle(.glassProminent).tint(style.accent)
-                case .ready:
-                    Button("Restart to Update") { updates.relaunchToUpdate() }
-                        .buttonStyle(.glassProminent).tint(style.accent)
-                default:
-                    EmptyView()
-                }
-                Button(updates.state == .checking ? "Checking…" : "Check for Updates") { updates.checkForUpdates() }
-                    .buttonStyle(.glass)
-                    .disabled(updates.state == .checking || updates.state.primaryAction == .none)
-            }
-        } header: {
-            Text("Updates")
-        } footer: {
-            Text("Checks every 6 hours and asks before installing. Only updates signed by Bark install.")
-                .font(.caption).foregroundStyle(.secondary)
-        }
     }
 }

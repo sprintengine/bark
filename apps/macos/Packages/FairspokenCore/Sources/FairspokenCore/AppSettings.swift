@@ -137,8 +137,25 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Show the words in the recording pill while the user speaks (local transcription only;
     /// the host protocol has no partial results).
     public var showTextWhileSpeaking = true
+    /// Which style each app and website gets, and the default (`clean`).
+    public var styleRules = StyleRules()
+    /// Cleanup switches (Settings › Transcription): fillers, stutters and repeats.
+    public var cleanupFillers = true
+    /// Restarts and cue corrections ("no wait", "sorry", "scratch that").
+    public var cleanupSelfCorrections = true
+    /// Spoken punctuation and layout commands ("comma", "new line"), and the punctuation tidy.
+    public var cleanupSpokenCommands = true
 
     public init() {}
+
+    public var cleanupSettings: CleanupSettings {
+        get { CleanupSettings(removeFillers: cleanupFillers, fixSelfCorrections: cleanupSelfCorrections, spokenCommands: cleanupSpokenCommands) }
+        set {
+            cleanupFillers = newValue.removeFillers
+            cleanupSelfCorrections = newValue.fixSelfCorrections
+            cleanupSpokenCommands = newValue.spokenCommands
+        }
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -183,6 +200,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
         trainingDataFolder = c.lenient(String.self, .trainingDataFolder) ?? d.trainingDataFolder
         favoriteModels = c.lenient([String].self, .favoriteModels) ?? d.favoriteModels
         showTextWhileSpeaking = c.lenient(Bool.self, .showTextWhileSpeaking) ?? d.showTextWhileSpeaking
+        styleRules = c.lenient(StyleRules.self, .styleRules) ?? d.styleRules
+        cleanupFillers = c.lenient(Bool.self, .cleanupFillers) ?? d.cleanupFillers
+        cleanupSelfCorrections = c.lenient(Bool.self, .cleanupSelfCorrections) ?? d.cleanupSelfCorrections
+        cleanupSpokenCommands = c.lenient(Bool.self, .cleanupSpokenCommands) ?? d.cleanupSpokenCommands
         self = normalized()
     }
 
@@ -208,6 +229,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         if SpeechModelCatalog.model(id: s.model) == nil { s.model = SpeechModelCatalog.defaultModelID }
         var seen = Set<String>()
         s.favoriteModels = s.favoriteModels.filter { SpeechModelCatalog.model(id: $0) != nil && seen.insert($0).inserted }
+        s.styleRules = s.styleRules.normalized()
         return s
     }
 

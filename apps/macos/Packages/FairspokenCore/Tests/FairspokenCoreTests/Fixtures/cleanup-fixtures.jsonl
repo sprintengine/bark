@@ -1,0 +1,345 @@
+{"raw": "I think, um, we should go.", "expected": "I think we should go.", "category": "filler", "note": "um set off by commas is removed with both commas"}
+{"raw": "I went to the shop, um, and bought milk.", "expected": "I went to the shop, and bought milk.", "category": "filler", "note": "filler before a conjunction keeps the earlier comma"}
+{"raw": "I'll see you then, um.", "expected": "I'll see you then.", "category": "filler", "note": "filler that ended the sentence hands its full stop to the previous word"}
+{"raw": "Um, the results are back.", "expected": "The results are back.", "category": "filler", "note": "sentence-initial um removed and next word capitalised"}
+{"raw": "Uh, can you send me the minutes from Tuesday?", "expected": "Can you send me the minutes from Tuesday?", "category": "filler", "note": "sentence-initial uh before a question"}
+{"raw": "The patient reports, er, intermittent chest pain since Monday.", "expected": "The patient reports intermittent chest pain since Monday.", "category": "filler", "note": "er inside a clinic note"}
+{"raw": "Erm, I'm not sure that works for Siobhan.", "expected": "I'm not sure that works for Siobhan.", "category": "filler", "note": "sentence-initial erm"}
+{"raw": "Hmm, let me check the rota for next week.", "expected": "Let me check the rota for next week.", "category": "filler", "note": "hmm is a filler"}
+{"raw": "We could, uh, push the meeting to 3 pm.", "expected": "We could push the meeting to 3 pm.", "category": "filler", "note": "uh between modal and verb"}
+{"raw": "She said she'd uh ring back after lunch.", "expected": "She said she'd ring back after lunch.", "category": "filler", "note": "uh with no commas around it"}
+{"raw": "I need um the report by Friday.", "expected": "I need the report by Friday.", "category": "filler", "note": "um with no commas around it"}
+{"raw": "You know, the clinic was packed this morning.", "expected": "The clinic was packed this morning.", "category": "filler", "note": "sentence-initial 'You know,' is a filler"}
+{"raw": "It was, you know, a bit of a mess.", "expected": "It was a bit of a mess.", "category": "filler", "note": "', you know,' set off by commas is a filler"}
+{"raw": "I was, I mean, quite surprised by the results.", "expected": "I was quite surprised by the results.", "category": "filler", "note": "', I mean,' set off by commas with no typed repair is a filler"}
+{"raw": "Like, I haven't slept properly in weeks.", "expected": "I haven't slept properly in weeks.", "category": "filler", "note": "sentence-initial 'Like,' is a filler"}
+{"raw": "I'm just, like, so tired today.", "expected": "I'm just so tired today.", "category": "filler", "note": "', like,' before an intensifier is a filler"}
+{"raw": "The new rota is, like, really confusing.", "expected": "The new rota is really confusing.", "category": "filler", "note": "', like,' before an adverb is a filler"}
+{"raw": "Um, uh, I'll call you back.", "expected": "I'll call you back.", "category": "filler", "note": "two fillers in a row at the start"}
+{"raw": "Can you, um, forward that to Niamh?", "expected": "Can you forward that to Niamh?", "category": "filler", "note": "filler inside a question"}
+{"raw": "The bloods came back normal, um, but the ECG was abnormal.", "expected": "The bloods came back normal, but the ECG was abnormal.", "category": "filler", "note": "filler before 'but' keeps the earlier comma"}
+{"raw": "We'll head to Galway on Saturday, uh, or maybe Sunday.", "expected": "We'll head to Galway on Saturday, or maybe Sunday.", "category": "filler", "note": "filler before 'or' keeps the earlier comma"}
+{"raw": "Thanks for the update, erm.", "expected": "Thanks for the update.", "category": "filler", "note": "sentence-final erm"}
+{"raw": "I'm running late, um, so start without me.", "expected": "I'm running late, so start without me.", "category": "filler", "note": "filler before 'so' keeps the earlier comma"}
+{"raw": "Hmm, that's odd. Um, I'll look into it.", "expected": "That's odd. I'll look into it.", "category": "filler", "note": "fillers at the start of two sentences"}
+{"raw": "Er, is Mr Byrne coming in today?", "expected": "Is Mr Byrne coming in today?", "category": "filler", "note": "sentence-initial er before a question"}
+{"raw": "She's, you know, the one who runs the Cork office.", "expected": "She's the one who runs the Cork office.", "category": "filler", "note": "', you know,' mid-sentence"}
+{"raw": "We should, uh, probably tell Pádraig first.", "expected": "We should probably tell Pádraig first.", "category": "filler", "note": "uh before an adverb"}
+{"raw": "The parking in Leeds is, um, a nightmare.", "expected": "The parking in Leeds is a nightmare.", "category": "filler", "note": "um before a noun phrase"}
+{"raw": "Erm, Dr O'Connell will see you at 10.", "expected": "Dr O'Connell will see you at 10.", "category": "filler", "note": "sentence-initial erm before a name already capitalised"}
+{"raw": "I, um, think, uh, it's fine.", "expected": "I think it's fine.", "category": "filler", "note": "two separate fillers in one sentence"}
+{"raw": "That's grand, uh.", "expected": "That's grand.", "category": "filler", "note": "sentence-final uh"}
+{"raw": "Can you send the the report to Aoife?", "expected": "Can you send the report to Aoife?", "category": "repetition", "note": "doubled determiner"}
+{"raw": "I I I don't think that's right.", "expected": "I don't think that's right.", "category": "repetition", "note": "tripled pronoun stutter"}
+{"raw": "We need to, to finish this by Friday.", "expected": "We need to finish this by Friday.", "category": "repetition", "note": "repeat across a comma drops the comma too"}
+{"raw": "I think I think we should cancel.", "expected": "I think we should cancel.", "category": "repetition", "note": "repeated two-word phrase"}
+{"raw": "Take one tablet in the in the morning.", "expected": "Take one tablet in the morning.", "category": "repetition", "note": "repeated prepositional phrase"}
+{"raw": "The the patient was seen at 9.", "expected": "The patient was seen at 9.", "category": "repetition", "note": "sentence-initial doubled determiner keeps the capital"}
+{"raw": "It's it's not a problem.", "expected": "It's not a problem.", "category": "repetition", "note": "doubled contraction"}
+{"raw": "My my flight lands at 6 pm.", "expected": "My flight lands at 6 pm.", "category": "repetition", "note": "doubled possessive"}
+{"raw": "We'll we'll sort it out tomorrow.", "expected": "We'll sort it out tomorrow.", "category": "repetition", "note": "doubled contraction at sentence start"}
+{"raw": "Could you, could you check the rota?", "expected": "Could you check the rota?", "category": "repetition", "note": "repeated two words across a comma"}
+{"raw": "He's allergic to to penicillin.", "expected": "He's allergic to penicillin.", "category": "repetition", "note": "doubled preposition in a clinic note"}
+{"raw": "I was going to say, I was going to say it's fine.", "expected": "I was going to say it's fine.", "category": "repetition", "note": "repeated five-word phrase across a comma"}
+{"raw": "Is is Ciarán around?", "expected": "Is Ciarán around?", "category": "repetition", "note": "doubled auxiliary at the start of a question"}
+{"raw": "The meeting is on on Thursday.", "expected": "The meeting is on Thursday.", "category": "repetition", "note": "doubled preposition before a weekday"}
+{"raw": "And and then we went to Cork.", "expected": "And then we went to Cork.", "category": "repetition", "note": "doubled conjunction"}
+{"raw": "There's a, a problem with the printer.", "expected": "There's a problem with the printer.", "category": "repetition", "note": "doubled article across a comma"}
+{"raw": "We need we need more staff on the ward.", "expected": "We need more staff on the ward.", "category": "repetition", "note": "repeated subject and verb"}
+{"raw": "Tell Niamh I'm I'm running late.", "expected": "Tell Niamh I'm running late.", "category": "repetition", "note": "doubled contraction mid-sentence"}
+{"raw": "The blood pressure was was 140 over 90.", "expected": "The blood pressure was 140 over 90.", "category": "repetition", "note": "doubled verb before a reading"}
+{"raw": "Can we can we move it to Monday?", "expected": "Can we move it to Monday?", "category": "repetition", "note": "repeated question opener"}
+{"raw": "I just just want to check in.", "expected": "I just want to check in.", "category": "repetition", "note": "doubled adverb that is not an intensifier"}
+{"raw": "Thanks so much for for your help.", "expected": "Thanks so much for your help.", "category": "repetition", "note": "doubled preposition"}
+{"raw": "We need a feature where you can fix a sentence if the user says, where you can fix a sentence if the user says the wrong thing.", "expected": "We need a feature where you can fix a sentence if the user says the wrong thing.", "category": "restart", "note": "founder example: abandoned clause restarted with the same words"}
+{"raw": "I would have said where you could, where you can change it", "expected": "I would have said where you can change it", "category": "restart", "note": "partial restart: abandoned fragment ends on a modal"}
+{"raw": "Can you send the, can you send me the notes from clinic?", "expected": "Can you send me the notes from clinic?", "category": "restart", "note": "abandoned fragment ends on a determiner"}
+{"raw": "I was going to, I was hoping to leave early today.", "expected": "I was hoping to leave early today.", "category": "restart", "note": "abandoned fragment ends on 'to'"}
+{"raw": "The patient has been, the patient was seen by Dr O'Connell yesterday.", "expected": "The patient was seen by Dr O'Connell yesterday.", "category": "restart", "note": "abandoned fragment ends on an auxiliary"}
+{"raw": "Could you ask her to, could you ask Siobhan to ring me back?", "expected": "Could you ask Siobhan to ring me back?", "category": "restart", "note": "restart replaces a pronoun with a name"}
+{"raw": "We need to book the, we need to book a room for Thursday.", "expected": "We need to book a room for Thursday.", "category": "restart", "note": "abandoned fragment ends on 'the'"}
+{"raw": "She told me that she, she told me that the results were fine.", "expected": "She told me that the results were fine.", "category": "restart", "note": "abandoned fragment ends on a pronoun"}
+{"raw": "I'll send it over when I, I'll send it over tonight.", "expected": "I'll send it over tonight.", "category": "restart", "note": "abandoned fragment ends on 'I'"}
+{"raw": "Let's meet at the, let's meet in the café on Patrick Street.", "expected": "Let's meet in the café on Patrick Street.", "category": "restart", "note": "restart changes the preposition"}
+{"raw": "He should have, he should be here by 4.", "expected": "He should be here by 4.", "category": "restart", "note": "abandoned fragment ends on 'have'"}
+{"raw": "The appointment is for, the appointment is at 10:30 on Friday.", "expected": "The appointment is at 10:30 on Friday.", "category": "restart", "note": "abandoned fragment ends on a preposition"}
+{"raw": "Can you put me, can you put Aoife on the list?", "expected": "Can you put Aoife on the list?", "category": "restart", "note": "abandoned fragment ends on an object pronoun"}
+{"raw": "I think we could, I think we should leave it until Monday.", "expected": "I think we should leave it until Monday.", "category": "restart", "note": "restart swaps the modal"}
+{"raw": "Tell him that we, tell him that the delivery is late.", "expected": "Tell him that the delivery is late.", "category": "restart", "note": "abandoned fragment ends on 'we'"}
+{"raw": "We were going to the, we were going to Galway for the weekend.", "expected": "We were going to Galway for the weekend.", "category": "restart", "note": "abandoned fragment ends on 'the'"}
+{"raw": "Her blood sugar was, her blood sugar is stable now.", "expected": "Her blood sugar is stable now.", "category": "restart", "note": "abandoned fragment ends on 'was'"}
+{"raw": "I'd like to, I'd like you to review the draft.", "expected": "I'd like you to review the draft.", "category": "restart", "note": "abandoned fragment ends on 'to'"}
+{"raw": "The report should, the report will be ready by Friday.", "expected": "The report will be ready by Friday.", "category": "restart", "note": "abandoned fragment ends on 'should'"}
+{"raw": "If you can, if you could bring the forms with you.", "expected": "If you could bring the forms with you.", "category": "restart", "note": "restart of an if-clause, unlike 'If you can, you can come early'"}
+{"raw": "We need a system where the, we need a system where staff can swap shifts.", "expected": "We need a system where staff can swap shifts.", "category": "restart", "note": "long shared opening, fragment ends on 'the'"}
+{"raw": "Thanks for that. I'll get back to, I'll get back to you on Monday.", "expected": "Thanks for that. I'll get back to you on Monday.", "category": "restart", "note": "restart in the second sentence leaves the first alone"}
+{"raw": "Is there any way we can, is there any way we could move it?", "expected": "Is there any way we could move it?", "category": "restart", "note": "restart inside a question"}
+{"raw": "Let's meet on Tuesday, no wait, Wednesday.", "expected": "Let's meet on Wednesday.", "category": "selfCorrection", "note": "weekday repaired with 'no wait'"}
+{"raw": "Send it to John, sorry, Mary.", "expected": "Send it to Mary.", "category": "selfCorrection", "note": "name repaired with 'sorry'"}
+{"raw": "I'll be there at five. Scratch that. I'll be there at six.", "expected": "I'll be there at six.", "category": "selfCorrection", "note": "sentence-initial 'Scratch that' deletes the previous sentence"}
+{"raw": "The dose is 50 mg, I mean 25 mg, twice a day.", "expected": "The dose is 25 mg, twice a day.", "category": "selfCorrection", "note": "dose repaired with 'I mean', repair keeps its own comma"}
+{"raw": "See you on Tuesday. Sorry, Wednesday.", "expected": "See you on Wednesday.", "category": "selfCorrection", "note": "repair in the next sentence keeps its full stop, drops the first"}
+{"raw": "It costs 50 euros, sorry, 60.", "expected": "It costs 60 euros.", "category": "selfCorrection", "note": "number repair without a unit keeps the original unit"}
+{"raw": "The meeting is at 3 pm, sorry, 4 pm.", "expected": "The meeting is at 4 pm.", "category": "selfCorrection", "note": "time repaired with 'sorry'"}
+{"raw": "Book it for Thursday, no sorry, Friday.", "expected": "Book it for Friday.", "category": "selfCorrection", "note": "weekday repaired with 'no sorry'"}
+{"raw": "We're flying out on Tuesday, sorry, on Wednesday.", "expected": "We're flying out on Wednesday.", "category": "selfCorrection", "note": "repeated preposition: the wrong 'on' goes too"}
+{"raw": "Her review is in March, or rather April.", "expected": "Her review is in April.", "category": "selfCorrection", "note": "month repaired with 'or rather'"}
+{"raw": "Can you ring Aoife, sorry, Niamh?", "expected": "Can you ring Niamh?", "category": "selfCorrection", "note": "name repair inside a question"}
+{"raw": "Take 2 tablets, sorry, 1 tablet at night.", "expected": "Take 1 tablet at night.", "category": "selfCorrection", "note": "amount repair followed by the linking word 'at'"}
+{"raw": "The appointment is tomorrow, no wait, today at 2.", "expected": "The appointment is today at 2.", "category": "selfCorrection", "note": "tomorrow repaired to today"}
+{"raw": "I'll call Mr Byrne, sorry, Mr Kelly after lunch.", "expected": "I'll call Mr Kelly after lunch.", "category": "selfCorrection", "note": "title and surname repaired, followed by 'after'"}
+{"raw": "Put me down for 6 places, actually 8.", "expected": "Put me down for 8 places.", "category": "selfCorrection", "note": "'actually' before a same-type number repair, unit kept"}
+{"raw": "The flight leaves at 7:15, correction, 7:45.", "expected": "The flight leaves at 7:45.", "category": "selfCorrection", "note": "clock time repaired with 'correction'"}
+{"raw": "Let's say the 12th of June, sorry, July.", "expected": "Let's say the 12th of July.", "category": "selfCorrection", "note": "month repaired, day kept"}
+{"raw": "Her name is Sinéad, no sorry, Siobhan.", "expected": "Her name is Siobhan.", "category": "selfCorrection", "note": "name with a fada repaired"}
+{"raw": "I need a taxi, sorry, a lift to the station.", "expected": "I need a lift to the station.", "category": "selfCorrection", "note": "'a X' noun phrase repaired with 'a Y', followed by 'to'"}
+{"raw": "Grab the blue folder, sorry, the red folder from my desk.", "expected": "Grab the red folder from my desk.", "category": "selfCorrection", "note": "'the X' noun phrase repaired, followed by 'from'"}
+{"raw": "The clinic opens on Monday, I mean Tuesday.", "expected": "The clinic opens on Tuesday.", "category": "selfCorrection", "note": "weekday repaired with 'I mean'"}
+{"raw": "We'll need 20 chairs, no wait, 30 chairs.", "expected": "We'll need 30 chairs.", "category": "selfCorrection", "note": "count with unit repaired"}
+{"raw": "We should cancel the trip, scratch that, let's just postpone it.", "expected": "Let's just postpone it.", "category": "selfCorrection", "note": "mid-sentence 'scratch that' deletes back to the sentence start"}
+{"raw": "Tell Ciarán I'm free on Friday. Scratch that. Tell him I'm busy all week.", "expected": "Tell him I'm busy all week.", "category": "selfCorrection", "note": "'Scratch that' as its own sentence deletes the sentence before it"}
+{"raw": "The results were bad, let me rephrase, the results were not what we hoped.", "expected": "The results were not what we hoped.", "category": "selfCorrection", "note": "mid-sentence 'let me rephrase' deletes back to the sentence start"}
+{"raw": "I think we should hire two people. Let me rephrase. We need two more nurses on nights.", "expected": "We need two more nurses on nights.", "category": "selfCorrection", "note": "'Let me rephrase' as its own sentence deletes the previous sentence"}
+{"raw": "The total is £250, or rather £275.", "expected": "The total is £275.", "category": "selfCorrection", "note": "sterling amount repaired"}
+{"raw": "Pick me up at 8, sorry, 8:30.", "expected": "Pick me up at 8:30.", "category": "selfCorrection", "note": "hour repaired with a clock time"}
+{"raw": "Meet me in Cork, sorry, Galway on Saturday.", "expected": "Meet me in Galway on Saturday.", "category": "selfCorrection", "note": "place name repaired, followed by 'on'"}
+{"raw": "It's due on Friday, no wait, on Monday.", "expected": "It's due on Monday.", "category": "selfCorrection", "note": "repeated preposition with 'no wait'"}
+{"raw": "Her temperature was 38.5, sorry, 37.5.", "expected": "Her temperature was 37.5.", "category": "selfCorrection", "note": "decimal reading repaired"}
+{"raw": "Give him 5 ml, I mean 10 ml, every 4 hours.", "expected": "Give him 10 ml, every 4 hours.", "category": "selfCorrection", "note": "volume repaired, repair keeps its comma"}
+{"raw": "The deadline is the 3rd, correction, the 5th.", "expected": "The deadline is the 5th.", "category": "selfCorrection", "note": "ordinal date repaired with 'correction'"}
+{"raw": "Can you book the room for Wednesday, actually Thursday?", "expected": "Can you book the room for Thursday?", "category": "selfCorrection", "note": "'actually' before a weekday repair in a question"}
+{"raw": "I'll see Dr O'Connell, sorry, Dr Walsh at 11.", "expected": "I'll see Dr Walsh at 11.", "category": "selfCorrection", "note": "doctor's name repaired, followed by 'at'"}
+{"raw": "The order was for 12 boxes, no sorry, 15.", "expected": "The order was for 15 boxes.", "category": "selfCorrection", "note": "bare number repair keeps the unit 'boxes'"}
+{"raw": "Send the invoice to Pádraig, I mean Ciarán.", "expected": "Send the invoice to Ciarán.", "category": "selfCorrection", "note": "name repaired with 'I mean'"}
+{"raw": "We're closed on Monday, sorry, Tuesday and Wednesday.", "expected": "We're closed on Tuesday and Wednesday.", "category": "selfCorrection", "note": "repair followed by 'and'"}
+{"raw": "Let's do lunch on Thursday. No wait, Friday.", "expected": "Let's do lunch on Friday.", "category": "selfCorrection", "note": "sentence-initial 'No wait' repairs the previous sentence"}
+{"raw": "Ring me tomorrow, sorry, today if you can.", "expected": "Ring me today if you can.", "category": "selfCorrection", "note": "repair followed by 'if'"}
+{"raw": "Thanks Niamh. Send it to the whole team, scratch that.", "expected": "Thanks Niamh.", "category": "selfCorrection", "note": "sentence-final 'scratch that' deletes its own sentence only"}
+{"raw": "Book two tickets, sorry, three.", "expected": "Book three tickets.", "category": "selfCorrection", "note": "number word repaired, unit kept"}
+{"raw": "Hi Aoife comma can we meet on Friday question mark", "expected": "Hi Aoife, can we meet on Friday?", "category": "spokenCommand", "note": "comma and question mark commands"}
+{"raw": "Dear Mr Byrne comma new line thank you for your letter full stop", "expected": "Dear Mr Byrne,\nThank you for your letter.", "category": "spokenCommand", "note": "new line capitalises the next word"}
+{"raw": "Thanks for coming in today period see you next week period", "expected": "Thanks for coming in today. See you next week.", "category": "spokenCommand", "note": "period command capitalises the next sentence"}
+{"raw": "Patient seen in clinic today full stop new paragraph plan is to review in 2 weeks full stop", "expected": "Patient seen in clinic today.\n\nPlan is to review in 2 weeks.", "category": "spokenCommand", "note": "new paragraph gives a blank line"}
+{"raw": "Can you bring the forms question mark", "expected": "Can you bring the forms?", "category": "spokenCommand", "note": "question mark at the end"}
+{"raw": "We won the match exclamation mark", "expected": "We won the match!", "category": "spokenCommand", "note": "dictated exclamation mark"}
+{"raw": "Shopping list new line milk new line bread new line eggs", "expected": "Shopping list\nMilk\nBread\nEggs", "category": "spokenCommand", "note": "repeated new line builds a list"}
+{"raw": "Hi Siobhan comma new paragraph just a quick note about Thursday full stop", "expected": "Hi Siobhan,\n\nJust a quick note about Thursday.", "category": "spokenCommand", "note": "email greeting then paragraph"}
+{"raw": "The bloods are normal comma the ECG is fine full stop", "expected": "The bloods are normal, the ECG is fine.", "category": "spokenCommand", "note": "comma attaches with no space before it"}
+{"raw": "Are you free on Monday question mark if not comma Tuesday works full stop", "expected": "Are you free on Monday? If not, Tuesday works.", "category": "spokenCommand", "note": "capital after a question mark"}
+{"raw": "Thanks, Ciarán full stop", "expected": "Thanks, Ciarán.", "category": "spokenCommand", "note": "full stop after recogniser punctuation"}
+{"raw": "Kind regards comma new line Pádraig", "expected": "Kind regards,\nPádraig", "category": "spokenCommand", "note": "email sign-off"}
+{"raw": "Happy birthday Sinéad exclamation mark", "expected": "Happy birthday Sinéad!", "category": "spokenCommand", "note": "exclamation mark after a name"}
+{"raw": "Is the clinic open on Saturday question mark", "expected": "Is the clinic open on Saturday?", "category": "spokenCommand", "note": "question mark after a weekday"}
+{"raw": "Review in 6 weeks period new line Dr O'Connell", "expected": "Review in 6 weeks.\nDr O'Connell", "category": "spokenCommand", "note": "period then new line in a clinic note"}
+{"raw": "First point full stop new paragraph second point full stop", "expected": "First point.\n\nSecond point.", "category": "spokenCommand", "note": "two paragraphs"}
+{"raw": "I'll be in Leeds on Tuesday comma Wednesday and Thursday full stop", "expected": "I'll be in Leeds on Tuesday, Wednesday and Thursday.", "category": "spokenCommand", "note": "comma in a list, no Oxford comma added"}
+{"raw": "Did you get my email question mark let me know full stop", "expected": "Did you get my email? Let me know.", "category": "spokenCommand", "note": "question then statement"}
+{"raw": "Good morning all comma new paragraph the rota for December is attached full stop", "expected": "Good morning all,\n\nThe rota for December is attached.", "category": "spokenCommand", "note": "greeting, paragraph and full stop"}
+{"raw": "BP 130 over 80 comma pulse 72 full stop", "expected": "BP 130 over 80, pulse 72.", "category": "spokenCommand", "note": "commands after digits"}
+{"raw": "We did it exclamation mark see you all at the party full stop", "expected": "We did it! See you all at the party.", "category": "spokenCommand", "note": "capital after an exclamation mark"}
+{"raw": "Thanks again period new line Aoife", "expected": "Thanks again.\nAoife", "category": "spokenCommand", "note": "period then new line before a name"}
+{"raw": "Can you ring me back question mark new line thanks", "expected": "Can you ring me back?\nThanks", "category": "spokenCommand", "note": "question mark then new line capitalises"}
+{"raw": "I need to speak to the. Manager about it.", "expected": "I need to speak to the manager about it.", "category": "punctuation", "note": "stray full stop after 'the' removed, next word lowercased"}
+{"raw": "Thanks, And see you then.", "expected": "Thanks, and see you then.", "category": "punctuation", "note": "capitalised conjunction after a comma lowercased"}
+{"raw": "Hello , Niamh .", "expected": "Hello, Niamh.", "category": "punctuation", "note": "spaces before punctuation removed"}
+{"raw": "We're meeting at 3,, in the main office.", "expected": "We're meeting at 3, in the main office.", "category": "punctuation", "note": "doubled comma tidied"}
+{"raw": "That's the end of it,.", "expected": "That's the end of it.", "category": "punctuation", "note": "comma then full stop tidied to a full stop"}
+{"raw": "The results are  back from the  lab.", "expected": "The results are back from the lab.", "category": "punctuation", "note": "doubled spaces collapsed"}
+{"raw": "the bloods are back.", "expected": "The bloods are back.", "category": "punctuation", "note": "first letter of the text capitalised"}
+{"raw": "Can you pass on my. Thanks to Siobhan?", "expected": "Can you pass on my thanks to Siobhan?", "category": "punctuation", "note": "stray full stop after 'my'"}
+{"raw": "I was late because. The bus didn't come.", "expected": "I was late because the bus didn't come.", "category": "punctuation", "note": "stray full stop after 'because'"}
+{"raw": "It's bigger than. The last one.", "expected": "It's bigger than the last one.", "category": "punctuation", "note": "stray full stop after 'than'"}
+{"raw": "She's one of. The best nurses on the ward.", "expected": "She's one of the best nurses on the ward.", "category": "punctuation", "note": "stray full stop after 'of'"}
+{"raw": "Bring a. Coat, it's freezing in Galway.", "expected": "Bring a coat, it's freezing in Galway.", "category": "punctuation", "note": "stray full stop after 'a'"}
+{"raw": "Is that your. Car outside?", "expected": "Is that your car outside?", "category": "punctuation", "note": "stray full stop after 'your'"}
+{"raw": "I'll ring you later, But not before 6.", "expected": "I'll ring you later, but not before 6.", "category": "punctuation", "note": "capitalised 'But' after a comma lowercased"}
+{"raw": "Milk and. Bread, please.", "expected": "Milk and bread, please.", "category": "punctuation", "note": "stray full stop after 'and'"}
+{"raw": "great, thanks. see you on Monday.", "expected": "Great, thanks. See you on Monday.", "category": "punctuation", "note": "sentence starts capitalised"}
+{"raw": "Grand, So I'll see you at 7.", "expected": "Grand, so I'll see you at 7.", "category": "punctuation", "note": "capitalised 'So' after a comma lowercased"}
+{"raw": "No, Thursday is fine.", "expected": "No, Thursday is fine.", "category": "mustNotChange", "note": "bare 'no' answering a question is not a correction cue"}
+{"raw": "I actually liked it.", "expected": "I actually liked it.", "category": "mustNotChange", "note": "'actually' as an adverb"}
+{"raw": "Sorry I'm late.", "expected": "Sorry I'm late.", "category": "mustNotChange", "note": "apology, nothing to repair"}
+{"raw": "I mean it.", "expected": "I mean it.", "category": "mustNotChange", "note": "'I mean' as a verb phrase"}
+{"raw": "He said \"um, no wait, Tuesday\" and laughed.", "expected": "He said \"um, no wait, Tuesday\" and laughed.", "category": "mustNotChange", "note": "fillers and cues inside quoted speech stay"}
+{"raw": "She typed \"the the\" twice in the heading.", "expected": "She typed \"the the\" twice in the heading.", "category": "mustNotChange", "note": "repeat inside quotes stays"}
+{"raw": "The transcript reads \"I I I don't know\" at that point.", "expected": "The transcript reads \"I I I don't know\" at that point.", "category": "mustNotChange", "note": "stutter inside quotes stays"}
+{"raw": "Her text just said \"sorry, Monday\" and nothing else.", "expected": "Her text just said \"sorry, Monday\" and nothing else.", "category": "mustNotChange", "note": "cue inside quotes stays"}
+{"raw": "He always says \"you know\" at the end of every sentence.", "expected": "He always says \"you know\" at the end of every sentence.", "category": "mustNotChange", "note": "'you know' inside quotes stays"}
+{"raw": "It was very very busy in A and E today.", "expected": "It was very very busy in A and E today.", "category": "mustNotChange", "note": "intensifier 'very very'"}
+{"raw": "No no, that's grand, leave it with me.", "expected": "No no, that's grand, leave it with me.", "category": "mustNotChange", "note": "emphatic 'no no'"}
+{"raw": "Bye bye, see you on Tuesday.", "expected": "Bye bye, see you on Tuesday.", "category": "mustNotChange", "note": "'bye bye' is a set phrase"}
+{"raw": "I really really need a holiday.", "expected": "I really really need a holiday.", "category": "mustNotChange", "note": "intensifier 'really really'"}
+{"raw": "The film was only so so.", "expected": "The film was only so so.", "category": "mustNotChange", "note": "'so so' meaning mediocre"}
+{"raw": "Night night, Aoife, sleep well.", "expected": "Night night, Aoife, sleep well.", "category": "mustNotChange", "note": "'night night' is a set phrase"}
+{"raw": "She had had enough by Friday.", "expected": "She had had enough by Friday.", "category": "mustNotChange", "note": "grammatical 'had had'"}
+{"raw": "He said that that was the plan.", "expected": "He said that that was the plan.", "category": "mustNotChange", "note": "grammatical 'that that'"}
+{"raw": "What it is is a staffing problem.", "expected": "What it is is a staffing problem.", "category": "mustNotChange", "note": "grammatical 'is is'"}
+{"raw": "I know, I know, I'm late.", "expected": "I know, I know, I'm late.", "category": "mustNotChange", "note": "deliberate repeat for emphasis"}
+{"raw": "We need milk, we need bread and we need eggs.", "expected": "We need milk, we need bread and we need eggs.", "category": "mustNotChange", "note": "parallel list looks like a restart but is not"}
+{"raw": "If you can, you can come early.", "expected": "If you can, you can come early.", "category": "mustNotChange", "note": "conditional echo is not a restart"}
+{"raw": "I called Aoife, I called Niamh and I called Siobhan.", "expected": "I called Aoife, I called Niamh and I called Siobhan.", "category": "mustNotChange", "note": "parallel clauses with names"}
+{"raw": "I like it.", "expected": "I like it.", "category": "mustNotChange", "note": "'like' as a verb"}
+{"raw": "It looks like rain over Galway.", "expected": "It looks like rain over Galway.", "category": "mustNotChange", "note": "'like' as a preposition"}
+{"raw": "He was like ten minutes late.", "expected": "He was like ten minutes late.", "category": "mustNotChange", "note": "'like' meaning approximately"}
+{"raw": "There were about, like, ten people at the meeting.", "expected": "There were about, like, ten people at the meeting.", "category": "mustNotChange", "note": "', like,' before a number is ambiguous, keep it"}
+{"raw": "I'd like a table for 4 at 8 pm, please.", "expected": "I'd like a table for 4 at 8 pm, please.", "category": "mustNotChange", "note": "'would like' as a verb"}
+{"raw": "She sings like her mother.", "expected": "She sings like her mother.", "category": "mustNotChange", "note": "'like' as a preposition"}
+{"raw": "Like I said, the forms are on the front desk.", "expected": "Like I said, the forms are on the front desk.", "category": "mustNotChange", "note": "'Like I said' with no comma after 'Like'"}
+{"raw": "You know him, don't you?", "expected": "You know him, don't you?", "category": "mustNotChange", "note": "'you know' with an object"}
+{"raw": "Do you know, I never thought of that.", "expected": "Do you know, I never thought of that.", "category": "mustNotChange", "note": "'Do you know,' is not the filler"}
+{"raw": "As you know, the surgery closes at 1 on Thursdays.", "expected": "As you know, the surgery closes at 1 on Thursdays.", "category": "mustNotChange", "note": "'As you know,' is not the filler"}
+{"raw": "Let me know if you know anyone in Leeds.", "expected": "Let me know if you know anyone in Leeds.", "category": "mustNotChange", "note": "'you know' as a verb phrase"}
+{"raw": "You know what I mean?", "expected": "You know what I mean?", "category": "mustNotChange", "note": "'you know' and 'I mean' as verbs"}
+{"raw": "It actually works.", "expected": "It actually works.", "category": "mustNotChange", "note": "'actually' as an adverb"}
+{"raw": "Actually, Wednesday works better for me.", "expected": "Actually, Wednesday works better for me.", "category": "mustNotChange", "note": "repair followed by a verb is a new clause"}
+{"raw": "I actually think Siobhan is right about the rota.", "expected": "I actually think Siobhan is right about the rota.", "category": "mustNotChange", "note": "'actually' before a verb"}
+{"raw": "It's on Tuesday, actually.", "expected": "It's on Tuesday, actually.", "category": "mustNotChange", "note": "sentence-final 'actually' with nothing after it"}
+{"raw": "Sorry, Monday is a bank holiday.", "expected": "Sorry, Monday is a bank holiday.", "category": "mustNotChange", "note": "'Sorry,' as an apology before a day used normally"}
+{"raw": "Sorry, Aoife, I missed your call.", "expected": "Sorry, Aoife, I missed your call.", "category": "mustNotChange", "note": "'Sorry,' as an apology before a name"}
+{"raw": "See you on Monday. Sorry, Tuesday works better for me.", "expected": "See you on Monday. Sorry, Tuesday works better for me.", "category": "mustNotChange", "note": "repair followed by a verb: do nothing"}
+{"raw": "No wait, I'll do it myself.", "expected": "No wait, I'll do it myself.", "category": "mustNotChange", "note": "'No wait' followed by a clause, no typed repair"}
+{"raw": "No, sorry, I can't make it on Friday.", "expected": "No, sorry, I can't make it on Friday.", "category": "mustNotChange", "note": "apology followed by a clause"}
+{"raw": "Is it Tuesday? No, Wednesday.", "expected": "Is it Tuesday? No, Wednesday.", "category": "mustNotChange", "note": "question and answer, bare 'no' is not a cue"}
+{"raw": "On Monday, sorry to say, the clinic is closed.", "expected": "On Monday, sorry to say, the clinic is closed.", "category": "mustNotChange", "note": "'sorry to say' is not a cue"}
+{"raw": "Sorry for the delay, the printer jammed.", "expected": "Sorry for the delay, the printer jammed.", "category": "mustNotChange", "note": "'sorry for' is an apology"}
+{"raw": "I mean the one on the left, not the right.", "expected": "I mean the one on the left, not the right.", "category": "mustNotChange", "note": "'I mean' with an object, no reparandum"}
+{"raw": "I'd rather go on Friday.", "expected": "I'd rather go on Friday.", "category": "mustNotChange", "note": "'rather' without 'or'"}
+{"raw": "The correction is in the minutes.", "expected": "The correction is in the minutes.", "category": "mustNotChange", "note": "'correction' as a noun"}
+{"raw": "We issued a correction on Friday.", "expected": "We issued a correction on Friday.", "category": "mustNotChange", "note": "'correction' as a noun before a weekday"}
+{"raw": "I need to scratch that itch before the holidays.", "expected": "I need to scratch that itch before the holidays.", "category": "mustNotChange", "note": "'scratch that' as a literal verb phrase"}
+{"raw": "Let me rephrase the question for the patient.", "expected": "Let me rephrase the question for the patient.", "category": "mustNotChange", "note": "'let me rephrase' with an object is literal"}
+{"raw": "My number is 087 2 2 3 4 5 6 7.", "expected": "My number is 087 2 2 3 4 5 6 7.", "category": "mustNotChange", "note": "digit run in a phone number"}
+{"raw": "The door code is two two three.", "expected": "The door code is two two three.", "category": "mustNotChange", "note": "repeated number words in a code"}
+{"raw": "Ring the office on 021 4 4 4 5 5 5.", "expected": "Ring the office on 021 4 4 4 5 5 5.", "category": "mustNotChange", "note": "repeated digits in a phone number"}
+{"raw": "The extension is 4 4 0.", "expected": "The extension is 4 4 0.", "category": "mustNotChange", "note": "repeated digits in an extension"}
+{"raw": "New York, New York is her party song.", "expected": "New York, New York is her party song.", "category": "mustNotChange", "note": "repeated name in a title"}
+{"raw": "We saw Duran Duran in Leeds years ago.", "expected": "We saw Duran Duran in Leeds years ago.", "category": "mustNotChange", "note": "reduplicated band name"}
+{"raw": "They went to Bora Bora on honeymoon.", "expected": "They went to Bora Bora on honeymoon.", "category": "mustNotChange", "note": "reduplicated place name"}
+{"raw": "Prescribed amoxicillin 500 mg three times a day for 7 days.", "expected": "Prescribed amoxicillin 500 mg three times a day for 7 days.", "category": "mustNotChange", "note": "prescription line"}
+{"raw": "Bilateral basal crackles, no peripheral oedema.", "expected": "Bilateral basal crackles, no peripheral oedema.", "category": "mustNotChange", "note": "clinical findings with 'no'"}
+{"raw": "BP 145 over 92, recheck in 2 weeks.", "expected": "BP 145 over 92, recheck in 2 weeks.", "category": "mustNotChange", "note": "blood pressure reading"}
+{"raw": "HbA1c 58 mmol/mol, up from 52 in March.", "expected": "HbA1c 58 mmol/mol, up from 52 in March.", "category": "mustNotChange", "note": "lab value with units"}
+{"raw": "Query left ventricular hypertrophy on the ECG.", "expected": "Query left ventricular hypertrophy on the ECG.", "category": "mustNotChange", "note": "medical terms"}
+{"raw": "Tinnitus in the left ear for 3 months, no vertigo.", "expected": "Tinnitus in the left ear for 3 months, no vertigo.", "category": "mustNotChange", "note": "symptom history"}
+{"raw": "She was taken to the ER in Boston.", "expected": "She was taken to the ER in Boston.", "category": "mustNotChange", "note": "'ER' is an acronym, not a filler"}
+{"raw": "The UM team sent the figures over.", "expected": "The UM team sent the figures over.", "category": "mustNotChange", "note": "'UM' is an acronym, not a filler"}
+{"raw": "There's a 5 mm lesion on the left forearm.", "expected": "There's a 5 mm lesion on the left forearm.", "category": "mustNotChange", "note": "'mm' as millimetres"}
+{"raw": "Use the 10 mm drill bit for the brackets.", "expected": "Use the 10 mm drill bit for the brackets.", "category": "mustNotChange", "note": "'mm' as millimetres"}
+{"raw": "Uh-huh, that's right.", "expected": "Uh-huh, that's right.", "category": "mustNotChange", "note": "'uh-huh' is a reply, not a filler"}
+{"raw": "Bring an umbrella, it's lashing in Cork.", "expected": "Bring an umbrella, it's lashing in Cork.", "category": "mustNotChange", "note": "'um' inside a word"}
+{"raw": "The trial period ends on the 30th.", "expected": "The trial period ends on the 30th.", "category": "mustNotChange", "note": "literal 'period'"}
+{"raw": "There's a full stop missing at the end of the line.", "expected": "There's a full stop missing at the end of the line.", "category": "mustNotChange", "note": "literal 'full stop'"}
+{"raw": "Do you use the Oxford comma?", "expected": "Do you use the Oxford comma?", "category": "mustNotChange", "note": "literal 'comma'"}
+{"raw": "They're bringing out a new line of products in spring.", "expected": "They're bringing out a new line of products in spring.", "category": "mustNotChange", "note": "literal 'new line'"}
+{"raw": "There's a question mark over it.", "expected": "There's a question mark over it.", "category": "mustNotChange", "note": "literal 'question mark'"}
+{"raw": "The notice period is one month.", "expected": "The notice period is one month.", "category": "mustNotChange", "note": "literal 'period'"}
+{"raw": "Don't put an exclamation mark in a formal letter.", "expected": "Don't put an exclamation mark in a formal letter.", "category": "mustNotChange", "note": "literal 'exclamation mark'"}
+{"raw": "Send it to Niamh, Siobhan and Aoife.", "expected": "Send it to Niamh, Siobhan and Aoife.", "category": "mustNotChange", "note": "list of names, no cue"}
+{"raw": "Either 3 pm or 4 pm suits me.", "expected": "Either 3 pm or 4 pm suits me.", "category": "mustNotChange", "note": "two times offered, no cue"}
+{"raw": "We could meet on Tuesday or, if that fails, Wednesday.", "expected": "We could meet on Tuesday or, if that fails, Wednesday.", "category": "mustNotChange", "note": "alternative, not a correction"}
+{"raw": "The bloods came back normal this morning.", "expected": "The bloods came back normal this morning.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "Can you send me the minutes from Tuesday's meeting?", "expected": "Can you send me the minutes from Tuesday's meeting?", "category": "mustNotChange", "note": "ordinary question"}
+{"raw": "Mr Byrne is due in at half ten for his review.", "expected": "Mr Byrne is due in at half ten for his review.", "category": "mustNotChange", "note": "ordinary clinic sentence"}
+{"raw": "Dr O'Connell will be on leave from the 4th to the 11th of December.", "expected": "Dr O'Connell will be on leave from the 4th to the 11th of December.", "category": "mustNotChange", "note": "ordinary sentence with dates"}
+{"raw": "Thanks for your email, I'll have a look this afternoon.", "expected": "Thanks for your email, I'll have a look this afternoon.", "category": "mustNotChange", "note": "ordinary email line"}
+{"raw": "We're driving down to Cork on Saturday morning.", "expected": "We're driving down to Cork on Saturday morning.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "Please bring a list of your current medications.", "expected": "Please bring a list of your current medications.", "category": "mustNotChange", "note": "ordinary instruction"}
+{"raw": "The train from Leeds was delayed by 40 minutes.", "expected": "The train from Leeds was delayed by 40 minutes.", "category": "mustNotChange", "note": "ordinary sentence with a number"}
+{"raw": "Ciarán has agreed to cover the late shift on Friday.", "expected": "Ciarán has agreed to cover the late shift on Friday.", "category": "mustNotChange", "note": "ordinary sentence with a name"}
+{"raw": "The invoice for £350 is attached.", "expected": "The invoice for £350 is attached.", "category": "mustNotChange", "note": "ordinary sentence with an amount"}
+{"raw": "Take 2.5 mg once daily with food.", "expected": "Take 2.5 mg once daily with food.", "category": "mustNotChange", "note": "ordinary dosing line"}
+{"raw": "Sinéad, can you check the stock levels before Monday?", "expected": "Sinéad, can you check the stock levels before Monday?", "category": "mustNotChange", "note": "ordinary question with a vocative"}
+{"raw": "Pádraig is presenting the quarterly figures at 11.", "expected": "Pádraig is presenting the quarterly figures at 11.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "I'll be working from home on Wednesday.", "expected": "I'll be working from home on Wednesday.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "Her next appointment is on the 14th of January at 9:15.", "expected": "Her next appointment is on the 14th of January at 9:15.", "category": "mustNotChange", "note": "ordinary sentence with a date and time"}
+{"raw": "The heating in the Galway office is broken again.", "expected": "The heating in the Galway office is broken again.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "Could you print three copies of the agenda?", "expected": "Could you print three copies of the agenda?", "category": "mustNotChange", "note": "ordinary question"}
+{"raw": "The patient denies any chest pain or shortness of breath.", "expected": "The patient denies any chest pain or shortness of breath.", "category": "mustNotChange", "note": "ordinary clinic note"}
+{"raw": "We're out of milk, can you grab some on the way home?", "expected": "We're out of milk, can you grab some on the way home?", "category": "mustNotChange", "note": "ordinary chat line"}
+{"raw": "The new starter, Niamh, begins on Monday.", "expected": "The new starter, Niamh, begins on Monday.", "category": "mustNotChange", "note": "ordinary sentence with an appositive"}
+{"raw": "Let's aim to have the draft finished by the end of the week.", "expected": "Let's aim to have the draft finished by the end of the week.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "Siobhan's flight lands in Dublin at 6:40.", "expected": "Siobhan's flight lands in Dublin at 6:40.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "Allergic to penicillin, causes a rash.", "expected": "Allergic to penicillin, causes a rash.", "category": "mustNotChange", "note": "ordinary clinic note"}
+{"raw": "Thanks a million, that's a great help.", "expected": "Thanks a million, that's a great help.", "category": "mustNotChange", "note": "ordinary thanks"}
+{"raw": "The car park will be closed for resurfacing on Thursday.", "expected": "The car park will be closed for resurfacing on Thursday.", "category": "mustNotChange", "note": "ordinary notice"}
+{"raw": "Swelling has reduced since the last visit.", "expected": "Swelling has reduced since the last visit.", "category": "mustNotChange", "note": "ordinary clinic note"}
+{"raw": "I've booked the room for 2 to 4 on Tuesday.", "expected": "I've booked the room for 2 to 4 on Tuesday.", "category": "mustNotChange", "note": "ordinary sentence with a time range"}
+{"raw": "Is there any update on the planning application?", "expected": "Is there any update on the planning application?", "category": "mustNotChange", "note": "ordinary question"}
+{"raw": "Aoife and I will meet the client in Belfast.", "expected": "Aoife and I will meet the client in Belfast.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "Referred to dermatology for a second opinion.", "expected": "Referred to dermatology for a second opinion.", "category": "mustNotChange", "note": "ordinary clinic note"}
+{"raw": "Tickets are €45 each, or €80 for two.", "expected": "Tickets are €45 each, or €80 for two.", "category": "mustNotChange", "note": "ordinary sentence with amounts"}
+{"raw": "The lab closes at 4:30 on Fridays.", "expected": "The lab closes at 4:30 on Fridays.", "category": "mustNotChange", "note": "ordinary sentence"}
+{"raw": "Did you know the office is moving to Leeds?", "expected": "Did you know the office is moving to Leeds?", "category": "mustNotChange", "note": "ordinary question with 'you know' inside"}
+{"raw": "Grand, see you at 8 so.", "expected": "Grand, see you at 8 so", "category": "casual", "note": "casual: words kept, the full stop dropped on a short single message", "style": "casual"}
+{"raw": "No bother, talk later.", "expected": "No bother, talk later", "category": "casual", "note": "casual: words kept, the full stop dropped on a short single message", "style": "casual"}
+{"raw": "Ha, that's brilliant.", "expected": "Ha, that's brilliant", "category": "casual", "note": "casual: words kept, the full stop dropped on a short single message", "style": "casual"}
+{"raw": "Running a bit behind, be there in 10.", "expected": "Running a bit behind, be there in 10", "category": "casual", "note": "casual: words kept, the full stop dropped on a short single message", "style": "casual"}
+{"raw": "Can you send me the rota?", "expected": "Can you send me the rota?", "category": "casual", "note": "casual keeps a question mark", "style": "casual"}
+{"raw": "Running late. Start without me.", "expected": "Running late. Start without me.", "category": "casual", "note": "casual keeps full stops when there is more than one sentence", "style": "casual"}
+{"raw": "um, see you at 6, no wait, 7.", "expected": "see you at 7", "category": "casual", "note": "casual cleans fillers and corrections but keeps the speaker's lowercase start", "style": "casual"}
+{"raw": "I'll take the car, sorry, the dog needs walking.", "expected": "I'll take the car, sorry, the dog needs walking.", "category": "mustNotChange", "note": "repair followed by a verb starts a new clause"}
+{"raw": "I'll ring him, I'll ring her as well.", "expected": "I'll ring him, I'll ring her as well.", "category": "mustNotChange", "note": "two calls, not a restart"}
+{"raw": "He was born in May, sorry to say.", "expected": "He was born in May, sorry to say.", "category": "mustNotChange", "note": "sorry to say is an idiom"}
+{"raw": "Tell Mark, sorry, I forgot to say.", "expected": "Tell Mark, sorry, I forgot to say.", "category": "mustNotChange", "note": "sorry before a new clause"}
+{"raw": "I was there on Monday, actually Tuesday was the day.", "expected": "I was there on Monday, actually Tuesday was the day.", "category": "mustNotChange", "note": "repair followed by a verb"}
+{"raw": "Meet me at 3, or rather whenever suits you.", "expected": "Meet me at 3, or rather whenever suits you.", "category": "mustNotChange", "note": "or rather without a typed repair"}
+{"raw": "Room 4, sorry, room 5 is free.", "expected": "Room 4, sorry, room 5 is free.", "category": "mustNotChange", "note": "lowercase noun repair is not typed"}
+{"raw": "I said no, no, no.", "expected": "I said no, no, no.", "category": "mustNotChange", "note": "repeated no is emphasis"}
+{"raw": "Bye bye now.", "expected": "Bye bye now.", "category": "mustNotChange", "note": "bye bye is a word"}
+{"raw": "She had had enough by then.", "expected": "She had had enough by then.", "category": "mustNotChange", "note": "had had is grammatical"}
+{"raw": "What it is is a scheduling problem.", "expected": "What it is is a scheduling problem.", "category": "mustNotChange", "note": "is is is grammatical after it"}
+{"raw": "Come in in five minutes.", "expected": "Come in in five minutes.", "category": "mustNotChange", "note": "in in after a verb particle"}
+{"raw": "Log on on Monday morning.", "expected": "Log on on Monday morning.", "category": "mustNotChange", "note": "on on after a verb particle"}
+{"raw": "Is that that report you mentioned?", "expected": "Is that that report you mentioned?", "category": "mustNotChange", "note": "that that mid-sentence"}
+{"raw": "The full stop at the end is missing.", "expected": "The full stop at the end is missing.", "category": "mustNotChange", "note": "full stop as a noun"}
+{"raw": "Add a comma after Dublin.", "expected": "Add a comma after Dublin.", "category": "mustNotChange", "note": "comma as a noun after a"}
+{"raw": "Use comma separated values for the export.", "expected": "Use comma separated values for the export.", "category": "mustNotChange", "note": "comma separated"}
+{"raw": "Put a new line in the address.", "expected": "Put a new line in the address.", "category": "mustNotChange", "note": "new line as a noun"}
+{"raw": "The new line manager starts on Monday.", "expected": "The new line manager starts on Monday.", "category": "mustNotChange", "note": "new line manager"}
+{"raw": "We discussed period pain and cramps.", "expected": "We discussed period pain and cramps.", "category": "mustNotChange", "note": "period pain is not a command"}
+{"raw": "My period was late this month.", "expected": "My period was late this month.", "category": "mustNotChange", "note": "my period"}
+{"raw": "Like I said, the results are fine.", "expected": "Like I said, the results are fine.", "category": "mustNotChange", "note": "like I said"}
+{"raw": "It's like, a mile away.", "expected": "It's like, a mile away.", "category": "mustNotChange", "note": "like before an amount phrase"}
+{"raw": "Thanks Siobhan, sorry Pádraig asked me to tell you.", "expected": "Thanks Siobhan, sorry Pádraig asked me to tell you.", "category": "mustNotChange", "note": "sorry before a clause with a name subject"}
+{"raw": "On Monday, actually, the clinic is closed.", "expected": "On Monday, actually, the clinic is closed.", "category": "mustNotChange", "note": "actually before a clause"}
+{"raw": "I'd say 10, actually 10 is too many.", "expected": "I'd say 10, actually 10 is too many.", "category": "mustNotChange", "note": "repair followed by a verb"}
+{"raw": "Don't scratch that, it'll get infected.", "expected": "Don't scratch that, it'll get infected.", "category": "mustNotChange", "note": "scratch that as an instruction"}
+{"raw": "Let me rephrase the question for you.", "expected": "Let me rephrase the question for you.", "category": "mustNotChange", "note": "let me rephrase as a request"}
+{"raw": "That's correct, actually.", "expected": "That's correct, actually.", "category": "mustNotChange", "note": "actually at the end"}
+{"raw": "Wait, is it Tuesday or Wednesday?", "expected": "Wait, is it Tuesday or Wednesday?", "category": "mustNotChange", "note": "wait at the start"}
+{"raw": "I'll wait, Friday is fine.", "expected": "I'll wait, Friday is fine.", "category": "mustNotChange", "note": "wait as a verb"}
+{"raw": "He's a big, big man.", "expected": "He's a big, big man.", "category": "mustNotChange", "note": "big big is emphasis"}
+{"raw": "It was a long, long day.", "expected": "It was a long, long day.", "category": "mustNotChange", "note": "long long is emphasis"}
+{"raw": "Many, many thanks for this.", "expected": "Many, many thanks for this.", "category": "mustNotChange", "note": "many many is emphasis"}
+{"raw": "Tell her her results are back.", "expected": "Tell her her results are back.", "category": "mustNotChange", "note": "her her is grammatical"}
+{"raw": "I told you you were right.", "expected": "I told you you were right.", "category": "mustNotChange", "note": "you you is grammatical"}
+{"raw": "Two, two three four five six.", "expected": "Two, two three four five six.", "category": "mustNotChange", "note": "digits read out"}
+{"raw": "Send it to Dr O'Connell, sorry, Dr O'Connell's secretary.", "expected": "Send it to Dr O'Connell, sorry, Dr O'Connell's secretary.", "category": "mustNotChange", "note": "possessive repair is left alone"}
+{"raw": "We'll go on Tuesday or Wednesday.", "expected": "We'll go on Tuesday or Wednesday.", "category": "mustNotChange", "note": "or is an alternative, not a cue"}
+{"raw": "I can do Tuesday, no Wednesday.", "expected": "I can do Tuesday, no Wednesday.", "category": "mustNotChange", "note": "no alone is not a cue"}
+{"raw": "The ER was busy last night.", "expected": "The ER was busy last night.", "category": "mustNotChange", "note": "ER is an acronym"}
+{"raw": "A 5 mm lesion on the left forearm.", "expected": "A 5 mm lesion on the left forearm.", "category": "mustNotChange", "note": "mm is millimetres"}
+{"raw": "He said \"I mean it\" twice.", "expected": "He said \"I mean it\" twice.", "category": "mustNotChange", "note": "quoted I mean"}
+{"raw": "Ask Mary, sorry, ask John.", "expected": "Ask Mary, sorry, ask John.", "category": "mustNotChange", "note": "repair is not a typed phrase"}
+{"raw": "I need the red one, I mean the blue one is better.", "expected": "I need the red one, I mean the blue one is better.", "category": "mustNotChange", "note": "repair followed by a verb"}
+{"raw": "Thursday, the 3rd, sorry to bother you.", "expected": "Thursday, the 3rd, sorry to bother you.", "category": "mustNotChange", "note": "sorry to"}
+{"raw": "The meeting is at 3, sorry I'm late with this.", "expected": "The meeting is at 3, sorry I'm late with this.", "category": "mustNotChange", "note": "sorry I'm"}
+{"raw": "So, so many people came.", "expected": "So, so many people came.", "category": "mustNotChange", "note": "so so with a comma"}
+{"raw": "It's so so, nothing special.", "expected": "It's so so, nothing special.", "category": "mustNotChange", "note": "so so means mediocre"}
+{"raw": "Wait — really?", "expected": "Wait — really?", "category": "mustNotChange", "note": "a dash standing alone keeps the word before it"}
+{"raw": "Fine – see you there.", "expected": "Fine – see you there.", "category": "mustNotChange", "note": "an en dash standing alone keeps the word before it"}
+{"raw": "I love you. I love you more every day.", "expected": "I love you. I love you more every day.", "category": "mustNotChange", "note": "a finished sentence repeated as the start of the next is not a restart"}
+{"raw": "Call me tomorrow. Call me tomorrow if you can't make it.", "expected": "Call me tomorrow. Call me tomorrow if you can't make it.", "category": "mustNotChange", "note": "a finished sentence is never taken as an abandoned clause"}
+{"raw": "I can't do Monday, sorry. Tuesday?", "expected": "I can't do Monday, sorry. Tuesday?", "category": "mustNotChange", "note": "sorry ending its sentence is an apology"}
+{"raw": "Not the red one, sorry. The blue one.", "expected": "Not the red one, sorry. The blue one.", "category": "mustNotChange", "note": "sorry ending its sentence before a noun phrase"}
+{"raw": "I can't make 5, sorry. 6?", "expected": "I can't make 5, sorry. 6?", "category": "mustNotChange", "note": "sorry ending its sentence before a number"}
+{"raw": "If you need it, it is in the drawer.", "expected": "If you need it, it is in the drawer.", "category": "mustNotChange", "note": "a comma closing an if clause separates two words"}
+{"raw": "If you like this, this one is better.", "expected": "If you like this, this one is better.", "category": "mustNotChange", "note": "a comma closing an if clause separates two words"}
+{"raw": "They cost five euros each. The total is ten.", "expected": "They cost five euros each. The total is ten.", "category": "mustNotChange", "note": "each can end a sentence"}
+{"raw": "That's all I can think of. The rest is fine.", "expected": "That's all I can think of. The rest is fine.", "category": "mustNotChange", "note": "of can end a sentence"}
+{"raw": "Take vitamin A. The dose is small.", "expected": "Take vitamin A. The dose is small.", "category": "mustNotChange", "note": "a capital A is a letter, not the article"}
+{"raw": "We need new line items in the budget.", "expected": "We need new line items in the budget.", "category": "mustNotChange", "note": "new line items is a noun phrase"}
+{"raw": "Can you get me a quote for the roof? Um, the the gutters too.", "expected": "Can you get me a quote for the roof? The gutters too.", "category": "filler", "note": "the noun quote does not stop the rest being cleaned"}
+{"raw": "Ring Dr. Byrne about the results, e.g. the bloods.", "expected": "Ring Dr. Byrne about the results, e.g. the bloods.", "category": "mustNotChange", "note": "abbreviations don't start a sentence, so nothing after them is capitalised"}
+{"raw": "Ask Mr. O'Connell, i.e. the new consultant, to call me.", "expected": "Ask Mr. O'Connell, i.e. the new consultant, to call me.", "category": "mustNotChange", "note": "i.e. keeps the next word lowercase"}
+{"raw": "The clinic on St. Patrick's Road opens at 9 a.m. tomorrow.", "expected": "The clinic on St. Patrick's Road opens at 9 a.m. tomorrow.", "category": "mustNotChange", "note": "St. and a.m. mid-sentence"}

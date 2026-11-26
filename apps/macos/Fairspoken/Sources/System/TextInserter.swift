@@ -37,25 +37,33 @@ enum TextInserter {
 
     /// `expectedApp` is the app that was frontmost when recording started. If another app is in
     /// front now, the text is still pasted but the old clipboard is not put back, so the
-    /// dictation stays recoverable if it landed somewhere unexpected.
+    /// dictation stays recoverable if it landed somewhere unexpected. With `requireExpectedApp`
+    /// (pasting a dictation again into its app) it is copied instead.
+    ///
+    /// With `html`, the pasteboard gets one item carrying both the HTML and the plain text, so
+    /// apps that take rich text paste the layout and the rest paste the words.
+    ///
     /// `commit` is asked just before the text is first written anywhere (after the waits for
     /// the keys and the focus). A dictation cancelled meanwhile (Escape) lands nowhere; one
     /// that must not be pasted any more is copied. Once it says `deliver` or `copyOnly` the
     /// dictation can no longer be cancelled.
-    static func deliver(_ text: String, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?,
-                        commit: () -> Commit = { .deliver }) async -> Outcome {
+    static func deliver(_ text: String, html: String? = nil, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?,
+                        requireExpectedApp: Bool = false, commit: () -> Commit = { .deliver }) async -> Outcome {
         let pasteboard = NSPasteboard.general
+        func write(_ text: String, to pasteboard: NSPasteboard, transient: Bool, plainOnly: Bool = false) {
+            Self.write(text, html: plainOnly ? nil : html, to: pasteboard, transient: transient)
+        }
         /// Nil to go on and paste; otherwise what became of it.
-        func committed(copyReason: String?) -> Outcome? {
+        func committed(copyReason: String?, plainOnly: Bool = false) -> Outcome? {
             switch commit() {
             case .withdraw:
                 return .withdrawn
             case .copyOnly(let reason):
-                write(text, to: pasteboard, transient: false)
+                write(text, to: pasteboard, transient: false, plainOnly: plainOnly)
                 return .copied(reason: reason)
             case .deliver:
                 guard let copyReason else { return nil }
-                write(text, to: pasteboard, transient: false)
+                write(text, to: pasteboard, transient: false, plainOnly: plainOnly)
                 return .copied(reason: copyReason)
             }
         }
@@ -69,7 +77,8 @@ enum TextInserter {
         // the shortcut, and ⌘V goes to whatever is in front once it is up.
         await waitForModifierRelease(timeout: .milliseconds(800))
         if IsSecureEventInputEnabled() || focusedElementIsSecure() {
-            return committed(copyReason: "Copied — secure field") ?? .withdrawn
+            // Never rich text into a secure field.
+            return committed(copyReason: "Copied — secure field", plainOnly: true) ?? .withdrawn
         }
 
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
@@ -88,8 +97,13 @@ enum TextInserter {
         }
 
         let switchedApps = expectedApp != nil && front != expectedApp
+        if switchedApps && requireExpectedApp {
+            write(text, to: pasteboard, transient: false)
+            return .copied(reason: switchedDuringCheckReason)
+        }
         let saved = restoreClipboard && !switchedApps ? snapshot(pasteboard) : nil
-        write(text, to: pasteboard, transient: saved != nil)
+        // The layout was made for the app the recording started in: elsewhere, words only.
+        Self.write(text, html: switchedApps ? nil : html, to: pasteboard, transient: saved != nil)
         let ourChange = pasteboard.changeCount
         postCommandV()
 
@@ -104,14 +118,23 @@ enum TextInserter {
         return .pasted
     }
 
-    static func copy(_ text: String) {
-        write(text, to: .general, transient: false)
+    static func copy(_ text: String, html: String? = nil) {
+        write(text, html: html, to: .general, transient: false)
     }
 
-    private static func write(_ text: String, to pasteboard: NSPasteboard, transient: Bool) {
+    private static func write(_ text: String, html: String?, to pasteboard: NSPasteboard, transient: Bool) {
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        if transient { pasteboard.setData(Data(), forType: transientType) }
+        guard let html else {
+            pasteboard.setString(text, forType: .string)
+            if transient { pasteboard.setData(Data(), forType: transientType) }
+            return
+        }
+        let item = NSPasteboardItem()
+        // The charset declaration keeps non-ASCII text (fadas, curly quotes) intact in every reader.
+        item.setString("<meta charset=\"utf-8\">" + html, forType: .html)
+        item.setString(text, forType: .string)
+        if transient { item.setData(Data(), forType: transientType) }
+        pasteboard.writeObjects([item])
     }
 
     private static func snapshot(_ pasteboard: NSPasteboard) -> [[NSPasteboard.PasteboardType: Data]] {

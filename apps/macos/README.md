@@ -5,7 +5,7 @@ Swift packages:
 
 | App | Bundle id (Release / Debug) | What it is |
 |---|---|---|
-| **Bark** (`Bark.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a black-and-white dashboard with one pink accent beside a native, collapsible sidebar (Home, with the dog banner, Models, Post-training, Settings), a setup guide, a floating recording pill, and optional transcription on your own host |
+| **Bark** (`Bark.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a main window with the dictation history as a thread list down the left and each dictation opened as a conversation (true-black, one blue), a setup guide, a floating recording pill, and optional transcription on your own host |
 | **Bark Server** (`Bark Server.app`, scheme `FairspokenServer`) | `ie.fairspoken.server` / `.dev` | A transcription server for a practice or a team: the host protocol of `src-tauri/src/host/PROTOCOL.md` on Parakeet and the Neural Engine, with a live view of who is dictating, models, configuration and the address clients need |
 
 Bark (Mac), the Windows and Linux desktop app and the web dashboard all talk to Bark
@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Bark,Bark Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (255), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
+scripts/test.sh                       # unit tests: FairspokenCore (304), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Bark → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Bark Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Bark-<version>-macos-arm64.{zip,dmg}
@@ -88,8 +88,10 @@ path and macOS build); later launches load in under a second.
 1. **App** (default): a menu-bar item (status, server address, copy token, start/stop, start at
    login) and a window: Activity (counters and the live constellation of clients → queue → workers →
    models), Clients, Models (download, delete, per-worker model), Connect (address, token, QR code)
-   and Configuration. The toolbar's Live/Demo switch shows a simulated practice server instead of
-   this one (the real server keeps serving). The window reads the host in-process: the same snapshot
+   and Configuration, in the same look as Bark: a solid sidebar of sections and a top bar with the
+   serving status, Live or Demo and Start or Stop; Configuration is grouped cards of divided rows.
+   The top bar's Live/Demo switch shows a simulated practice server instead of this one (the real
+   server keeps serving). The window reads the host in-process: the same snapshot
    and event frames as `/v1/events`, decoded by the `HostEvent`/`HostLiveState` code in FairspokenCore.
 2. **Start at login**: Configuration › This Mac › Start at login (`SMAppService.mainApp`). The app
    opens in the menu bar when you log in; System Settings › General › Login Items lists it.
@@ -166,10 +168,92 @@ real HTTP server, queue and workers over a stub engine, for protocol work withou
 
 ## Bark (dictation client)
 
-Settings › Transcription › **Network device** holds the host URL, token (Keychain) and timeout, a Test
-connection button and a status line such as "Using host: practice-mini.local:48173 · connected"
+### The window
+
+True-black ground, a thread list down the left, a conversation in the middle, and one blue for the
+thing you are about to do. Surfaces step up in white from black: cards and the composer at #111111,
+what you said at #1e1e1e, the selected row at #191a1d, with 8% white hairlines; text in three greys
+(#f5f5f5, #a3a3a3, #8f8f8f); the primary blue #346bf1; blue and orange for what was added and removed;
+red only for a live microphone. Corners are 8 pt (controls), 12 pt (cards) and 16 pt (the composer);
+type is the system font with system mono for data. Light mode keeps the same structure on a near-white
+ground. Every surface is opaque: nothing behind the window shows through. No gradients, no green.
+The tokens live in `FairspokenUI/Theme.swift` (`Crystal`, `Radius`, `TypeScale`), each with an
+Increase Contrast variant, and every text colour holds 4.5:1 on the surfaces it sits on.
+
+- **Sidebar.** Bark's name beside the traffic lights and the sidebar's button (⌃⌘S); search over the
+  history (⌘F; a filter for notes and for dictations that went to the clipboard; its ⌘K opens the palette); the history grouped
+  Today, Yesterday, Previous 7 days and Earlier. Each row: the app as a two-letter tile (a website by
+  its name), how long ago, the first line, and the style and word count; "Clipboard" when nothing could
+  take the paste; copy and retry under the pointer. ↑ and ↓ move through it, ⏎ edits the open one,
+  ⌫ deletes it after asking, esc goes back to Home. At the foot: the model and whether it's ready, then
+  Home, Models, Post-training and Settings.
+- **Home** is the new-dictation screen: how to dictate, a composer ("Try it here") to type or dictate
+  into and keep as a note (⌘⏎), the keyboard hints, the week in four numbers (words, time saved, which
+  opens the speed test, average pace, the share cleanup took out) and the model, with Bark Server when
+  one is set up. Before setup is finished, what's missing takes the numbers' place; dictations still to
+  transcribe come first.
+- **A dictation, opened**: what you said in a grey bubble with the words cleanup took out dimmed, what
+  was pasted as the reply, then "Cleaned up in N ms", which opens a table of the changes, the style and
+  why, and a word diff (blue added, orange removed; worked out from the words as heard when no edits
+  were recorded). Beside it an actions card: open the app, copy (⇧⌘C), paste again, edit, the style,
+  restyle (the style is a menu: another style runs the formatter again on what was heard and saves
+  the result; Always Use makes it the rule for the app or site), transcribe again from a kept
+  post-training recording, add a name-like word to the Dictionary, delete. A composer docked at the bottom
+  corrects the text: click in, change it, ⏎ saves it to history. Typed over the text, a command
+  ("change Tuesday to Friday", "delete really", "add see you then at the end") is applied instead,
+  when what it names appears exactly once (`NoteEditCommand`).
+- **⌘K** opens a palette over the window: one field, results under small labels. Dictations by their
+  words and app (the words searched for underlined), then actions (new dictation, paste or copy the last
+  dictation, the model library), Settings pages, the speech model and the default style. Every word typed
+  must match; a whole word beats the start of one, which beats the middle; ties keep the newest first
+  (`PaletteSearch`). ↑↓ move, ⏎ opens, ⌘C copies a dictation's text, esc closes.
+- **The menu-bar menu** is a native menu led by two views of Bark's own: the status (ready or listening,
+  the model and where it runs, how to dictate) and the last dictation, which copies on a click. Then
+  Start Dictation and Paste Last Dictation with their shortcuts, the microphone and where transcription
+  runs (submenus), Open Bark, Settings, updates and Quit.
+- **Paste last dictation** (⌥⇧V, from the menu bar or ⌘K) pastes the newest dictation again into the app
+  in front, as Paste again does: only if that app is still in front when ⌘V goes and has a text field,
+  otherwise it is left on the clipboard. From Bark's own window it goes to the app it was dictated into.
+
+- **Settings** has its own sidebar in place of the thread list: search (⌘F; it matches rows on every
+  page and shows them live, each page listed with how many rows match), the pages, and Back to Bark
+  (esc). Pages are grouped cards of divided rows (title, a one-line description, the control on the
+  right; the switches are the only blue), built from `SettingsKit` in FairspokenUI, which Bark
+  Server uses too. **General**: the shortcut and its mode, hold fn, the microphone with a level test,
+  the longest recording, paste and clipboard, text while speaking, sounds, launch at login
+  (`SMAppService`), permissions, the setup guide, and post-training recordings. **History**: how many
+  dictations to keep (100 to 1,000, a Mac-only preference in the app's defaults) and Delete all.
+  **Transcription**: this Mac or Bark Server, the model (the one in use, the others on this Mac and
+  the recommended ones), and the three cleanup switches, each with a worked example. **App styles**: a
+  style per kind of app (Email, Chat, Notes, Documents, Code; `StyleRules.categories`) and for
+  everything else, then every app and site with its own rule or seen in history, with the app's
+  icon, why it gets its style, a picker, and a before-and-after preview of a sample dictation made by
+  the real formatter; Add App or Site. Terminals show Always Verbatim. **Dictionary**: suggestions,
+  your words, corrections, learning and packs. **Bark Server**, **Updates** and **About**.
+
+Settings › **Bark Server** holds the host URL, token (Keychain) and timeout, servers found on your
+Tailscale network, a Test button and the server's state ("Reachable", "Not reachable")
 (one `GET /v1/health` when Settings or Home opens, or on Test; no background polling). Monitoring a
 host is Bark Server's job (or the web dashboard at the host's `/`); the client has no Server view.
+
+### The pill
+
+An opaque capsule floating above the app you're typing in: a solid card with a hairline ring and a soft
+shadow, nothing behind it showing through. While listening: cancel (×) with an "esc to cancel" hint, the
+red recording dot, a timer, the style this dictation will get and why ("Email · Mail rule"), a waveform
+that follows the microphone, and finish (✓). Then "Transcribing…" (with cancel; "Transcribing on this
+Mac" after the server failed), and what happened: "Pasted into Mail · 38 words" (with "via build-box"
+after a dictation on Bark Server), "Copied to the clipboard ⌘V to paste" with the reason when there is
+one, "Nothing heard", "Too short", "Couldn't transcribe · saved to retry", or, in red, "Microphone
+unavailable" with Retry (`PillPresentation`).
+
+Resting the pointer on the style chip (or clicking it) opens the styles for this dictation, with the
+current one ticked, "Back to …" after a choice, and "Always use … for <app or site>"
+(`StyleChipState`). A menu the pointer opened closes when the pointer leaves; one opened with a click
+stays until a choice, a click elsewhere or the end of the recording. Terminals and secure fields show
+"Verbatim" with a lock and no menu. The pill and the menu are non-activating panels that can't become
+key: their buttons take the first click (and the panel takes the mouse only over the capsule while it has
+buttons), so the app you were typing in keeps the keyboard focus and the paste lands there.
 
 ### Text while speaking
 
@@ -224,9 +308,66 @@ Accessibility, such as terminals and web-view apps) is pasted as before. If a di
 front than when recording started, the text is pasted but the old clipboard is not restored, so the
 dictation can still be pasted again.
 
+## Cleanup and styles
+
+Every dictation goes through `DictationPipeline` (FairspokenCore) before it is pasted: the user's
+vocabulary casing, then cleanup, then the user's corrections, then the style's layout. It is
+deterministic, uses no models and no network, and takes well under 2 ms for a typical dictation.
+
+**Cleanup** (`TranscriptCleanup`) is a precision-first rule set. A wrongly deleted word is worse
+than a missed fix, so every rule needs clear evidence and anything ambiguous is left as heard:
+
+- fillers: "um", "uh", "er", "erm", "hmm"; "you know", "I mean" and "like" only when commas set
+  them off as fillers ("I was, like, so tired"), never "I like it" or "like ten minutes";
+- stutters and repeats: "the the", "I I I", "I think I think we"; not "very very", "bye bye",
+  "had had", "what it is is", "I know, I know";
+- restarts: a clause abandoned and started again ("where you could, where you can"), only when the
+  abandoned part ends on an unfinished word or a cut-off mark;
+- cue corrections: "no wait", "sorry", "I mean", "or rather", "actually", "correction", "make that",
+  when the repair after the cue is the same kind of thing as the words before it (a day, a month, a
+  number or amount with its unit, a name, a "the …" noun phrase) and stands on its own: "on Tuesday,
+  sorry, Wednesday" → "on Wednesday", but "Sorry, Wednesday works better" is left alone. "Scratch
+  that" and "let me rephrase" take back the clause or sentence before them;
+- spoken commands: "new line", "new paragraph", "full stop" / "period", "comma", "question mark",
+  "exclamation mark", "semicolon", except where the words are ordinary nouns ("the Oxford comma",
+  "a trial period");
+- a punctuation tidy: a full stop a pause put after "the" or "and", a capital after a comma, doubled
+  punctuation, the first word of each sentence.
+
+Quoted speech is never changed. Settings › Transcription has three switches (`cleanupFillers`,
+`cleanupSelfCorrections`, `cleanupSpokenCommands`, all on). The golden fixtures in
+`Packages/FairspokenCore/Tests/FairspokenCoreTests/Fixtures/cleanup-fixtures.jsonl` (345 cases, 179
+of them must-not-change) report exact matches per category and a harm count of content words
+wrongly removed or added, which must stay at 0.
+
+**Styles** (`DictationStyle`): Verbatim (vocabulary and corrections only), Casual (light cleanup, the
+speaker's casing, no full stop on a short single message), Clean (the default), Email (a spoken
+greeting and sign-off on their own lines, paragraphs at "new paragraph" or, in long bodies, before
+"Also," and the like), Document and Notes (spoken headings, "bullet point" lists, "number one…" and
+"first… second…" numbered lists) and Code (no punctuation polishing). Formatters only reshape words
+that were spoken: nothing is ever added. Email, Document and Notes are pasted as one pasteboard item
+with plain text and minimal HTML (`<div>`, `<h2>`, `<ul>`/`<ol>`, no fonts or colours).
+
+**Which style** (`StyleRules`, in `styleRules` in settings.json): the user's rule for the app (by
+bundle id) beats the user's rule for the website (host, optional path prefix), which beats Bark's
+defaults (Mail, Outlook and webmail → Email; Notes, Obsidian, Bear → Notes; Pages, Word, Google Docs,
+Notion → Document; Slack, Messages, WhatsApp, Discord, Teams → Casual; Xcode, VS Code, Cursor,
+github.com → Code; each kind can be given another style in Settings › App styles), which beats the
+user's default (Clean). The destination is read when recording
+starts, off the main thread within 300 ms (`DestinationReader`): the app, the window title, whether
+the field is single-line, and in a browser the page's `AXURL` (or the window's `AXDocument`), cut to
+scheme, host and path (Chromium browsers are asked once per process to build their full accessibility
+tree, which is where the address comes from). A single-line field gets no multi-line layout; terminals and secure fields are
+always Verbatim and plain, whatever was chosen. While recording, the pill can change the dictation's
+style (`setStyleOverride`) and make it the rule for the site, or for the app when the user already has
+a rule for that browser (`alwaysUseStyle`, `alwaysUseTarget`). Each history item records the raw text, the edits,
+the style and why, the website's host and the time cleanup took.
+
+`Contents/MacOS/Fairspoken --pipeline-demo` (Debug builds) prints sample dictations through every style.
+
 ## Learning from your corrections
 
-**Settings › Vocabulary › Learn from your corrections** (`learnFromEdits`, on by default) is the
+**Settings › Dictionary › Learn from your corrections** (`learnFromEdits`, on by default) is the
 Tauri app's edit watcher, ported. As a recording ends, while it is transcribed, the app reads the
 focused field it will paste into (its text and selection, for the text either side of the
 dictation). It reads that field again when the next dictation starts, when another app or field
@@ -406,7 +547,10 @@ Run as `…/Contents/MacOS/<executable> <flags>` (`Fairspoken` or `Fairspoken Se
 | both | `--demo` | Sample data: the client's dictations and stats; the server window on the simulated practice server |
 | both | `--screenshots <dir>` | Renders every screen in light and dark into `<dir>` and quits (`scripts/screenshots.sh`). The server uses a sample configuration and binds nothing |
 | both | `--screenshots <dir> --updates` | Captures the update UI instead: every update state, the toast and the Updates settings (simulated, no Sparkle) |
-| client | `--screenshots <dir> --speed-test` | Captures Home's speed-test card and every step of the test instead: typing, speaking, a kept result and a rough one (sample runs; nothing records) |
+| client | `--screenshots <dir> --dashboard-only` | Renders the main window's screens alone (no setup guide or pill), for quick review |
+| client | `--screenshots <dir> --stage3` | Renders the pill, the menu-bar menu and the ⌘K palette alone, for quick review |
+| client | `--demo --pill-demo-paste [dir]` | Debug builds: with another app in front, a recording with no microphone aimed at it; rests on the style chip, picks Notes, lets a hover menu close, pins one with a click, then pastes a sample transcript, logging focus after each step (the real pointer with Accessibility, a stand-in without) |
+| client | `--screenshots <dir> --speed-test` | Captures Home's time saved (typical and measured pace) and every step of the test instead: typing, speaking, a kept result and a rough one (sample runs; nothing records) |
 | client | `--selftest <wav> [--model id] [--host URL --token T]` | Headless end-to-end check of the engine, the streaming client and the SSE feed, with no microphone or TCC |
 | client | `--ax-probe [seconds]` | After the delay, says whether the edit watcher can read the focused field of the app in front (lengths and offsets only, never the text), before and after asking a Chromium-based app for its accessibility tree. Needs Accessibility |
 | client | `--show-dashboard` | Opens the dashboard at launch |
@@ -426,7 +570,7 @@ Bark:
 | Input Monitoring | Only for "hold fn to dictate" (a listen-only event tap) | System Settings › Privacy & Security › Input Monitoring |
 
 The setup guide (shown at first launch, whenever the microphone isn't allowed, and from Settings ›
-General › Setup guide or the menu bar) walks through: permissions with live status, a microphone test,
+General › Setup guide) walks through: permissions with live status, a microphone test,
 choosing a model from the catalogue (it downloads in the background), the shortcut, a place to try it,
 and a live checklist of what is set up, with a fix for anything that isn't. It always reopens at its
 first step, and closing or hiding it stops its microphone test. For hold-fn, also set
@@ -455,15 +599,11 @@ address may bring up macOS's Local Network prompt the first time another device 
 - **Bundle ids:** `MV_BUNDLE_ID_BASE` in the same files; Debug appends `.dev` (`Config/Debug.xcconfig`).
   `Config/Server-{Debug,Release}.xcconfig` include the client's and then `Server.xcconfig`, so version,
   signing and Swift settings are shared.
-- **Brand:** `FairspokenUI` holds the palette (`Color.fs*` from `design/brand/README.md`: Copybook Blue,
-  Margin Red for the signal only, Limestone/Night, status colours) and the marks: `BrandMark` is the
-  app icon's sheepdog photo on its tile (the client's `BrandTile` image), and `DogMark` is the
-  one-colour mark traced from it (`design/brand/logo/dog/dog-mark.svg`), which `FairspokenMark` fits
-  to a square. The server follows the brand's Liquid Glass rules:
-  glass only on the control layer (sidebar, toolbar, constellation nodes); cards, tables and charts
-  are opaque. The client puts its sidebar on the window's frost and its content on solid cards
-  (`design/crystal/README.md` › Bark for Mac). Both app icons, `BrandTile` and
-  `DogMarkPaths.swift` come from `design/brand/_tools/gen-dog-icons.mjs`; the server's tile adds
+- **Brand:** `FairspokenUI` holds the tokens (`Crystal`, `Radius`, `TypeScale`; see *The window*) and
+  the marks: `BrandMark` is the app icon's sheepdog photo on its tile (the client's `BrandTile` image),
+  and `DogMark` is the one-colour mark traced from it (`design/brand/logo/dog/dog-mark.svg`), which
+  `FairspokenMark` fits to a square. Bark Server shares the tokens: the same opaque true-black ground,
+  cards and blue. Both app icons, `BrandTile` and `DogMarkPaths.swift` come from `design/brand/_tools/gen-dog-icons.mjs`; the server's tile adds
   faint ruled lines. No taglines anywhere.
 - **Wire identifiers** (per `PROTOCOL.md`): the `x-fairspoken-*` headers, the
   `application/vnd.fairspoken.pcm-stream` content type, `FAIRSPOKEN_HOST_*` and the client id `fairspoken-macos`.
@@ -478,10 +618,12 @@ Fairspoken/                      Bark
   Sources/Audio/                 AVAudioEngine capture → 16 kHz mono Float32, device selection, level meter
   Sources/Engine/                ModelLibrary, local/remote sessions, HostStatus (network device reachability)
   Sources/Dictation/             DictationController state machine, PendingDictations (kept audio, retries)
-  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, copy-only with no text field), EditWatcher +
-                                 FieldReader (learning from corrections), hotkeys + Fn tap, sounds
+  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, rich paste, copy-only with no text field),
+                                 DestinationReader (app, field and website for the style), EditWatcher + FieldReader
+                                 (learning from corrections), hotkeys + Fn tap, sounds
   Sources/Storage/               settings.json / transcript-history.json / usage-stats.json / learned.json (Rust schemas), Keychain
-  Sources/UI/                    Home, Models, Settings, Onboarding, Pill
+  Sources/UI/                    Shell (window, sidebar, thread list), Home, Dictation (one opened), Models, Settings,
+                                 Onboarding, Pill
 FairspokenServer/                Bark Server
   Sources/App/                   main (app or --headless), delegate + menu bar, headless runner, login item, sleep guard, screenshots
   Sources/Engine/                FluidAudioBackend (the host's speech engine)
@@ -490,16 +632,16 @@ FairspokenServer/                Bark Server
 Packages/
   FairspokenCore/                platform-neutral core + tests: frame codec, URL policy, protocol types, SSE parser,
                                  host events/stats/live-state reducer, polling differ, simulator, settings/history models,
-                                 edit diff and learned dictionary
+                                 edit diff and learned dictionary, transcript cleanup, styles and the post-processing pipeline
   FairspokenSpeech/              FairspokenSpeech: the only FluidAudio code (pinned 0.17.5): model registry, the client's engine,
                                  the server's worker pool (shared weights, one decoder per worker);
                                  FairspokenWhisper (client only): the only WhisperKit code (pinned 1.1.1), the
                                  Whisper model store, `SpeechModels` and the client's `LocalSpeechRouter`
   FairspokenHost/                the server runtime + tests: HTTP/1.1 on Network.framework, routing and auth, queue,
                                  workers, metrics, SSE fan-out, config file; `fairspoken-host-dev` (stub engine)
-  FairspokenUI/                  shared SwiftUI: palette, cards, chips, tags, brand mark, formatting
+  FairspokenUI/                  shared SwiftUI: palette, cards, chips, tags, brand mark, formatting, the settings kit
   FairspokenUpdates/             Sparkle 2 updater (UpdateController, custom user driver), update channel,
-                                 sidebar button, toast and Settings section + tests (FairspokenUpdateModel)
+                                 sidebar button, glyph and toast + tests (FairspokenUpdateModel)
 scripts/                         build, test, install, release, screenshots, setup-signing, server-agent, make-*-icon
 ```
 
@@ -538,7 +680,7 @@ used, nothing is deleted without asking.
 
 ## Speed test
 
-Home invites you to type a short passage and then read it aloud, and keeps the last result (with a
+The test has you type a short passage and then read it aloud, and keeps the last result (with a
 retake). Typing is timed from the first key; net words per minute count five characters a word, and a
 skipped space is one mistake rather than a run of them (`SpeedTest` in FairspokenCore). Pasting and
 every automatic text change are off in the field. The reading is a *measured* recording: the
@@ -549,19 +691,25 @@ stats or the post-training folder, and the edit watcher never sees it. The trans
 word against the passage (`TranscriptComparison`); below 80% the run is shown as too rough and not
 kept, and so is one typed under 80% accurately or with a pause of over 15 s. A kept run goes to
 `speed-test.json` (the desktop app's file, imported once). Its typing speed is offered for time saved:
-chosen, it goes to `measuredTypingWpm` in `usage-stats.json`, so Home's "Typing would take" and "Time
-saved" count your own speed rather than the assumed 40 wpm (Home's card goes back to 40).
+chosen, it goes to `measuredTypingWpm` in `usage-stats.json`, so Home's "Time saved" counts your own
+speed rather than the assumed 40 wpm. Home's "Time saved" opens the test.
 
 ## Screenshots
 
 `scripts/screenshots.sh` writes these locally. Git ignores them, so they never reach the repository.
 
-`docs/screenshots/` (Bark, light and dark): `home`, `home-listening`, `home-all` (See all),
-`home-first-use` (before the first dictation), `models`, `models-library` (a download in progress and a
+`docs/screenshots/` (Bark, light and dark): `home`, `home-listening`, `home-row-hover`,
+`home-sidebar-hidden`, `home-first-use` (before the first dictation), `dictation-email` (cleanup edits,
+the change table and the word diff), `dictation-code`, `dictation-clipboard`, `dictation-server`,
+`dictation-note`, `dictation-before-cleanup`, `dictation-folded`, `dictation-no-panel`, `sidebar-search`,
+`sidebar-notes`, `models`, `models-library` (a download in progress and a
 favourite), `models-detail`, `models-link-open`, `models-link-saved`, `training`, `settings`,
 `settings-transcription`, `settings-host` (Network device), `settings-vocabulary`, every step of the setup
-guide (`onboarding-1-welcome` … `onboarding-7-finish`), and `pill` (every pill state, with and without text
-while speaking, with the keys that stop and cancel).
+guide (`onboarding-1-welcome` … `onboarding-7-finish`), `pill-states` (ready, listening with the style chip, with live
+words, a terminal locked to Verbatim, transcribing), `pill-outcomes` (pasted, via Bark Server, copied,
+nothing heard, too short, saved to retry, microphone unavailable), `pill-style-menu` (the chip's menu, and
+after a choice), `pill-levels`, `pill-scroll-*`, `menu-bar`, and `palette`, `palette-search` and
+`palette-settings` (⌘K as it opens and searching).
 
 `docs/screenshots/server-app/` (Bark Server, light and dark, demo simulator): `activity`
 (the live constellation with requests in flight), `clients`, `models`, `connect`, `configuration`.
