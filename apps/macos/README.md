@@ -606,9 +606,9 @@ Packages/
                                  Whisper model store, `SpeechModels` and the client's `LocalSpeechRouter`
   FairspokenHost/                the server runtime + tests: HTTP/1.1 on Network.framework, routing and auth, queue,
                                  workers, metrics, SSE fan-out, config file; `fairspoken-host-dev` (stub engine)
-  FairspokenUI/                  shared SwiftUI: palette, cards, chips, tags, brand mark, formatting
+  FairspokenUI/                  shared SwiftUI: palette, cards, chips, tags, brand mark, formatting, the settings kit
   FairspokenUpdates/             Sparkle 2 updater (UpdateController, custom user driver), update channel,
-                                 sidebar button, toast and Settings section + tests (FairspokenUpdateModel)
+                                 sidebar button, glyph and toast + tests (FairspokenUpdateModel)
 scripts/                         build, test, install, release, screenshots, setup-signing, server-agent, make-*-icon
 ```
 
