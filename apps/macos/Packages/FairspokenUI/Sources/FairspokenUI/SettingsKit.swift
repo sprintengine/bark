@@ -618,3 +618,28 @@ public struct SettingsTextField: View {
         .accessibilityLabel(label)
     }
 }
+
+/// A value with a stepper beside it: "2 min" [−|+].
+public struct ValueStepper: View {
+    @Binding var value: Int
+    var range: ClosedRange<Int>
+    var step: Int
+    var label: String
+    var format: (Int) -> String
+
+    public init(value: Binding<Int>, range: ClosedRange<Int>, step: Int = 1, label: String, format: @escaping (Int) -> String) {
+        _value = value
+        self.range = range
+        self.step = step
+        self.label = label
+        self.format = format
+    }
+
+    public var body: some View {
+        HStack(spacing: 8) {
+            Text(format(value)).font(.system(size: 13, weight: .medium)).monospacedDigit().foregroundStyle(Crystal.ink)
+            Stepper(label, value: $value, in: range, step: step).labelsHidden()
+        }
+        .accessibilityElement(children: .combine)
+    }
+}

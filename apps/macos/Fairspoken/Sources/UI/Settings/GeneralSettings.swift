@@ -204,23 +204,6 @@ private struct GlobeKeyWarning: View {
     }
 }
 
-/// A value with a stepper beside it: "2 min" [−|+].
-struct ValueStepper: View {
-    @Binding var value: Int
-    var range: ClosedRange<Int>
-    var step: Int
-    var label: String
-    var format: (Int) -> String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Text(format(value)).font(.system(size: 13, weight: .medium)).monospacedDigit().foregroundStyle(Crystal.ink)
-            Stepper(label, value: $value, in: range, step: step).labelsHidden()
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
 // MARK: - History
 
 /// How much history is kept, and deleting it.
