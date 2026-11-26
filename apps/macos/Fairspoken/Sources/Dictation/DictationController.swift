@@ -930,6 +930,9 @@ final class DictationController {
     /// Screenshots: forgets the in-app result (a first use).
     func showcaseClearResult() { lastInAppResult = nil }
 
+    /// Screenshots: what transcribing is doing when it isn't the first attempt.
+    func showcaseTranscribingNote(_ note: String?) { transcribingNote = note }
+
     /// Screenshots: where the recording is going and any style chosen in the pill.
     func showcaseStyle(_ destination: DictationDestination?, override: DictationStyle.ID? = nil) {
         self.destination = destination
@@ -991,3 +994,41 @@ nonisolated private final class RetryFlag: Sendable {
     func set() { value.withLock { $0 = true } }
     var isSet: Bool { value.withLock { $0 } }
 }
+
+#if DEBUG
+extension DictationController {
+    /// `--pill-demo-paste`: a recording with no microphone, aimed at the app in front, so the
+    /// floating pill, its style menu and the paste can be checked by hand without speaking.
+    func debugBeginFakeRecording() {
+        let front = NSWorkspace.shared.frontmostApplication
+        targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
+        startedInWindow = nil
+        beginDestination(for: targetApp)
+        showcasing = true
+        phase = .listening(since: Date())
+    }
+
+    /// Ends the fake recording with `raw` as if it had been heard: styled as the pill now says,
+    /// then delivered exactly as a dictation is (pasted into the app if it is still in front).
+    func debugFinishFakeRecording(_ raw: String) async -> Delivery? {
+        defer { showcasing = false }
+        let s = settings.settings
+        let target = targetApp
+        let resolution = currentStyle
+            ?? s.styleRules.resolve(DictationDestination(bundleID: target?.bundleIdentifier, appName: target?.localizedName))
+        let processed = DictationPipeline.process(raw, context: PostProcessContext(settings: s, appBundleID: target?.bundleIdentifier,
+                                                                                    resolution: resolution))
+        phase = .transcribing
+        let delivery = await deliver(processed.plainText, html: processed.html, settings: s, target: target, retried: false,
+                                     copyOnly: nil, commit: { .deliver })
+        if let delivery {
+            phase = .done(Result(text: processed.plainText, words: WordCounter.count(processed.plainText), delivery: delivery,
+                                 latencyMs: 0, placement: .neuralEngine, style: resolution))
+            scheduleReset(after: .milliseconds(1600))
+        } else {
+            phase = .idle
+        }
+        return delivery
+    }
+}
+#endif

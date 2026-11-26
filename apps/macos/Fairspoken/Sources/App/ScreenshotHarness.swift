@@ -15,10 +15,12 @@ final class ScreenshotHarness {
     private let windows: WindowCoordinator
     private let output: URL
     private var showcaseWindow: NSWindow?
+    private let statusItem: StatusItemController?
 
-    init(model: AppModel, windows: WindowCoordinator, output: URL) {
+    init(model: AppModel, windows: WindowCoordinator, statusItem: StatusItemController? = nil, output: URL) {
         self.model = model
         self.windows = windows
+        self.statusItem = statusItem
         self.output = output
     }
 
@@ -61,13 +63,24 @@ final class ScreenshotHarness {
             }
             for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)] {
                 NSApp.appearance = NSAppearance(named: appearance)
+                // `--stage3`: the pill, the menu-bar menu and the palette, for quick review.
+                if AppInfo.arguments.contains("--stage3") {
+                    await pillShots(suffix: name)
+                    await menuBarShots(suffix: name)
+                    await paletteShots(suffix: name)
+                    continue
+                }
                 // `--pill-only`: just the recording pill, for quick review of its states.
                 if !AppInfo.arguments.contains("--pill-only") {
                     await dashboardShots(suffix: name)
                     // `--dashboard-only`: the main window alone, for quick review of the shell.
                     if !AppInfo.arguments.contains("--dashboard-only") { await onboardingShots(suffix: name) }
                 }
-                if !AppInfo.arguments.contains("--dashboard-only") { await pillShots(suffix: name) }
+                if !AppInfo.arguments.contains("--dashboard-only") {
+                    await pillShots(suffix: name)
+                    await menuBarShots(suffix: name)
+                }
+                if !AppInfo.arguments.contains("--pill-only") { await paletteShots(suffix: name) }
             }
             NSApp.terminate(nil)
         }
@@ -386,37 +399,143 @@ final class ScreenshotHarness {
         }
     }
 
-    /// The pill states over a wallpaper-like backdrop (the real pill samples the desktop,
-    /// which a window capture can't include, so it is staged in a showcase window).
+    /// Every pill state, staged in a showcase window over a plain ground (the floating panel
+    /// can't be captured on its own): the listening family with the style chip, the outcomes, and
+    /// the style menu open. Then the levels and the live text scrolled.
     private func pillShots(suffix: String) async {
-        let phases: [(String, DictationController.Phase)] = [
-            ("listening", .listening(since: Date().addingTimeInterval(-12))),
-            ("listening-text", .listening(since: Date().addingTimeInterval(-9))),
-            ("transcribing", .transcribing),
-            ("inserted", .done(.init(text: "x", words: 38, delivery: .pasted(app: "Mail"), latencyMs: 68, placement: .neuralEngine))),
-            ("error", .failed("No speech detected")),
-        ]
-        var controllers: [DictationController] = []
-        var feeders: [Task<Void, Never>] = []
-        for (name, phase) in phases {
-            let c = DictationController(settings: model.settings, models: model.models, history: model.history, permissions: model.permissions,
-                                        pending: model.pending)
-            c.showcase(phase, liveText: name == "listening-text"
-                ? "The patient reports a dry cough for two weeks, with no fever, and mild shortness of breath when climbing stairs"
-                : "")
-            feeders.append(feedLevels(into: c.meter))
-            controllers.append(c)
+        let words = "The patient reports a dry cough for two weeks, with no fever, and mild shortness of breath when climbing stairs"
+        let mail = DictationDestination(bundleID: "com.apple.mail", appName: "Mail")
+        let slack = DictationDestination(bundleID: "com.tinyspeck.slackmacgap", appName: "Slack")
+        let terminal = DictationDestination(bundleID: "com.apple.Terminal", appName: "Terminal")
+        func done(_ delivery: DictationController.Delivery, words: Int, remote: Bool = false) -> DictationController.Phase {
+            .done(.init(text: "x", words: words, delivery: delivery, latencyMs: 68, placement: remote ? .remoteHost : .neuralEngine))
         }
-        let window = stageShowcase(PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols))
-        try? await Task.sleep(for: .milliseconds(1500))
-        window.contentViewController = NSHostingController(rootView: PillShowcase(controllers: controllers, shortcut: HotkeyController.currentShortcutSymbols))
-        window.setContentSize(NSSize(width: 760, height: 600))
-        try? await Task.sleep(for: .milliseconds(250))
-        await capture(window, as: "pill-\(suffix)")
-        feeders.forEach { $0.cancel() }
-        window.orderOut(nil)
+        let states: [PillShowcase.Row] = [
+            .init("1", "Ready", .idle),
+            .init("2", "Listening", .listening(since: Date().addingTimeInterval(-7)), destination: mail),
+            .init("2b", "Listening, with live words", .listening(since: Date().addingTimeInterval(-9)), liveText: words, destination: mail),
+            .init("2c", "A terminal: always verbatim", .listening(since: Date().addingTimeInterval(-4)), destination: terminal),
+            .init("3", "Transcribing", .transcribing),
+            .init("3b", "After the server failed", .transcribing, note: "Transcribing on this Mac"),
+        ]
+        let outcomes: [PillShowcase.Row] = [
+            .init("4", "Pasted", done(.pasted(app: "Mail"), words: 38)),
+            .init("4b", "Where it ran, said once", done(.pasted(app: "Slack"), words: 8, remote: true)),
+            .init("4c", "Nothing could take the paste", done(.copied("Copied to clipboard"), words: 9)),
+            .init("4d", "No text field", done(.copied(TextInserter.noTextTargetReason), words: 9)),
+            .init("5", "Nothing heard", .failed("No speech detected")),
+            .init("5b", "Too short", .failed("Too short — hold the shortcut while you speak")),
+            .init("5c", "Failed, saved to retry", .failed("Couldn't transcribe — saved to retry")),
+            .init("5d", "Microphone unavailable", .failed("Couldn't start the microphone: The operation couldn’t be completed.")),
+        ]
+        for (name, rows, height) in [("pill-states", states, 640.0), ("pill-outcomes", outcomes, 640.0)] {
+            let staged = rows.map { stage($0) }
+            let view = PillShowcase(rows: staged.map(\.0), shortcut: HotkeyController.currentShortcutSymbols)
+            let window = stageShowcase(view, size: NSSize(width: 760, height: height))
+            try? await Task.sleep(for: .milliseconds(1500))
+            window.contentViewController = NSHostingController(rootView: view)
+            window.setContentSize(NSSize(width: 760, height: height))
+            try? await Task.sleep(for: .milliseconds(300))
+            await capture(window, as: "\(name)-\(suffix)")
+            staged.forEach { $0.1.cancel() }
+            window.orderOut(nil)
+        }
+        await pillMenuShots(suffix: suffix, mail: mail, slack: slack)
         await pillLevelShots(suffix: suffix)
         await pillScrollShots(suffix: suffix)
+    }
+
+    /// A showcase row's controller, fed speech-like levels while it listens.
+    private func stage(_ row: PillShowcase.Row) -> (PillShowcase.Staged, Task<Void, Never>) {
+        let c = DictationController(settings: model.settings, models: model.models, history: model.history,
+                                    permissions: model.permissions, pending: model.pending)
+        c.showcase(row.phase, liveText: row.liveText)
+        if let destination = row.destination { c.showcaseStyle(destination, override: row.override) }
+        if let note = row.note { c.showcaseTranscribingNote(note) }
+        return (PillShowcase.Staged(row: row, controller: c), feedLevels(into: c.meter))
+    }
+
+    /// The style chip under the pointer with its menu open, as the floating panel shows it: first
+    /// with the rules' style ticked and Casual under the pointer, then after choosing Casual.
+    private func pillMenuShots(suffix: String, mail: DictationDestination, slack: DictationDestination) async {
+        let rows: [PillShowcase.Row] = [
+            .init("6", "Resting on the style", .listening(since: Date().addingTimeInterval(-6)), destination: mail,
+                  menu: true, highlight: "style-casual"),
+            .init("6b", "After choosing Casual", .listening(since: Date().addingTimeInterval(-8)), destination: mail,
+                  override: .casual, menu: true, highlight: "rules"),
+        ]
+        let staged = rows.map { stage($0) }
+        let view = PillMenuShowcase(rows: staged.map(\.0), shortcut: HotkeyController.currentShortcutSymbols)
+        let size = NSSize(width: 1040, height: 560)
+        let window = stageShowcase(view, size: size)
+        try? await Task.sleep(for: .milliseconds(1500))
+        window.contentViewController = NSHostingController(rootView: view)
+        window.setContentSize(size)
+        try? await Task.sleep(for: .milliseconds(400))
+        await capture(window, as: "pill-style-menu-\(suffix)")
+        staged.forEach { $0.1.cancel() }
+        window.orderOut(nil)
+    }
+
+    /// The menu-bar menu, popped up in a window of Bark's own (a status item's menu can't be
+    /// opened from code) and captured while it is open, with the demo history's last dictation.
+    private func menuBarShots(suffix: String) async {
+        guard let statusItem else { return }
+        model.history.showcase(DemoHistory.items())
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 560))
+        let window = AppWindow(contentViewController: NSViewController())
+        window.contentViewController?.view = host
+        window.styleMask = [.titled, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.setContentSize(host.frame.size)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        try? await Task.sleep(for: .milliseconds(600))
+        let menu = statusItem.debugMenu
+        statusItem.refresh()
+        let name = "menu-bar-\(suffix)"
+        let timer = Timer(timeInterval: 1.0, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.captureOpenMenu(as: name) }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        menu.popUp(positioning: nil, at: NSPoint(x: 40, y: host.frame.height - 30), in: host)
+        window.orderOut(nil)
+    }
+
+    /// The ⌘K palette over the main window: as it opens (recent dictations and actions), and
+    /// searching for "quote".
+    private func paletteShots(suffix: String) async {
+        model.history.showcase(DemoHistory.items())
+        windows.showDashboard(.home)
+        windows.dashboard?.setContentSize(NSSize(width: 1180, height: 800))
+        for (query, name) in [("", "palette"), ("quote", "palette-search"), ("transcr", "palette-settings")] {
+            model.showcasePaletteQuery = query
+            model.paletteOpen = true
+            try? await Task.sleep(for: .milliseconds(900))
+            await freshFrame()
+            try? await Task.sleep(for: .milliseconds(300))
+            if let window = windows.dashboard { await capture(window, as: "\(name)-\(suffix)") }
+        }
+        model.paletteOpen = false
+        model.showcasePaletteQuery = nil
+    }
+
+    private func captureOpenMenu(as name: String) {
+        if let png = Self.pngOfOwnMenuWindow() {
+            try? png.write(to: output.appendingPathComponent("\(name).png"))
+        }
+        statusItem?.debugMenu.cancelTracking()
+    }
+
+    /// The topmost window of this app at the menu level (an open menu), as PNG.
+    private static func pngOfOwnMenuWindow() -> Data? {
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        let pid = Int(ProcessInfo.processInfo.processIdentifier)
+        guard let menuWindow = info.first(where: {
+            ($0[kCGWindowOwnerPID as String] as? Int) == pid && (($0[kCGWindowLayer as String] as? Int) ?? 0) >= 101
+        }), let number = menuWindow[kCGWindowNumber as String] as? Int else { return nil }
+        return png(windowNumber: number)
     }
 
     /// The level indicator at a few voice levels (peak dBFS RMS), with and without Reduce Motion.
@@ -573,34 +692,153 @@ final class ScreenshotHarness {
     }
 
     /// The window's own pixels as PNG.
-    static func png(of window: NSWindow) -> Data? {
+    static func png(of window: NSWindow) -> Data? { png(windowNumber: window.windowNumber) }
+
+    static func png(windowNumber: Int) -> Data? {
+        guard windowNumber > 0 else { return nil }
         guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return nil }
         let create = unsafeBitCast(symbol, to: CreateImage.self)
         // includingWindow = 1 << 3; boundsIgnoreFraming = 1 << 0, bestResolution = 1 << 3
-        guard let image = create(.null, 1 << 3, UInt32(window.windowNumber), (1 << 0) | (1 << 3))?.takeRetainedValue() else { return nil }
+        guard let image = create(.null, 1 << 3, UInt32(windowNumber), (1 << 0) | (1 << 3))?.takeRetainedValue() else { return nil }
         return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
     }
 }
 
+/// Pills staged for screenshots, each under a small caption, over a plain ground like the
+/// desktop the real one floats above.
 private struct PillShowcase: View {
-    var controllers: [DictationController]
+    struct Row {
+        var number: String
+        var caption: String
+        var phase: DictationController.Phase
+        var liveText = ""
+        var destination: DictationDestination?
+        var override: DictationStyle.ID?
+        var note: String?
+        var menu = false
+        var highlight: String?
+
+        init(_ number: String, _ caption: String, _ phase: DictationController.Phase, liveText: String = "",
+             destination: DictationDestination? = nil, override: DictationStyle.ID? = nil, note: String? = nil,
+             menu: Bool = false, highlight: String? = nil) {
+            self.number = number
+            self.caption = caption
+            self.phase = phase
+            self.liveText = liveText
+            self.destination = destination
+            self.override = override
+            self.note = note
+            self.menu = menu
+            self.highlight = highlight
+        }
+    }
+
+    struct Staged {
+        var row: Row
+        var controller: DictationController
+    }
+
+    var rows: [Staged]
     var shortcut: String
 
-    @Environment(\.colorScheme) private var scheme
+    init(rows: [Staged], shortcut: String) {
+        self.rows = rows
+        self.shortcut = shortcut
+    }
+
+    /// Pills without captions (the levels and the scrolled text).
+    init(controllers: [DictationController], shortcut: String) {
+        rows = controllers.map { Staged(row: Row("", "", $0.phase), controller: $0) }
+        self.shortcut = shortcut
+    }
 
     var body: some View {
-        ZStack {
-            // A quiet, wallpaper-like backdrop in neutral greys: graphite in dark mode, pale in light.
-            LinearGradient(colors: scheme == .dark ? [Color(white: 0.11), Color(white: 0.24)] : [Color(white: 0.80), Color(white: 0.93)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-            VStack(spacing: 18) {
-                ForEach(Array(controllers.enumerated()), id: \.offset) { _, c in
-                    PillView(dictation: c, shortcut: shortcut).frame(width: 520).frame(minHeight: 76)
+        ZStack(alignment: .top) {
+            ShowcaseGround()
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, staged in
+                    HStack(alignment: .center, spacing: 0) {
+                        if !staged.row.caption.isEmpty {
+                            ShowcaseCaption(number: staged.row.number, caption: staged.row.caption).frame(width: 200, alignment: .leading)
+                        }
+                        PillView(dictation: staged.controller, shortcut: shortcut, serverName: "build-box")
+                        Spacer(minLength: 0)
+                    }
                 }
             }
-            .padding(.top, 20)
+            .padding(.horizontal, 28)
+            .padding(.top, 44)
         }
         .ignoresSafeArea()
+    }
+}
+
+/// The style menu open over the pill, placed as the floating panel places it: above the pill,
+/// its left edge under the chip's.
+private struct PillMenuShowcase: View {
+    var rows: [PillShowcase.Staged]
+    var shortcut: String
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            ShowcaseGround()
+            HStack(alignment: .bottom, spacing: 40) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, staged in
+                    MenuColumn(staged: staged, shortcut: shortcut)
+                }
+            }
+            .padding(.top, 44)
+            .padding(.horizontal, 28)
+        }
+        .ignoresSafeArea()
+    }
+
+    private struct MenuColumn: View {
+        var staged: PillShowcase.Staged
+        var shortcut: String
+        @State private var interaction = PillInteraction()
+
+        var body: some View {
+            let c = staged.controller
+            VStack(alignment: .leading, spacing: 10) {
+                ShowcaseCaption(number: staged.row.number, caption: staged.row.caption)
+                VStack(alignment: .leading, spacing: 6) {
+                    if let state = StyleChipState(resolution: c.currentStyle, rulesResolution: c.rulesStyle, target: c.alwaysUseTarget) {
+                        StyleMenuView(state: state, onStyle: { _ in }, onRules: {}, onAlwaysUse: { _ in },
+                                      showcaseHighlight: staged.row.highlight)
+                            .padding(.leading, max(0, chipOffset - 4))
+                    }
+                    PillView(dictation: c, shortcut: shortcut, interaction: interaction, showcaseChipHover: true)
+                }
+            }
+            .frame(minWidth: 460, alignment: .leading)
+        }
+
+        /// The chip's left edge within the pill.
+        private var chipOffset: CGFloat {
+            guard let chip = interaction.chipFrame else { return 0 }
+            return chip.minX - interaction.capsuleFrame.minX
+        }
+    }
+}
+
+private struct ShowcaseCaption: View {
+    var number: String
+    var caption: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(number).font(.system(size: 12, weight: .medium, design: .monospaced)).foregroundStyle(Crystal.ink3)
+            Text(caption).font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink)
+        }
+    }
+}
+
+/// A plain ground standing in for the desktop: near-black in dark mode, pale grey in light.
+private struct ShowcaseGround: View {
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        (scheme == .dark ? Color(white: 0.03) : Color(white: 0.94)).ignoresSafeArea()
     }
 }
 
