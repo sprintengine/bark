@@ -213,6 +213,7 @@ function shortErrorMessage(message: string): string {
   if (lower.includes("allowance used")) return "Cloud allowance used — see Settings";
   if (lower.includes("cloud sign-in expired")) return "Cloud sign-in expired — see Settings";
   if (lower.includes("took too long")) return "Took too long, try again";
+  if (lower.includes("speech model is still busy")) return "Still finishing the last one";
   if (!normalized) return "Error";
   return normalized.length <= 40 ? normalized : `${normalized.slice(0, 39)}…`;
 }
