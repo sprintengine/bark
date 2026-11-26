@@ -64,7 +64,7 @@ struct PillPresentationTests {
     @Test func shortHostName() {
         #expect(PillPresentation.shortHostName("build-box.tail1234.ts.net") == "build-box")
         #expect(PillPresentation.shortHostName("mac-mini.local:48173") == "mac-mini")
-        #expect(PillPresentation.shortHostName("100.64.0.7:48173") == "100.64.0.7")
+        #expect(PillPresentation.shortHostName("192.0.2.10:48173") == "192.0.2.10")
     }
 }
 
