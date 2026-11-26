@@ -4,7 +4,7 @@ import FairspokenUI
 import SwiftUI
 
 /// A dictation, opened as a conversation: what you said in a grey bubble (the words cleanup took
-/// out dimmed), what Bark pasted as the reply, "Cleaned up in N ms" opening a table of the changes
+/// out dimmed), what Bark pasted as the reply, and under it "Cleaned up in N ms" opening a table of the changes
 /// and a word diff (blue added, orange removed), an actions card beside it, and a composer docked
 /// at the bottom to correct the text.
 struct DictationDetailView: View {
@@ -73,6 +73,9 @@ private struct Conversation: View {
                 meta.frame(maxWidth: .infinity, alignment: .leading)
             }
 
+            // The reply first; under it, the toggle and the changes it opens, so the two sit together.
+            PastedText(item: item).padding(.top, item.isBarkNote ? 14 : 18)
+
             if !item.isBarkNote {
                 Button {
                     withAnimation(Motion.unlessReduced(Motion.normal, reduceMotion)) { changesShown.toggle() }
@@ -94,15 +97,14 @@ private struct Conversation: View {
                 .accessibilityLabel(headline(changed: changed))
                 .accessibilityValue(changed ? (changesShown ? "Changes shown" : "Changes hidden") : "")
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 18)
-                .padding(.bottom, 12)
-                .overlay(alignment: .bottom) { Rectangle().fill(Crystal.hairline).frame(height: 1) }
+                .padding(.top, 14)
+                .padding(.bottom, 4)
+                .overlay(alignment: .top) { Rectangle().fill(Crystal.hairline).frame(height: 1) }
+                .padding(.top, 22)
             }
 
-            PastedText(item: item).padding(.top, item.isBarkNote ? 14 : 12)
-
             if changed && changesShown {
-                ChangesTable(item: item, diff: diff).padding(.top, 14)
+                ChangesTable(item: item, diff: diff).padding(.top, 2)
                 if let diff, !diff.isUnchanged {
                     DiffCard(diff: diff).padding(.top, 14)
                 }
@@ -131,7 +133,7 @@ private struct Conversation: View {
 
     private func headline(changed: Bool) -> String {
         let ms = item.cleanupMs ?? item.timings.map { $0.polishMs }.flatMap { $0 > 0 ? $0 : nil }
-        if changed { return ms.map { "Cleaned up in \($0) ms" } ?? "Cleaned up" }
+        if changed { return ms.map { $0 < 1 ? "Cleaned up in under 1 ms" : "Cleaned up in \($0) ms" } ?? "Cleaned up" }
         if let total = item.timings?.totalMs, total > 0 { return "Pasted as heard, \(total) ms after you let go" }
         return "Pasted as heard"
     }
@@ -220,12 +222,6 @@ private struct ChangesTable: View {
     var body: some View {
         let rows = Self.rows(item, diff: diff)
         Grid(alignment: .topLeading, horizontalSpacing: 0, verticalSpacing: 0) {
-            GridRow {
-                Text("Step").fontWeight(.semibold)
-                Text("Result").fontWeight(.semibold)
-            }
-            .padding(.bottom, 9)
-            Rectangle().fill(Crystal.hairline).frame(height: 1).gridCellUnsizedAxes(.horizontal)
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 GridRow {
                     Text(row.step).foregroundStyle(Crystal.ink2)
