@@ -154,7 +154,7 @@ struct CommandPalette: View {
                 }
                 .padding(6)
             }
-            .frame(maxHeight: 392)
+            .frame(maxHeight: 460)
             .fixedSize(horizontal: false, vertical: true)
             .onChange(of: selected) { _, index in
                 guard flat.indices.contains(index) else { return }
