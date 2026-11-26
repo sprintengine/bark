@@ -101,8 +101,17 @@ export async function registerGlobalShortcuts(settings = shortcutSettings): Prom
       if (!activeBindings[role]) addEvent("warning", `${role} shortcut is unavailable: ${failures.join("; ")}`);
     }
     shortcutSettings = normalized;
-    pillHint.textContent = shortcutHint(activeBindings.recording || normalized.recordingShortcut);
+    showHint(activeBindings.recording || normalized.recordingShortcut);
   });
+}
+
+// The hover pill has room for the name and a short chord ("⌘⇧1",
+// "Ctrl+Shift+1"); a longer one takes the name's place so it never runs
+// under the settings gear.
+function showHint(shortcut: string): void {
+  const text = shortcutHint(shortcut);
+  pillHint.textContent = text;
+  document.body.toggleAttribute("data-long-hint", text.length > 13);
 }
 
 type ShortcutPatch = { recordingShortcut?: string; transcriptStackShortcut?: string };
@@ -128,7 +137,7 @@ export function initPillShortcuts(hint: HTMLElement, shortcutActions: ShortcutAc
         // settings-updated queued during persistence refreshes mode/sounds from
         // the authoritative snapshot, without registering these chords again.
         shortcutSettings = next;
-        pillHint.textContent = shortcutHint(next.recordingShortcut);
+        showHint(next.recordingShortcut);
         result = { requestId: payload.requestId, ok: true };
       } catch (error) {
         result = { requestId: payload.requestId, ok: false, error: String(error) };

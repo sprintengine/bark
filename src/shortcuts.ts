@@ -11,9 +11,10 @@ const onMac = isMacOS();
 const KEY_GLYPHS: Record<string, string> = {
   CommandOrControl: onMac ? "⌘" : "Ctrl",
   Command: "⌘", Cmd: "⌘", Meta: onMac ? "⌘" : "Win", Super: onMac ? "⌘" : "Win",
-  Control: "⌃", Ctrl: "⌃",
+  // Mac keycaps are glyphs; Windows and Linux keyboards print the words.
+  Control: onMac ? "⌃" : "Ctrl", Ctrl: onMac ? "⌃" : "Ctrl",
   Alt: onMac ? "⌥" : "Alt", Option: "⌥",
-  Shift: "⇧",
+  Shift: onMac ? "⇧" : "Shift",
   ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→",
   Minus: "-", Equal: "=", BracketLeft: "[", BracketRight: "]", Backslash: "\\",
   Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", Backquote: "`",

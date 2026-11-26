@@ -463,14 +463,16 @@ for (const seg of [...POLISH_TONE_CATEGORIES.map((category) => polishToneSegs[ca
 
 // Both delivery integrations are macOS-only (CGEvent paste and the Fn event
 // tap); hide rather than disable them elsewhere so the form stays honest.
+// Only the rows: their cards also hold Language and AI polish.
 if (!isMacOS()) {
   insertAtCursorRow.hidden = true;
-  insertAtCursorRow.closest<HTMLElement>(".settings-section")?.setAttribute("hidden", "");
   fnPushToTalkRow.hidden = true;
+  // Writing through Accessibility is macOS-only too.
+  const accessibilityInsertRow = document.getElementById("accessibilityInsertRow");
+  if (accessibilityInsertRow) accessibilityInsertRow.hidden = true;
   // Context awareness reads the macOS Accessibility tree; there is no
   // Windows/Linux implementation yet.
   contextAwarenessRow.hidden = true;
-  contextAwarenessRow.closest<HTMLElement>(".settings-section")?.setAttribute("hidden", "");
 }
 
 // Settings auto-persist on change; the form must never submit/navigate, which

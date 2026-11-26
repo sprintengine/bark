@@ -86,9 +86,15 @@ function renderList(): void {
   const shown = visibleNotes();
 
   if (shown.length === 0) {
+    // With no notes at all the detail pane says so; the list stays blank
+    // rather than repeating it.
+    if (notes.length === 0) {
+      noteList.replaceChildren();
+      return;
+    }
     const empty = document.createElement("p");
     empty.className = "note-list-empty";
-    empty.textContent = notes.length === 0 ? "No notes yet." : "No notes match your search.";
+    empty.textContent = "No notes match your search.";
     noteList.replaceChildren(empty);
     return;
   }

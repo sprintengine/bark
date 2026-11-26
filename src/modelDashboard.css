@@ -88,7 +88,9 @@
    where it runs, action. */
 #screen-models { max-width: 1080px; }
 .model-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sem-space-sm); margin-bottom: var(--sem-space-sm); }
-.model-toolbar #modelSearchBox { flex: 1 1 240px; width: auto; min-width: 200px; }
+/* The search takes the first line; filters share the second, so no filter is
+ * ever left alone on a line of its own. */
+.model-toolbar #modelSearchBox { flex: 1 1 100%; width: auto; min-width: 200px; }
 .model-toolbar .setting-select { width: auto; }
 .model-toolbar-spacer { flex: 1 0 0; }
 .model-toolbar .icon-btn { width: 28px; height: 28px; display: grid; place-items: center; }
@@ -204,8 +206,6 @@
 .model-hub-row .ds-list-row-supporting { display: block; white-space: normal; color: var(--crystal-ink-2); font-size: var(--sem-font-size-meta); }
 
 @media (max-width: 960px) {
-  /* The search takes the first line; filters share the second. */
-  .model-toolbar #modelSearchBox { flex-basis: 100%; }
   .model-table-head, .model-row, .model-table.is-all-local .model-table-head, .model-table.is-all-local .model-row { grid-template-columns: 22px minmax(150px, 1fr) 64px 66px 66px 52px 84px; }
   .model-table-head > :nth-child(7), .model-row > :nth-child(7) { display: none; }
   .model-steps i { width: 7px; }

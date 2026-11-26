@@ -36,7 +36,7 @@ const TITLES: Record<Screen, string> = {
 
 // A quiet line under the title, where the screen has one worth saying.
 const SUBTITLES: Partial<Record<Screen, string>> = {
-  models: "Speech and polish models on this device",
+  models: "Speech and polish models",
   dictionary: "Applied to every dictation",
 };
 
@@ -137,7 +137,7 @@ function openSpeedTest(): void {
 
 function openVoiceTest(): void {
   if (!voiceTest) return;
-  openSubRoute("screen-voicetest", "Voice accuracy test");
+  openSubRoute("screen-voicetest", "Accuracy test");
   voiceTest.start();
 }
 
