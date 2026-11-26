@@ -55,7 +55,10 @@ struct CommandPalette: View {
         let groups = sections
         let flat = groups.flatMap(\.entries)
         ZStack(alignment: .top) {
+            // Over the whole window, the top bar and the title-bar strip included: stopping at the
+            // safe area left the top of the window bright above a dimmed page.
             Color.black.opacity(scheme == .dark ? 0.4 : 0.12)
+                .ignoresSafeArea()
                 .contentShape(.rect)
                 .onTapGesture { close() }
                 .accessibilityHidden(true)
