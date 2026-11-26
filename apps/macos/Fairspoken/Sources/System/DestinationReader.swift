@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
 import FairspokenCore
+import Synchronization
 
 /// Where a dictation is going, read through Accessibility when the recording starts: the
 /// window title, the kind of field that has focus, and for a browser the page's address.
@@ -20,6 +21,9 @@ nonisolated enum DestinationReader {
         "app.zen-browser.zen", "com.kagi.kagimacOS",
     ]
 
+    /// Chromium processes already asked to build their full tree: once per process is enough.
+    private static let primed = Mutex<Set<pid_t>>([])
+
     static func isBrowser(_ bundleID: String?) -> Bool {
         guard let bundleID else { return false }
         return browserPrefixes.contains { bundleID.hasPrefix($0) }
@@ -35,12 +39,13 @@ nonisolated enum DestinationReader {
         }
         let browser = isBrowser(bundleID)
         let chromium = browser && FieldReader.isChromiumBased(bundleURL: nil, bundleID: bundleID)
+            && primed.withLock { $0.insert(pid).inserted }
         let terminal = AppCategory.of(bundleID: bundleID) == .terminal
         let read = await FieldReader.withTimeout(deadline) {
             // Chromium builds the tree with page addresses only for assistive apps it knows
             // about: ask for it here too, whatever the edit watcher's settings (it is built
             // lazily, so the controller asks again a moment later if the address isn't there yet).
-            if chromium { _ = FieldReader.enableManualAccessibility(pid: pid) }
+            if chromium, !FieldReader.enableManualAccessibility(pid: pid) { primed.withLock { _ = $0.remove(pid) } }
             return snapshot(pid: pid, bundleID: bundleID, appName: name, wantsURL: browser, readsField: !terminal)
         }
         var destination = read ?? basic

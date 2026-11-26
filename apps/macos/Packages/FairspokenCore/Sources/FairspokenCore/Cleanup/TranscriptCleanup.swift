@@ -759,6 +759,8 @@ struct CleanupWork {
 
     mutating func applySentenceCase() {
         for i in t.indices where isSentenceStart(i) && !t[i].quoted && !t[i].isPunctuationOnly {
+            // "at 9 a.m. tomorrow": after an ambiguous abbreviation the speaker's case stands.
+            if i > 0, t[i].breakBefore == 0, t[i - 1].isAmbiguousAbbreviation { continue }
             let core = t[i].core
             guard let first = core.first, first.isLowercase,
                   !core.dropFirst().contains(where: \.isUppercase),

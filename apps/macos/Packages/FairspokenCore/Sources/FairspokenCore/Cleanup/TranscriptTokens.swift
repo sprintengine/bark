@@ -35,10 +35,24 @@ struct WordToken: Equatable, Sendable {
     var isPunctuationOnly: Bool { core.isEmpty }
 
     /// The trail ends a sentence ("." "?" "!" "…"), ignoring closing quotes and brackets.
+    /// "Dr." and "e.g." are abbreviations, not sentence ends.
     var endsSentence: Bool {
         guard let last = lastMark else { return false }
+        if last == ".", trail == ".", Self.abbreviations.contains(lower) { return false }
         return last == "." || last == "?" || last == "!" || last == "…"
     }
+
+    /// Abbreviations whose full stop doesn't end a sentence. ("etc.", "a.m.", "p.m." and "No."
+    /// often do, so they aren't here.)
+    static let abbreviations: Set<String> = [
+        "dr", "mr", "mrs", "ms", "mx", "st", "prof", "e.g", "i.e", "vs", "approx", "dept", "fig", "jr", "sr", "mt",
+        "rev", "fr", "cllr", "sgt", "capt", "lt", "col", "cf", "ref",
+    ]
+    /// Abbreviations that may or may not end a sentence: the next word's own case decides.
+    static let ambiguousAbbreviations: Set<String> = ["a.m", "p.m", "etc", "no"]
+
+    /// "a.m." and the like: a full stop that might not end the sentence.
+    var isAmbiguousAbbreviation: Bool { trail == "." && Self.ambiguousAbbreviations.contains(lower) }
 
     /// The trail is a pause: any punctuation that isn't a closing quote or bracket.
     var hasPause: Bool { lastMark != nil }

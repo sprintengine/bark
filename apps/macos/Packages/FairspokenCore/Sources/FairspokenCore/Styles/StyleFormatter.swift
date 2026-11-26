@@ -222,11 +222,11 @@ struct Layout {
     }
 
     /// "bullet point" pairs in the whole dictation: two or more make a list wherever they sit.
-    private var bulletCueCount: Int {
-        (0..<max(0, t.count - 1)).filter { t[$0].lower == "bullet" && t[$0 + 1].lower == "point" && !t[$0].quoted }.count
-    }
+    /// Counted once, when the structured layout starts.
+    private var bulletCueCount = 0
 
     mutating func layOutStructured() {
+        bulletCueCount = (0..<max(0, t.count - 1)).filter { t[$0].lower == "bullet" && t[$0 + 1].lower == "point" && !t[$0].quoted }.count
         // Numbered and ordinal lists count only as a sequence from one.
         let numbered = sequenceCues { if case .numbered(let n) = $0 { n } else { nil } }
         let ordinal = sequenceCues { if case .ordinal(let n) = $0 { n } else { nil } }
@@ -249,7 +249,8 @@ struct Layout {
             // first sentence, and what follows is a paragraph after the list.
             var after: [WordToken] = []
             if var last = l.items.popLast() {
-                if let end = last.firstIndex(where: \.endsSentence), end < last.count - 1 {
+                // A real sentence end: not "Dr." (see `endsSentence`), and a capital follows ("9 a.m. tomorrow" isn't one).
+                if let end = last.indices.dropLast().first(where: { last[$0].endsSentence && last[$0 + 1].isCapitalised }) {
                     after = Array(last[(end + 1)...])
                     last = Array(last[...end])
                     if !after.isEmpty { after[0].breakBefore = 2 }
@@ -351,9 +352,11 @@ struct Layout {
         while let last = w.last, last.isPunctuationOnly { w.removeLast() }
         if w.count > 1, let last = w.last, ["and", "or", "then"].contains(last.lower), last.trail.isEmpty || last.hasPause { w.removeLast() }
         guard !w.isEmpty else { return w }
-        let sentences = w.dropLast().filter(\.endsSentence).count
+        let sentences = w.indices.dropLast().filter { w[$0].endsSentence && w[$0 + 1].isCapitalised }.count
         var last = w[w.count - 1]
-        if sentences == 0 {
+        if last.isAmbiguousAbbreviation || CleanupLexicon.units.contains(last.lower) && last.lower.contains(".") {
+            // "9 a.m." keeps its full stop.
+        } else if sentences == 0 {
             while let c = last.trail.last, ".,;:".contains(c), !last.trail.hasSuffix("...") { last.trail.removeLast() }
         } else {
             while let c = last.trail.last, ",;:".contains(c) { last.trail.removeLast() }

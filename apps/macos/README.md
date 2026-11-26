@@ -302,7 +302,8 @@ Notion → Document; Slack, Messages, WhatsApp, Discord, Teams → Casual; Xcode
 github.com → Code), which beats the user's default (Clean). The destination is read when recording
 starts, off the main thread within 300 ms (`DestinationReader`): the app, the window title, whether
 the field is single-line, and in a browser the page's `AXURL` (or the window's `AXDocument`), cut to
-scheme, host and path. A single-line field gets no multi-line layout; terminals and secure fields are
+scheme, host and path (Chromium browsers are asked once per process to build their full accessibility
+tree, which is where the address comes from). A single-line field gets no multi-line layout; terminals and secure fields are
 always Verbatim and plain, whatever was chosen. While recording, the pill can change the dictation's
 style (`setStyleOverride`) and make it the rule for the site, or for the app when the user already has
 a rule for that browser (`alwaysUseStyle`, `alwaysUseTarget`). Each history item records the raw text, the edits,

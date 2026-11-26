@@ -64,6 +64,17 @@ struct StyleFormatterTests {
         #expect(r.html == "<ol><li>Ring the pharmacy</li><li>Book the room</li></ol><div>Let me know if that works.</div>")
     }
 
+    @Test func abbreviationsDontEndListItems() {
+        #expect(run("Number one, ring the pharmacy. Number two, see Dr. Byrne today.", .notes).plainText
+                == "1. Ring the pharmacy\n2. See Dr. Byrne today")
+        #expect(run("Number one, ring the pharmacy. Number two, book the room for 9 a.m. tomorrow.", .notes).plainText
+                == "1. Ring the pharmacy\n2. Book the room for 9 a.m. tomorrow")
+        #expect(run("Bullet point call Dr. Smith tomorrow. Bullet point ring Mrs. Byrne.", .notes).plainText
+                == "- Call Dr. Smith tomorrow\n- Ring Mrs. Byrne")
+        #expect(run("First, update the form. Second, call Mr. Byrne about it.", .document).plainText
+                == "1. Update the form\n2. Call Mr. Byrne about it")
+    }
+
     @Test func spokenCommandsSwitchKeepsLayoutCuesAsWords() {
         let raw = "Heading: shopping list. Bullet point milk bullet point eggs"
         let r = DictationPipeline.process(raw, context: PostProcessContext(appBundleID: nil, vocabulary: [], style: .notes,
@@ -302,6 +313,13 @@ struct NoteEditCommandTests {
         #expect(NoteEditCommand.apply("change room 3 to room 4", to: "Room 3 at 3 pm.")?.text == "Room 4 at 3 pm.")
         // A delete in lowercase text keeps it lowercase.
         #expect(NoteEditCommand.apply("delete really", to: "the getUserName call is really slow")?.text == "the getUserName call is slow")
+    }
+
+    @Test func composerTellsCommandsFromEdits() {
+        #expect(NoteEditCommand.command("change Tuesday to Friday", for: "See you Tuesday.")?.text == "See you Friday.")
+        // An edited copy that happens to start like a command is an edit.
+        #expect(NoteEditCommand.command("Delete the old files today.", for: "Delete the old files.") == nil)
+        #expect(NoteEditCommand.command("See you Friday.", for: "See you Tuesday.") == nil)
     }
 
     @Test func deleteAndAdd() {

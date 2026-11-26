@@ -340,3 +340,6 @@
 {"raw": "Take vitamin A. The dose is small.", "expected": "Take vitamin A. The dose is small.", "category": "mustNotChange", "note": "a capital A is a letter, not the article"}
 {"raw": "We need new line items in the budget.", "expected": "We need new line items in the budget.", "category": "mustNotChange", "note": "new line items is a noun phrase"}
 {"raw": "Can you get me a quote for the roof? Um, the the gutters too.", "expected": "Can you get me a quote for the roof? The gutters too.", "category": "filler", "note": "the noun quote does not stop the rest being cleaned"}
+{"raw": "Ring Dr. Byrne about the results, e.g. the bloods.", "expected": "Ring Dr. Byrne about the results, e.g. the bloods.", "category": "mustNotChange", "note": "abbreviations don't start a sentence, so nothing after them is capitalised"}
+{"raw": "Ask Mr. O'Connell, i.e. the new consultant, to call me.", "expected": "Ask Mr. O'Connell, i.e. the new consultant, to call me.", "category": "mustNotChange", "note": "i.e. keeps the next word lowercase"}
+{"raw": "The clinic on St. Patrick's Road opens at 9 a.m. tomorrow.", "expected": "The clinic on St. Patrick's Road opens at 9 a.m. tomorrow.", "category": "mustNotChange", "note": "St. and a.m. mid-sentence"}
