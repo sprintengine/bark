@@ -147,7 +147,8 @@ private struct TopBar: View {
     var body: some View {
         HStack(spacing: 10) {
             if !model.sidebarVisible {
-                SidebarToggle().padding(.leading, WindowChrome.afterLights - 24)
+                // Where the sidebar's header puts it, so it never moves under the traffic lights.
+                SidebarToggle().padding(.leading, WindowChrome.afterLights)
             }
             Breadcrumb()
             Spacer(minLength: 12)
