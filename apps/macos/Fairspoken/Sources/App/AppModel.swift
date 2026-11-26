@@ -30,10 +30,42 @@ final class AppModel {
     }
 
     var section: Section = .home {
-        didSet { if section != .home { homeShowsAllDictations = false } }
+        didSet { if section != .home { selectedDictationID = nil } }
     }
-    /// Home's "See all": every kept dictation, searchable, instead of the overview.
-    var homeShowsAllDictations = false
+    /// The dictation open in the main area (a row of the sidebar's thread list). Nil is Home,
+    /// the new-dictation screen.
+    var selectedDictationID: String?
+    /// The thread list's search text and filter.
+    var historyQuery = ""
+    var historyFilter: HistoryFilter = .all
+    /// Bumped to move the keyboard focus to the sidebar's search field (⌘K).
+    var searchFocusRequest = 0
+    /// Screenshots: the thread row drawn as if under the pointer.
+    var showcaseHoveredRow: String?
+    /// Bumped to start editing the open dictation's text (⏎ in the thread list).
+    var editRequest = 0
+    /// Dictations being transcribed again from their kept recording.
+    var retryingDictations: Set<String> = []
+    /// What the last action on a dictation did ("Copied", "Pasted into Mail"), shown briefly.
+    var dictationNotice: String?
+
+    enum HistoryFilter: String, CaseIterable, Identifiable {
+        case all, notes, clipboard
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .all: "All dictations"
+            case .notes: "Notes"
+            case .clipboard: "Copied to the clipboard"
+            }
+        }
+    }
+
+    /// Opens a dictation from the thread list (or Home, with nil).
+    func open(dictation id: String?) {
+        if section != .home { section = .home }
+        selectedDictationID = id
+    }
     /// The main window's sidebar is shown (View › Show Sidebar, ⌃⌘S, or the toolbar's sidebar
     /// button). Remembered across launches.
     var sidebarVisible = !UserDefaults.standard.bool(forKey: "SidebarHidden") {

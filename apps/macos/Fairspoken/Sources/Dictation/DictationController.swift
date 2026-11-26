@@ -80,6 +80,8 @@ final class DictationController {
     private(set) var liveText = ""
     /// Latest transcript produced while our own window was frontmost ("Try dictation").
     private(set) var lastInAppResult: Result?
+    /// The history entry of the last dictation shown in Bark's own window.
+    private(set) var lastInAppHistoryID: String?
     /// What `.transcribing` is doing when it isn't the first attempt ("Retrying the host (1 of 2)").
     private(set) var transcribingNote: String?
 
@@ -441,13 +443,19 @@ final class DictationController {
         let total = Int((ContinuousClock.now - released) / .milliseconds(1))
         let transcribeMs = Int((transcribed - released) / .milliseconds(1))
         let now = Date()
-        let entry = TranscriptHistoryItem(
+        var entry = TranscriptHistoryItem(
             id: "transcript-\(Int64(now.timeIntervalSince1970 * 1000))",
             createdAt: Int64(now.timeIntervalSince1970 * 1000), text: text, backend: output.backend,
             location: output.placement == .remoteHost ? "remote-host" : "local", durationSeconds: durationSeconds,
             timings: DictationTimings(transcribeMs: transcribeMs, speechModelMs: output.modelMs, totalMs: total),
             model: output.model, appName: item.appName, appBundleId: item.appBundleId)
+        // What the model heard, for the dictation view's bubble and diff.
+        entry.rawText = output.text
+        // Dictated into Bark's own window (Home's composer): a note.
+        if delivery == .shownInApp { entry.isNote = true }
+        if case .copied = delivery { entry.clipboardOnly = true }
         history.add(entry)
+        if delivery == .shownInApp { lastInAppHistoryID = entry.id }
         // The recording already on disk moves to the post-training folder; nothing is written twice.
         let captureID = pending.keepForTraining(item.id, samples: samples, rawText: output.text, finalText: text, model: output.model,
                                                 appBundleID: item.appBundleId)

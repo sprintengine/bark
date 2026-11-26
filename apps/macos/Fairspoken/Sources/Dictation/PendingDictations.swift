@@ -181,11 +181,13 @@ final class PendingDictations {
         guard !text.isEmpty else { return false }
         if copy { TextInserter.copy(text) }
         keepForTraining(item.id, samples: nil, rawText: output.text, finalText: text, model: output.model, appBundleID: item.appBundleId)
-        history.add(TranscriptHistoryItem(
+        var entry = TranscriptHistoryItem(
             id: "transcript-\(item.createdAt)", createdAt: item.createdAt, text: text, backend: output.backend,
             location: output.placement == .remoteHost ? "remote-host" : "local", durationSeconds: item.durationSeconds,
             timings: DictationTimings(transcribeMs: output.modelMs, speechModelMs: output.modelMs, totalMs: 0),
-            model: output.model, appName: item.appName, appBundleId: item.appBundleId))
+            model: output.model, appName: item.appName, appBundleId: item.appBundleId)
+        entry.rawText = output.text
+        history.add(entry)
         onRecovered?(WordCounter.count(text), copy, output.placement)
         return true
     }
