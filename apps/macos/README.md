@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Bark,Bark Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (294), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
+scripts/test.sh                       # unit tests: FairspokenCore (297), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Bark → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Bark Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Bark-<version>-macos-arm64.{zip,dmg}
@@ -252,7 +252,7 @@ than a missed fix, so every rule needs clear evidence and anything ambiguous is 
 
 Quoted speech is never changed. Settings › Transcription has three switches (`cleanupFillers`,
 `cleanupSelfCorrections`, `cleanupSpokenCommands`, all on). The golden fixtures in
-`Packages/FairspokenCore/Tests/FairspokenCoreTests/Fixtures/cleanup-fixtures.jsonl` (328 cases, 163
+`Packages/FairspokenCore/Tests/FairspokenCoreTests/Fixtures/cleanup-fixtures.jsonl` (342 cases, 176
 of them must-not-change) report exact matches per category and a harm count of content words
 wrongly removed or added, which must stay at 0.
 
@@ -272,8 +272,9 @@ github.com → Code), which beats the user's default (Clean). The destination is
 starts, off the main thread within 300 ms (`DestinationReader`): the app, the window title, whether
 the field is single-line, and in a browser the page's `AXURL` (or the window's `AXDocument`), cut to
 scheme, host and path. A single-line field gets no multi-line layout; terminals and secure fields are
-always Verbatim and plain. The pill can change one dictation's style (`setStyleOverride`) and make it
-the rule for the app or site (`alwaysUseStyle`). Each history item records the raw text, the edits,
+always Verbatim and plain, whatever was chosen. While recording, the pill can change the dictation's
+style (`setStyleOverride`) and make it the rule for the site, or for the app when the user already has
+a rule for that browser (`alwaysUseStyle`, `alwaysUseTarget`). Each history item records the raw text, the edits,
 the style and why, the website's host and the time cleanup took.
 
 `Contents/MacOS/Fairspoken --pipeline-demo` (Debug builds) prints sample dictations through every style.

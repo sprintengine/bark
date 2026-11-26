@@ -44,7 +44,7 @@ public enum DictationPipeline {
         // 4. Layout.
         let text = TranscriptTokenizer.render(tokens, multiline: context.allowsMultiline)
         let (plain, html, layoutEdits) = StyleFormatter.format(tokens, style: style, multiline: context.allowsMultiline,
-                                                               richText: context.allowsRichText)
+                                                               richText: context.allowsRichText, spokenCues: context.cleanup.spokenCommands)
         for e in layoutEdits.sorted() { add(e.edit.kind, e.edit.removed, e.edit.inserted, at: e.position) }
         return PostProcessResult(text: text, plainText: plain, html: html, edits: edits.sorted().map(\.edit),
                                  style: style, styleReason: context.styleReason)
@@ -115,13 +115,5 @@ public enum DictationPipeline {
         }
         flush()
         return (result, changes)
-    }
-}
-
-/// Post-processing as a `TranscriptPostProcessor`, for callers that only want the text.
-public struct StylePostProcessor: TranscriptPostProcessor {
-    public init() {}
-    public func process(_ text: String, context: PostProcessContext) async -> String {
-        DictationPipeline.process(text, context: context).plainText
     }
 }

@@ -102,9 +102,8 @@ enum TranscriptTokenizer {
                 core = core.dropLast()
             }
             let isPunctuation = core.isEmpty
-            if isPunctuation, pendingBreak == 0, var last = tokens.popLast(), Self.joinsPrevious(lead + trail) {
-                last.trail += lead + trail
-                tokens.append(last)
+            if isPunctuation, pendingBreak == 0, Self.joinsPrevious(lead + trail), !tokens.isEmpty {
+                tokens[tokens.count - 1].trail += lead + trail
                 return
             }
             tokens.append(WordToken(lead: lead, core: String(core), trail: trail, origin: index, breakBefore: pendingBreak))
@@ -138,14 +137,21 @@ enum TranscriptTokenizer {
     }
 
     /// Marks words inside double quotes, and between spoken "quote" and "unquote"/"end quote".
+    /// A spoken quote opens only when "unquote" or "end quote" closes it later, so the noun
+    /// ("a quote for the roof") never stops the rest of a dictation from being cleaned.
     static func markQuotes(_ tokens: inout [WordToken]) {
         var open = false
         var spoken = false
+        let closers = tokens.indices.filter { tokens[$0].lower == "unquote" || (tokens[$0].lower == "quote" && $0 > 0 && tokens[$0 - 1].lower == "end") }
         for i in tokens.indices {
             let opens = tokens[i].lead.contains { $0 == "\"" || $0 == "“" }
             if opens { open = true }
             let lower = tokens[i].lower
-            if !open, lower == "quote", i + 1 < tokens.count, tokens[i].trail.isEmpty || tokens[i].endsWithComma { spoken = true }
+            if !open, lower == "quote", i + 1 < tokens.count, tokens[i].trail.isEmpty || tokens[i].endsWithComma,
+               !(i > 0 && (CleanupLexicon.determiners.contains(tokens[i - 1].lower) || tokens[i - 1].lower == "end")),
+               closers.contains(where: { $0 > i + 1 }) {
+                spoken = true
+            }
             if open || spoken { tokens[i].quoted = true }
             if spoken, lower == "unquote" || (lower == "quote" && i > 0 && tokens[i - 1].lower == "end") { spoken = false }
             let closes = tokens[i].trail.contains { $0 == "\"" || $0 == "”" }

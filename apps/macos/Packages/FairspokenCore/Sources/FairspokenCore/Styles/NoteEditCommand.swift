@@ -2,8 +2,9 @@ import Foundation
 
 /// Simple, deterministic edit commands for the composer under a dictation ("correct this
 /// dictation"): "change X to Y", "replace X with Y", "delete X", "add Y at the end" (and "at
-/// the start"). Nil when the command isn't one of these, or X isn't in the text: the composer
-/// then treats what was typed as a note instead.
+/// the start"). Nil when the command isn't one of these, or X isn't in the text exactly once
+/// ("delete it" in a text with three "it"s is ambiguous): the composer then treats what was
+/// typed as a note instead.
 public enum NoteEditCommand {
     public struct Result: Equatable, Sendable {
         public var text: String
@@ -50,14 +51,14 @@ public enum NoteEditCommand {
         return nil
     }
 
-    /// Every whole-phrase, case-insensitive occurrence of `from` replaced (or removed), with a
+    /// The one whole-phrase, case-insensitive occurrence of `from` replaced (or removed), with a
     /// capital kept where the old words had one, and spacing and punctuation tidied after removal.
     static func replace(_ from: String, with to: String, in text: String) -> Result? {
         let pattern = "(?<![\\p{L}\\p{N}])" + NSRegularExpression.escapedPattern(for: from) + "(?![\\p{L}\\p{N}])"
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
         let ns = text as NSString
         let matches = regex.matches(in: text, range: NSRange(location: 0, length: ns.length))
-        guard !matches.isEmpty else { return nil }
+        guard matches.count == 1 else { return nil }
         var out = ""
         var cursor = 0
         var edits: [CleanupEdit] = []
@@ -71,7 +72,7 @@ public enum NoteEditCommand {
             cursor = m.range.location + m.range.length
         }
         out += ns.substring(from: cursor)
-        if to.isEmpty { out = tidyAfterRemoval(out) }
+        if to.isEmpty { out = tidyAfterRemoval(out, removedAtStart: matches[0].range.location == 0) }
         return Result(text: out, edits: edits)
     }
 
@@ -94,13 +95,12 @@ public enum NoteEditCommand {
         s.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\"'“”‘’")))
     }
 
-    /// Collapses the double spaces and stranded punctuation a removal leaves, and restores the
-    /// capital at the start of a sentence.
-    static func tidyAfterRemoval(_ text: String) -> String {
+    /// Collapses the double spaces and stranded punctuation a removal leaves, and gives the text
+    /// its capital back when the removed words began it. Casing elsewhere is left as it was.
+    static func tidyAfterRemoval(_ text: String, removedAtStart: Bool) -> String {
         var tokens = TranscriptTokenizer.tokenize(text)
         for i in tokens.indices where tokens[i].trail.count > 1 { tokens[i].trail = CleanupWork.tidyTrail(tokens[i].trail) }
-        if let first = tokens.indices.first { tokens[first].capitalise() }
-        for i in tokens.indices.dropFirst() where tokens[i - 1].endsSentence { tokens[i].capitalise() }
+        if removedAtStart, let first = tokens.indices.first { tokens[first].capitalise() }
         return TranscriptTokenizer.render(tokens)
     }
 }

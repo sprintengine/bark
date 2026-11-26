@@ -37,9 +37,10 @@ enum CleanupLexicon {
     static let conjunctions: Set<String> = ["and", "but", "or", "nor", "so", "because", "if", "when", "while", "that", "than", "then", "whether", "where", "which", "who", "what", "how", "why"]
 
     /// Words a sentence cannot end on: a full stop after one is a pause, not an ending.
+    /// ("of" and "each" are left out: "all I can think of." and "five euros each." end sentences.)
     static let cannotEndSentence: Set<String> = [
-        "a", "an", "the", "of", "and", "or", "but", "nor", "my", "your", "our", "their", "its", "than",
-        "because", "whether", "every", "each",
+        "a", "an", "the", "and", "or", "but", "nor", "my", "your", "our", "their", "its", "than",
+        "because", "whether", "every",
     ]
 
     /// Words after which a clause is clearly unfinished: a fragment ending on one was abandoned.

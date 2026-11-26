@@ -11,17 +11,22 @@ public enum StyleFormatter {
     }
 
     /// Formats `text` (already cleaned) for `style`.
-    public static func format(_ text: String, style: DictationStyle.ID, multiline: Bool = true, richText: Bool = true) -> Output {
-        let (plain, html, edits) = format(TranscriptTokenizer.tokenize(text), style: style, multiline: multiline, richText: richText)
+    /// `spokenCues` is the user's spoken-commands switch: without it, "heading", "bullet point" and
+    /// "number one" stay words.
+    public static func format(_ text: String, style: DictationStyle.ID, multiline: Bool = true, richText: Bool = true,
+                              spokenCues: Bool = true) -> Output {
+        let (plain, html, edits) = format(TranscriptTokenizer.tokenize(text), style: style, multiline: multiline, richText: richText,
+                                          spokenCues: spokenCues)
         return Output(plainText: plain, html: html, edits: edits.sorted().map(\.edit))
     }
 
-    static func format(_ tokens: [WordToken], style: DictationStyle.ID, multiline: Bool, richText: Bool) -> (String, String?, [PositionedEdit]) {
+    static func format(_ tokens: [WordToken], style: DictationStyle.ID, multiline: Bool, richText: Bool,
+                       spokenCues: Bool = true) -> (String, String?, [PositionedEdit]) {
         guard multiline else { return (TranscriptTokenizer.render(tokens, multiline: false), nil, []) }
         var layout = Layout(tokens)
         switch style {
         case .email: layout.layOutEmail()
-        case .notes, .document: layout.layOutStructured()
+        case .notes, .document: if spokenCues { layout.layOutStructured() } else { layout.blocks = layout.paragraphs(tokens[...]) }
         case .verbatim, .casual, .clean, .code: return (TranscriptTokenizer.render(tokens), nil, [])
         }
         let html = richText && style.producesHTML ? layout.html() : nil
@@ -189,9 +194,11 @@ struct Layout {
         let tok = t[i]
         guard !tok.quoted else { return nil }
         let prevIsDeterminer = i > 0 && L.determiners.contains(t[i - 1].lower) && !t[i - 1].hasPause
-        if tok.lower == "bullet", !prevIsDeterminer {
-            if i + 1 < t.count, t[i + 1].lower == "point" || t[i + 1].lower == "points", tok.trail.isEmpty { return (.bullet, 2) }
-            if tok.hasPause || isSentenceStart(i) { return (.bullet, 1) }
+        // "bullet point" (never "points": "use bullet points for the summary" is prose) at the
+        // start of a sentence or after a pause, or anywhere once the dictation has another one.
+        if tok.lower == "bullet", !prevIsDeterminer, i + 2 < t.count, t[i + 1].lower == "point", tok.trail.isEmpty,
+           isSentenceStart(i) || t[i - 1].hasPause || listOpen || bulletCueCount >= 2 {
+            return (.bullet, 2)
         }
         if ["next", "new"].contains(tok.lower), i + 1 < t.count, tok.trail.isEmpty, !prevIsDeterminer {
             let w = t[i + 1].lower
@@ -214,6 +221,11 @@ struct Layout {
         return nil
     }
 
+    /// "bullet point" pairs in the whole dictation: two or more make a list wherever they sit.
+    private var bulletCueCount: Int {
+        (0..<max(0, t.count - 1)).filter { t[$0].lower == "bullet" && t[$0 + 1].lower == "point" && !t[$0].quoted }.count
+    }
+
     mutating func layOutStructured() {
         // Numbered and ordinal lists count only as a sequence from one.
         let numbered = sequenceCues { if case .numbered(let n) = $0 { n } else { nil } }
@@ -232,8 +244,21 @@ struct Layout {
         }
         func flushList() {
             flushItem()
-            if let l = list, !l.items.isEmpty { out.append(.list(ordered: l.ordered, items: l.items)) }
+            guard var l = list, !l.items.isEmpty else { list = nil; return }
+            // "…Number two, book the room. Let me know if that works.": the last item ends with its
+            // first sentence, and what follows is a paragraph after the list.
+            var after: [WordToken] = []
+            if var last = l.items.popLast() {
+                if let end = last.firstIndex(where: \.endsSentence), end < last.count - 1 {
+                    after = Array(last[(end + 1)...])
+                    last = Array(last[...end])
+                    if !after.isEmpty { after[0].breakBefore = 2 }
+                }
+                l.items.append(last)
+            }
+            out.append(.list(ordered: l.ordered, items: l.items))
             list = nil
+            paragraph = after
         }
 
         while i < t.count {

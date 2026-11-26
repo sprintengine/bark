@@ -34,9 +34,14 @@ nonisolated enum DestinationReader {
             return DictationDestination(bundleID: bundleID, appName: name, isSecureField: true)
         }
         let browser = isBrowser(bundleID)
+        let chromium = browser && FieldReader.isChromiumBased(bundleURL: nil, bundleID: bundleID)
         let terminal = AppCategory.of(bundleID: bundleID) == .terminal
         let read = await FieldReader.withTimeout(deadline) {
-            snapshot(pid: pid, bundleID: bundleID, appName: name, wantsURL: browser, readsField: !terminal)
+            // Chromium builds the tree with page addresses only for assistive apps it knows
+            // about: ask for it here too, whatever the edit watcher's settings (it is built
+            // lazily, so the controller asks again a moment later if the address isn't there yet).
+            if chromium { _ = FieldReader.enableManualAccessibility(pid: pid) }
+            return snapshot(pid: pid, bundleID: bundleID, appName: name, wantsURL: browser, readsField: !terminal)
         }
         var destination = read ?? basic
         if IsSecureEventInputEnabled() { destination.isSecureField = true }

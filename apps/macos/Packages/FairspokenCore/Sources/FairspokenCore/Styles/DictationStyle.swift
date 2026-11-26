@@ -288,17 +288,47 @@ public struct StyleRules: Codable, Equatable, Sendable {
         sites.removeAll { $0.id == id }
     }
 
-    /// "Always use this for <app or site>": a site rule when the dictation went to a website,
-    /// otherwise an app rule. False when there is nothing to attach a rule to.
+    /// What "Always use this for …" attaches a rule to.
+    public enum RuleTarget: Equatable, Sendable {
+        case app(bundleID: String, name: String?)
+        case site(host: String)
+
+        /// "Mail", "mail.google.com".
+        public var label: String {
+            switch self {
+            case .app(let bundleID, let name): name ?? bundleID
+            case .site(let host): host
+            }
+        }
+    }
+
+    /// The rule "always use" would write for `destination`, so that it is the one `resolve`
+    /// then reaches: the website, unless the user already has a rule for the browser itself (an
+    /// app rule beats a site rule), in which case that app rule. Nil for a terminal or a secure
+    /// field, which are always verbatim, and when there is no app to attach a rule to.
+    public func alwaysUseTarget(for destination: DictationDestination) -> RuleTarget? {
+        if Self.isForced(destination) { return nil }
+        let bundleID = destination.bundleID.flatMap { $0.isEmpty ? nil : $0 }
+        if let host = destination.host, bundleID.map({ id in !apps.contains { $0.bundleID == id } }) ?? true {
+            return .site(host: host)
+        }
+        return bundleID.map { .app(bundleID: $0, name: destination.appName) }
+    }
+
+    /// "Always use this for <app or site>" (`alwaysUseTarget`). False when no rule could apply.
     @discardableResult
     public mutating func alwaysUse(_ style: DictationStyle.ID, for destination: DictationDestination) -> Bool {
-        if let host = destination.host {
-            setSite(host, style: style)
-            return true
+        switch alwaysUseTarget(for: destination) {
+        case .site(let host)?: setSite(host, style: style)
+        case .app(let bundleID, let name)?: setApp(bundleID, appName: name, style: style)
+        case nil: return false
         }
-        guard let bundleID = destination.bundleID, !bundleID.isEmpty else { return false }
-        setApp(bundleID, appName: destination.appName, style: style)
         return true
+    }
+
+    /// Terminals, password managers and secure fields: always verbatim and plain.
+    static func isForced(_ d: DictationDestination) -> Bool {
+        d.isSecureField || d.isTerminal || d.bundleID.map(isPasswordManager) == true
     }
 
     // MARK: Resolving
@@ -313,11 +343,11 @@ public struct StyleRules: Codable, Equatable, Sendable {
         if d.isSecureField || d.bundleID.map(Self.isPasswordManager) == true {
             return StyleResolution(style: .verbatim, reason: "Secure field", source: .forced, allowsMultiline: false, allowsRichText: false)
         }
-        if let override { return make(override, "You chose this", .dictation) }
-        // A terminal runs what it is given: no commands, no cleanup, nothing rich.
+        // A terminal runs what it is given: no commands, no cleanup, nothing rich, whatever was chosen.
         if d.isTerminal {
             return StyleResolution(style: .verbatim, reason: "Terminal", source: .forced, allowsMultiline: false, allowsRichText: false)
         }
+        if let override { return make(override, "You chose this", .dictation) }
         let appName = d.appName ?? "this app"
         if let bundleID = d.bundleID, let rule = apps.last(where: { $0.bundleID == bundleID }) {
             return make(rule.style, "Your rule for \(rule.appName ?? appName)", .app)

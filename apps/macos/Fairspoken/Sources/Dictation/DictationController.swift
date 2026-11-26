@@ -586,8 +586,11 @@ final class DictationController {
         currentStyle = settings.settings.styleRules.resolve(read, override: styleOverride)
     }
 
-    /// The pill's menu: this dictation only. Nil goes back to the rules.
-    func setStyleOverride(_ style: DictationStyle.ID?) {
+    /// The pill's menu: this dictation only. Nil goes back to the rules. Only while listening:
+    /// the style is fixed when the recording ends, so a later choice would show without applying.
+    @discardableResult
+    func setStyleOverride(_ style: DictationStyle.ID?) -> Bool {
+        guard phase.isListening, !isMeasuring else { return false }
         styleOverride = style
         if let destination {
             currentStyle = settings.settings.styleRules.resolve(destination, override: style)
@@ -596,25 +599,27 @@ final class DictationController {
         } else {
             currentStyle = startedInWindow == Self.dashboardWindow ? StyleChoice.noteResolution : nil
         }
+        return true
     }
 
-    /// What "Always use for …" would attach a rule to: the website's host, else the app's name.
-    var alwaysUseTarget: String? {
-        guard let destination else { return nil }
-        return destination.host ?? destination.appName ?? destination.bundleID
+    /// What "Always use for …" would attach a rule to ("Mail", "mail.google.com"); nil for a
+    /// terminal or a secure field, and for a recording in Bark's own window.
+    var alwaysUseTarget: StyleRules.RuleTarget? {
+        destination.flatMap { settings.settings.styleRules.alwaysUseTarget(for: $0) }
     }
 
-    /// "Always use <style> for <app or site>": writes the rule, and uses it for this dictation.
+    /// "Always use <style> for <app or site>": writes the rule, and while listening uses it for
+    /// this dictation too.
     @discardableResult
     func alwaysUseStyle(_ style: DictationStyle.ID) -> Bool {
         guard let destination else { return false }
         var wrote = false
         settings.update { wrote = $0.styleRules.alwaysUse(style, for: destination) }
         guard wrote else { return false }
-        styleOverride = nil
-        currentStyle = settings.settings.styleRules.resolve(destination)
-        // A rule for a terminal or a secure field doesn't change what they get: say so here.
-        if currentStyle?.style != style { styleOverride = style; currentStyle = settings.settings.styleRules.resolve(destination, override: style) }
+        if phase.isListening {
+            styleOverride = nil
+            currentStyle = settings.settings.styleRules.resolve(destination)
+        }
         return true
     }
 

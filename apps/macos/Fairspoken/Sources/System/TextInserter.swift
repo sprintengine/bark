@@ -67,7 +67,8 @@ enum TextInserter {
 
         let switchedApps = expectedApp != nil && front != expectedApp
         let saved = restoreClipboard && !switchedApps ? snapshot(pasteboard) : nil
-        write(text, to: pasteboard, transient: saved != nil)
+        // The layout was made for the app the recording started in: elsewhere, words only.
+        Self.write(text, html: switchedApps ? nil : html, to: pasteboard, transient: saved != nil)
         let ourChange = pasteboard.changeCount
         postCommandV()
 

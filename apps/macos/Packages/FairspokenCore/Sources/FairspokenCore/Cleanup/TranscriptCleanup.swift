@@ -206,6 +206,7 @@ struct CleanupWork {
     private static let commandNounFollowers: Set<String> = [
         "of", "for", "separated", "delimited", "splice", "splices", "sign", "over", "about", "is", "was",
         "has", "had", "there", "here", "key", "button", "character", "after", "between", "in",
+        "item", "items", "manager", "managers", "extension", "extensions", "number", "numbers", "rental",
     ]
 
     mutating func applySpokenCommands() {
@@ -334,12 +335,25 @@ struct CleanupWork {
                   t[j + 1].breakBefore == 0 {
                 j += 1
             }
+            // "If you need it, it is in the drawer": a comma closing a clause separates two words.
+            if j > i, (i..<j).contains(where: { t[$0].endsWithComma }), clauseOpensWithSubordinator(endingAt: i) {
+                i = j + 1
+                continue
+            }
             if j > i {
                 remove(i..<j, kind: .repetition)
                 continue
             }
             i += 1
         }
+    }
+
+    /// The clause ending at word `e` opens with "if", "when", "because"…
+    func clauseOpensWithSubordinator(endingAt e: Int) -> Bool {
+        let start = sentenceStart(of: e)
+        var i = e - 1
+        while i >= start, !t[i].hasPause { i -= 1 }
+        return i + 1 <= e && L.subordinators.contains(t[i + 1].lower)
     }
 
     /// Words that can be doubled grammatically ("what it is is", "carry on on Monday", "she had
@@ -394,7 +408,8 @@ struct CleanupWork {
             if k > 0 && (x.breakBefore > 0 || y.breakBefore > 0) { return false }
         }
         let firstEnd = t[b - 1]
-        if firstEnd.endsSentence && n < 3 { return false }
+        // "I love you. I love you more every day.": a finished sentence is not a restart.
+        if firstEnd.endsSentence { return false }
         if firstEnd.trail.contains("?") || firstEnd.trail.contains("!") { return false }
         let secondEnd = t[b + n - 1]
         if secondEnd.endsSentence { return false }
@@ -467,6 +482,9 @@ struct CleanupWork {
             guard (0..<cue.count).allSatisfy({ t[c + $0].lower == cue[$0] && !t[c + $0].quoted }) else { continue }
             // Inside a cue only a comma may sit between words ("no, wait").
             guard (c..<(end - 1)).allSatisfy({ t[$0].trail.isEmpty || t[$0].trail == "," }) else { continue }
+            // "I can't do Monday, sorry. Tuesday?": a cue that ends its sentence is an apology, not
+            // a correction. (Taking back a clause with "Scratch that." is checked on its own.)
+            if t[end - 1].endsSentence && !Self.clauseCues.contains(cue) { continue }
             return cue
         }
         return nil
@@ -694,7 +712,9 @@ struct CleanupWork {
         while i + 1 < t.count {
             let tok = t[i]
             // A full stop after a word that can't end a sentence was a pause.
-            if !tok.quoted, tok.trail == ".", L.cannotEndSentence.contains(tok.lower), t[i + 1].breakBefore == 0, !t[i + 1].quoted {
+            let ofAfterQuantifier = tok.lower == "of" && i > 0 && Self.quantifiers.contains(t[i - 1].lower)
+            if !tok.quoted, tok.trail == ".", L.cannotEndSentence.contains(tok.lower) || ofAfterQuantifier, tok.core != "A",
+               t[i + 1].breakBefore == 0, !t[i + 1].quoted {
                 let before = TranscriptTokenizer.render(t[i...(i + 1)])
                 t[i].trail = ""
                 if t[i + 1].isCapitalised, !t[i + 1].isAllCaps, !Self.isIForm(t[i + 1].lower), !isTaggedName(i + 1) {
@@ -714,6 +734,9 @@ struct CleanupWork {
             i += 1
         }
     }
+
+    /// "one of." can't end a sentence; "all I can think of." can.
+    static let quantifiers: Set<String> = ["one", "some", "most", "many", "none", "both", "any", "each", "several", "few", "part", "lots", "all"]
 
     static func tidyTrail(_ trail: String) -> String {
         guard trail.count > 1 else { return trail }

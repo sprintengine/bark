@@ -58,6 +58,19 @@ struct StyleFormatterTests {
         #expect(r.html == "<div>Things to do today.</div><ol><li>Ring the pharmacy</li><li>Send the referral</li><li>Book the room</li></ol>")
     }
 
+    @Test func listEndsWithItsLastSentence() {
+        let r = run("Number one, ring the pharmacy. Number two, book the room. Let me know if that works.", .notes)
+        #expect(r.plainText == "1. Ring the pharmacy\n2. Book the room\n\nLet me know if that works.")
+        #expect(r.html == "<ol><li>Ring the pharmacy</li><li>Book the room</li></ol><div>Let me know if that works.</div>")
+    }
+
+    @Test func spokenCommandsSwitchKeepsLayoutCuesAsWords() {
+        let raw = "Heading: shopping list. Bullet point milk bullet point eggs"
+        let r = DictationPipeline.process(raw, context: PostProcessContext(appBundleID: nil, vocabulary: [], style: .notes,
+                                                                           cleanup: CleanupSettings(spokenCommands: false)))
+        #expect(r.plainText == raw)
+    }
+
     @Test func documentOrdinalList() {
         let r = run("First, we need to update the consent form. Second, the audit is due. Third, the new nurse starts Monday.", .document)
         #expect(r.plainText == "1. We need to update the consent form\n2. The audit is due\n3. The new nurse starts Monday")
@@ -66,7 +79,8 @@ struct StyleFormatterTests {
 
     @Test func structuredStylesLeaveOrdinaryWordsAlone() {
         for raw in ["Heading home now.", "Add a bullet point here.", "She is my number one priority.", "First of all, thanks for coming.",
-                    "The first patient is at nine and the second at ten."] {
+                    "The first patient is at nine and the second at ten.", "Use bullet points for the summary.",
+                    "We should use bullet points here and keep it short.", "Put it in bullet point form."] {
             #expect(run(raw, .notes).plainText == raw)
             #expect(run(raw, .document).plainText == raw)
         }
@@ -158,8 +172,13 @@ struct StyleRulesTests {
         #expect(secure.style == .verbatim)
         #expect(secure.source == .forced)
         #expect(rules.resolve(.init(bundleID: "com.1password.1password")).style == .verbatim)
-        // Choosing a style in the pill still works in a terminal.
-        #expect(rules.resolve(.init(bundleID: "com.apple.Terminal"), override: .clean).style == .clean)
+        // Not even a choice in the pill reshapes what a terminal runs, and no rule is written for one.
+        #expect(rules.resolve(.init(bundleID: "com.apple.Terminal"), override: .clean).style == .verbatim)
+        var writable = rules
+        let wrote = writable.alwaysUse(.clean, for: .init(bundleID: "com.apple.Terminal"))
+        #expect(!wrote)
+        #expect(writable.apps.isEmpty)
+        #expect(rules.alwaysUseTarget(for: .init(bundleID: "com.apple.mail", isSecureField: true)) == nil)
     }
 
     @Test func singleLineFieldsGetNoLayouts() {
@@ -182,6 +201,15 @@ struct StyleRulesTests {
         rules.removeApp("com.apple.mail")
         rules.removeSite("mail.google.com")
         #expect(rules.apps.isEmpty && rules.sites.isEmpty)
+        // With a rule for the browser itself, a site rule would never be reached: the browser's
+        // rule is the one updated, so "always use" keeps working.
+        rules.setApp("com.google.Chrome", appName: "Chrome", style: .verbatim)
+        let gmail = DictationDestination(bundleID: "com.google.Chrome", appName: "Chrome", url: "https://mail.google.com/mail/")
+        #expect(rules.alwaysUseTarget(for: gmail) == .app(bundleID: "com.google.Chrome", name: "Chrome"))
+        let updated = rules.alwaysUse(.email, for: gmail)
+        #expect(updated)
+        #expect(rules.resolve(gmail).style == .email)
+        #expect(rules.sites.isEmpty)
     }
 
     @Test func urlsKeepOnlySchemeHostAndPath() {
@@ -266,6 +294,14 @@ struct NoteEditCommandTests {
         // A capital stays a capital.
         #expect(NoteEditCommand.apply("change thanks to cheers", to: "Thanks, Niamh.")?.text == "Cheers, Niamh.")
         #expect(NoteEditCommand.apply("change Friday to Monday", to: "See you Tuesday.") == nil)
+    }
+
+    @Test func ambiguousTargetsAreLeftAlone() {
+        #expect(NoteEditCommand.apply("delete it", to: "Put it on the desk and leave it there.") == nil)
+        #expect(NoteEditCommand.apply("change 3 to 4", to: "Room 3 at 3 pm.") == nil)
+        #expect(NoteEditCommand.apply("change room 3 to room 4", to: "Room 3 at 3 pm.")?.text == "Room 4 at 3 pm.")
+        // A delete in lowercase text keeps it lowercase.
+        #expect(NoteEditCommand.apply("delete really", to: "the getUserName call is really slow")?.text == "the getUserName call is slow")
     }
 
     @Test func deleteAndAdd() {

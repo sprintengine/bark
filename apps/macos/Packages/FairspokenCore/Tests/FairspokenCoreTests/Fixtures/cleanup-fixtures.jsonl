@@ -326,3 +326,17 @@
 {"raw": "The meeting is at 3, sorry I'm late with this.", "expected": "The meeting is at 3, sorry I'm late with this.", "category": "mustNotChange", "note": "sorry I'm"}
 {"raw": "So, so many people came.", "expected": "So, so many people came.", "category": "mustNotChange", "note": "so so with a comma"}
 {"raw": "It's so so, nothing special.", "expected": "It's so so, nothing special.", "category": "mustNotChange", "note": "so so means mediocre"}
+{"raw": "Wait — really?", "expected": "Wait — really?", "category": "mustNotChange", "note": "a dash standing alone keeps the word before it"}
+{"raw": "Fine – see you there.", "expected": "Fine – see you there.", "category": "mustNotChange", "note": "an en dash standing alone keeps the word before it"}
+{"raw": "I love you. I love you more every day.", "expected": "I love you. I love you more every day.", "category": "mustNotChange", "note": "a finished sentence repeated as the start of the next is not a restart"}
+{"raw": "Call me tomorrow. Call me tomorrow if you can't make it.", "expected": "Call me tomorrow. Call me tomorrow if you can't make it.", "category": "mustNotChange", "note": "a finished sentence is never taken as an abandoned clause"}
+{"raw": "I can't do Monday, sorry. Tuesday?", "expected": "I can't do Monday, sorry. Tuesday?", "category": "mustNotChange", "note": "sorry ending its sentence is an apology"}
+{"raw": "Not the red one, sorry. The blue one.", "expected": "Not the red one, sorry. The blue one.", "category": "mustNotChange", "note": "sorry ending its sentence before a noun phrase"}
+{"raw": "I can't make 5, sorry. 6?", "expected": "I can't make 5, sorry. 6?", "category": "mustNotChange", "note": "sorry ending its sentence before a number"}
+{"raw": "If you need it, it is in the drawer.", "expected": "If you need it, it is in the drawer.", "category": "mustNotChange", "note": "a comma closing an if clause separates two words"}
+{"raw": "If you like this, this one is better.", "expected": "If you like this, this one is better.", "category": "mustNotChange", "note": "a comma closing an if clause separates two words"}
+{"raw": "They cost five euros each. The total is ten.", "expected": "They cost five euros each. The total is ten.", "category": "mustNotChange", "note": "each can end a sentence"}
+{"raw": "That's all I can think of. The rest is fine.", "expected": "That's all I can think of. The rest is fine.", "category": "mustNotChange", "note": "of can end a sentence"}
+{"raw": "Take vitamin A. The dose is small.", "expected": "Take vitamin A. The dose is small.", "category": "mustNotChange", "note": "a capital A is a letter, not the article"}
+{"raw": "We need new line items in the budget.", "expected": "We need new line items in the budget.", "category": "mustNotChange", "note": "new line items is a noun phrase"}
+{"raw": "Can you get me a quote for the roof? Um, the the gutters too.", "expected": "Can you get me a quote for the roof? The gutters too.", "category": "filler", "note": "the noun quote does not stop the rest being cleaned"}
