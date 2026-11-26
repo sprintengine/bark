@@ -84,6 +84,8 @@ const NO_STREAMED_AUDIO: &str = "No audio frames were streamed to the transcribe
 pub(crate) const NO_SPEECH: &str = "No speech was transcribed";
 /// What a cancelled session (or a chunk of one) answers.
 pub(crate) const CANCELLED: &str = "Transcription was cancelled";
+/// How often a finishing session checks whether its dictation was cancelled.
+const FINISH_CANCEL_POLL: std::time::Duration = std::time::Duration::from_millis(100);
 
 /// A loaded speech-to-text engine that can transcribe a single block of PCM.
 /// Both Parakeet and (optionally) Whisper implement this so the chunked
@@ -277,11 +279,15 @@ impl TranscriptionService {
         }
     }
 
+    /// Finishes the streaming session, or transcribes the whole recording
+    /// when nothing streamed. Setting `cancel` ends a wait on the streaming
+    /// worker straight away, even one stuck in a decode.
     pub fn finish_session(
         &mut self,
         recording: &Recording,
         settings: &Settings,
         models: &ModelService,
+        cancel: &AtomicBool,
     ) -> Result<String, String> {
         // A saturated callback channel must never lose words in the final text.
         // The full capture buffer is authoritative when any stream frame dropped.
@@ -289,7 +295,7 @@ impl TranscriptionService {
             self.cancel_session();
         }
         if let Some(handle) = self.session.take() {
-            let result = handle.finish();
+            let result = handle.finish(cancel);
             self.close_super_tally();
             match result {
                 Ok(transcript) => return Ok(transcript),
@@ -878,13 +884,28 @@ impl SessionHandle {
         })
     }
 
-    fn finish(mut self) -> Result<String, String> {
+    /// Ends the session and waits for its transcript, until `cancel` is set.
+    /// A cancelled wait walks away from the worker, which may be stuck in a
+    /// decode: it finishes on its own and its result is dropped, so it can
+    /// neither hold up nor touch the next session.
+    fn finish(mut self, cancel: &AtomicBool) -> Result<String, String> {
         let _ = self.control_tx.send(SessionControl::Finish);
         drop(self.audio_tx);
-        let result = self
-            .result_rx
-            .recv()
-            .map_err(|_| "Transcription worker stopped without a transcript".to_string())?;
+        let result = match crate::dictation_lifecycle::recv_unless_cancelled(
+            &self.result_rx,
+            cancel,
+            FINISH_CANCEL_POLL,
+        ) {
+            Ok(result) => result,
+            Err(crate::dictation_lifecycle::WaitError::Cancelled) => {
+                let _ = self.control_tx.send(SessionControl::Cancel);
+                self.worker.take();
+                return Err(CANCELLED.to_string());
+            }
+            Err(crate::dictation_lifecycle::WaitError::Disconnected) => {
+                return Err("Transcription worker stopped without a transcript".to_string())
+            }
+        };
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
         }
@@ -1925,6 +1946,8 @@ fn path_to_string(path: &Path) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use super::CANCELLED;
+    use std::sync::atomic::AtomicBool;
     use super::{
         contains_probable_speech, dispatch_final_chunk, dispatch_ready_chunks,
         is_non_speech_annotation, is_phantom_phrase, merge_chunk_results, merge_transcript_text, polish_frozen_len,
@@ -2024,7 +2047,7 @@ mod tests {
                 .unwrap();
         }
         // Finish before releasing the cold engine: finalization must retain everything.
-        let finished = std::thread::spawn(move || handle.finish());
+        let finished = std::thread::spawn(move || handle.finish(&AtomicBool::new(false)));
         release_tx.send(()).unwrap();
         assert!(!finished.join().unwrap().unwrap().is_empty());
         let samples = seen.lock().unwrap();
@@ -2034,6 +2057,53 @@ mod tests {
             assert!(samples.contains(&(3000 + n)));
         }
         assert_eq!(*samples.last().unwrap(), 3099);
+    }
+
+    #[test]
+    fn a_cancelled_finish_walks_away_from_a_decode_that_never_returns() {
+        struct HungEngine {
+            started: Mutex<mpsc::Sender<()>>,
+        }
+        impl ChunkTranscriber for HungEngine {
+            fn transcribe_pcm(
+                &self,
+                _: &[i16],
+                _: u32,
+                _: &str,
+                _: Option<&str>,
+            ) -> Result<String, String> {
+                let _ = self.started.lock().unwrap().send(());
+                // A decode that does not come back within the test.
+                std::thread::sleep(std::time::Duration::from_secs(30));
+                Ok("late words".into())
+            }
+        }
+        let (started_tx, started_rx) = mpsc::channel();
+        let engine = Arc::new(HungEngine {
+            started: Mutex::new(started_tx),
+        });
+        let handle = SessionHandle::start(engine, "en".into(), None, 5, None).unwrap();
+        handle
+            .audio_tx
+            .send(AudioFrame {
+                pcm_i16: vec![2000; 6000],
+                sample_rate: 1000,
+            })
+            .unwrap();
+        started_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("the decode starts");
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let setter = Arc::clone(&cancel);
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            setter.store(true, Ordering::SeqCst);
+        });
+        let started = std::time::Instant::now();
+        let err = handle.finish(&cancel).expect_err("cancel ends the wait");
+        assert_eq!(err, CANCELLED);
+        assert!(started.elapsed() < std::time::Duration::from_secs(3));
     }
 
     #[test]
@@ -2064,7 +2134,7 @@ mod tests {
             .send(speech_frame(sample_rate, chunk_samples * 3))
             .expect("send audio frame");
 
-        let transcript = handle.finish().expect("finish session");
+        let transcript = handle.finish(&AtomicBool::new(false)).expect("finish session");
 
         let count = calls.load(Ordering::SeqCst);
         assert!(count >= 2, "expected multiple chunks, transcribed {count}");
@@ -2115,7 +2185,7 @@ mod tests {
         let handle = SessionHandle::start(transcriber, "en".to_string(), None, 5, None)
             .expect("start session");
 
-        let err = handle.finish().expect_err("no audio should error");
+        let err = handle.finish(&AtomicBool::new(false)).expect_err("no audio should error");
         assert_eq!(err, NO_STREAMED_AUDIO);
     }
 
@@ -2229,7 +2299,7 @@ mod tests {
             .send(speech_frame(sample_rate, chunk_samples * 2))
             .expect("send audio frame");
 
-        let transcript = handle.finish().expect("finish session");
+        let transcript = handle.finish(&AtomicBool::new(false)).expect("finish session");
         let previews: Vec<_> = preview_rx.iter().collect();
         assert!(!previews.is_empty(), "expected at least one preview");
         let final_preview = previews

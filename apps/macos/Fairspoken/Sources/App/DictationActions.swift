@@ -35,6 +35,7 @@ extension AppModel {
                                               expectedApp: app.processIdentifier, requireExpectedApp: true) {
             case .pasted: notify("Pasted into \(name)")
             case .copied(let reason): notify(reason)
+            case .withdrawn: break
             }
         }
     }

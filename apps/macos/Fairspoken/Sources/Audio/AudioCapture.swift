@@ -34,6 +34,12 @@ nonisolated final class AudioCapture: @unchecked Sendable {
     private var running = false
     /// Who started the capture last (a dictation or the setup guide's test).
     private var ownership = CaptureOwnership()
+    /// Watches the engine while it runs (`onConfigurationChange`).
+    private var configurationObserver: NSObjectProtocol?
+    /// Called (on any thread) when the input changed under a running capture (a microphone
+    /// unplugged, the default device switched, its format changed): `AVAudioEngine` has
+    /// stopped itself, so nothing more is being captured.
+    var onConfigurationChange: (@Sendable () -> Void)?
     private let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: AudioCapture.sampleRate, channels: 1, interleaved: false)!
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "audio")
 
@@ -69,6 +75,7 @@ nonisolated final class AudioCapture: @unchecked Sendable {
         engine.prepare()
         try engine.start()
         lock.withLock { running = true }
+        observeConfiguration()
         return token
     }
 
@@ -82,6 +89,10 @@ nonisolated final class AudioCapture: @unchecked Sendable {
     /// Stops and returns everything captured (16 kHz mono).
     @discardableResult
     func stop() -> [Float] {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+            self.configurationObserver = nil
+        }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         // Flush the converter's internal resampler state into the tail.
@@ -91,6 +102,16 @@ nonisolated final class AudioCapture: @unchecked Sendable {
             let out = samples
             samples.removeAll()
             return out
+        }
+    }
+
+    private func observeConfiguration() {
+        if let configurationObserver { NotificationCenter.default.removeObserver(configurationObserver) }
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { [weak self] _ in
+            guard let self, self.isRunning else { return }
+            Self.log.notice("The audio input changed during a recording; the engine stopped")
+            self.onConfigurationChange?()
         }
     }
 

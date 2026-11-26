@@ -14,7 +14,7 @@ import Synchronization
 /// transcribed on this Mac; if that fails too it is kept, to be retried later.
 @Observable
 final class DictationController {
-    enum Trigger { case hotkey, fn, button }
+    typealias Trigger = DictationTrigger
 
     enum Delivery: Equatable {
         case pasted(app: String?)
@@ -24,6 +24,15 @@ final class DictationController {
         case recovered(copied: Bool)
 
         var isRecovered: Bool { if case .recovered = self { true } else { false } }
+
+        var label: String {
+            switch self {
+            case .pasted: "pasted"
+            case .copied: "copied"
+            case .shownInApp: "shown in Bark"
+            case .recovered: "recovered"
+            }
+        }
     }
 
     struct Result: Equatable {
@@ -48,6 +57,17 @@ final class DictationController {
             switch self {
             case .listening, .transcribing: true
             default: false
+            }
+        }
+
+        /// For the log: the stage, never the words.
+        var label: String {
+            switch self {
+            case .idle: "idle"
+            case .listening: "listening"
+            case .transcribing: "transcribing"
+            case .done(let result): "done (\(result.delivery.label))"
+            case .failed: "failed"
             }
         }
     }
@@ -75,6 +95,14 @@ final class DictationController {
         didSet {
             guard phase != oldValue else { return }
             if !phase.isActive { liveText = "" }
+            if phase.isActive != oldValue.isActive, !showcasing {
+                // Escape cancels while listening and while transcribing; never steal it otherwise.
+                hotkeys?.setCancelEnabled(phase.isActive)
+            }
+            if oldValue.isListening, !phase.isListening { hotkeys?.stopWatchingShortcutHold() }
+            if phase.isActive || oldValue.isActive, !showcasing {
+                Self.log.notice("Dictation \(self.lifecycle.id): \(oldValue.label, privacy: .public) → \(self.phase.label, privacy: .public) (\(self.lifecycle.stage.label, privacy: .public), started by \(self.trigger.rawValue, privacy: .public))")
+            }
             onPhaseChange?(phase)
         }
     }
@@ -108,8 +136,19 @@ final class DictationController {
     /// Whether a dictation shown in Bark's own window lands in Home's composer (and so is a note).
     @ObservationIgnored var shownInAppIsNote: () -> Bool = { false }
     @ObservationIgnored let capture = AudioCapture()
-    @ObservationIgnored private var session: (any TranscriptionSession)?
+    /// Which dictation is current, its stage, and its session while it is listening. A late
+    /// finish from an earlier dictation checks its id here and changes nothing.
+    @ObservationIgnored private var lifecycle = DictationLifecycle<any TranscriptionSession>()
+    /// The current dictation's transcription, and its id (cancelled by Escape or the deadline).
+    @ObservationIgnored private var transcription: (id: Int, pendingID: String, task: Task<Void, Never>)?
+    /// Gives up on a dictation that has been transcribing too long (`transcribingDeadline`).
+    @ObservationIgnored private var deadline: Task<Void, Never>?
+    /// The screen locked or the Mac went to sleep during this dictation: copy it, never paste.
+    @ObservationIgnored private var copyOnly: (id: Int, reason: String)?
+    @ObservationIgnored private var systemObservers: [(NotificationCenter, NSObjectProtocol)] = []
     @ObservationIgnored private var watchdog: Task<Void, Never>?
+    /// Screenshots: phases are set for show, so Escape isn't registered and nothing is logged.
+    @ObservationIgnored private var showcasing = false
     @ObservationIgnored private var resetTask: Task<Void, Never>?
     /// Which of this app's windows the recording is for (Home, the setup guide), or nil when it
     /// is for another app.
@@ -151,32 +190,81 @@ final class DictationController {
         self.history = history
         self.permissions = permissions
         self.pending = pending
+        capture.onConfigurationChange = { [weak self] in
+            Task { @MainActor [weak self] in self?.endForSystemEvent("the audio input changed", copyReason: nil) }
+        }
+        observeSystemEvents()
     }
 
     // MARK: Triggers
 
-    /// Combo key-down. Toggle mode toggles; push-to-talk starts.
-    func hotkeyPressed() {
-        if settings.settings.recordingShortcutMode == .toggle {
-            phase.isListening ? stop() : start(.hotkey)
-        } else if !phase.isListening {
-            start(.hotkey)
+    /// Combo key-down. Toggle mode toggles; push-to-talk starts. Either way it stops a recording
+    /// Fn or a button started.
+    func hotkeyPressed() { handle(.shortcutDown) }
+    func hotkeyReleased() { handle(.shortcutUp) }
+    func fnPressed() { handle(.fnDown) }
+    func fnReleased() { handle(.fnUp) }
+    /// Home, the setup guide, the menu bar and the speed test's buttons.
+    func toggleFromUI() { handle(.button) }
+
+    /// While listening, any trigger stops the recording, whichever started it
+    /// (`DictationLifecycle.action`).
+    private func handle(_ event: DictationTriggerEvent) {
+        switch lifecycle.action(for: event, shortcutMode: settings.settings.recordingShortcutMode) {
+        case .start(let trigger):
+            start(trigger)
+        case .stop:
+            if let started = lifecycle.listeningTrigger, event != Self.ownStop(for: started, mode: settings.settings.recordingShortcutMode) {
+                Self.log.notice("Dictation \(self.lifecycle.id): \(event.rawValue, privacy: .public) stops a recording started by \(started.rawValue, privacy: .public)")
+            }
+            stop()
+        case .ignore:
+            break
         }
     }
 
-    func hotkeyReleased() {
-        if settings.settings.recordingShortcutMode == .pushToTalk, phase.isListening, trigger == .hotkey { stop() }
+    /// The event that ordinarily ends a recording `trigger` started (for the log).
+    private static func ownStop(for trigger: Trigger, mode: RecordingShortcutMode) -> DictationTriggerEvent {
+        switch trigger {
+        case .hotkey: mode == .pushToTalk ? .shortcutUp : .shortcutDown
+        case .fn: .fnUp
+        case .button: .button
+        }
     }
 
-    func fnPressed() { if !phase.isActive { start(.fn) } }
-    func fnReleased() { if phase.isListening, trigger == .fn { stop() } }
+    /// Sleep, the screen locking, the session switching away, or the microphone going: a
+    /// recording that is listening ends now and is transcribed. After sleep, a lock or a switch
+    /// the dictation (listening or transcribing) is copied rather than pasted, as nothing should
+    /// be typed into the lock screen or into whatever is in front on return.
+    private func endForSystemEvent(_ what: String, copyReason: String?) {
+        guard lifecycle.isActive else { return }
+        // Still transcribing: it lands later, perhaps after unlocking, and is copied, not pasted.
+        if let copyReason, !lifecycle.isDelivering { copyOnly = (lifecycle.id, copyReason) }
+        guard lifecycle.isListening else { return }
+        Self.log.notice("Dictation \(self.lifecycle.id): \(what, privacy: .public); ending the recording")
+        stop()
+    }
 
-    func toggleFromUI() { phase.isListening ? stop() : start(.button) }
+    private func observeSystemEvents() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        let distributed = DistributedNotificationCenter.default()
+        let events: [(NotificationCenter, Notification.Name, String, String)] = [
+            (workspace, NSWorkspace.willSleepNotification, "the Mac is going to sleep", "Copied — the Mac went to sleep"),
+            (workspace, NSWorkspace.sessionDidResignActiveNotification, "the user session switched away", "Copied — you switched user"),
+            (distributed, Notification.Name("com.apple.screenIsLocked"), "the screen locked", "Copied — the screen was locked"),
+        ]
+        for (center, name, what, reason) in events {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.endForSystemEvent(what, copyReason: reason) }
+            }
+            systemObservers.append((center, token))
+        }
+    }
 
     // MARK: Lifecycle
 
     func start(_ trigger: Trigger) {
-        guard !phase.isActive else { return }
+        guard !lifecycle.isActive, !phase.isActive else { return }
         // The next dictation may land in the field the last one is being watched in.
         editWatcher?.flush()
         onWillStart?()
@@ -238,23 +326,56 @@ final class DictationController {
             fail("Couldn't start the microphone: \(error.localizedDescription)")
             return
         }
-        session = newSession
+        let id = lifecycle.begin(trigger, session: newSession)
         kept = (item, writer)
+        copyOnly = nil
         self.trigger = trigger
         resetTask?.cancel()
         phase = .listening(since: Date())
-        hotkeys?.setCancelEnabled(true)
         Sounds.play(.start, enabled: s.interactionSounds)
-        let limit = s.maxRecordingSeconds
-        watchdog = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(limit))
-            guard !Task.isCancelled else { return }
-            self?.stop()
+        startWatchdog(id, limit: s.maxRecordingSeconds)
+        if trigger == .hotkey, s.recordingShortcutMode == .pushToTalk {
+            hotkeys?.watchShortcutHold { [weak self] in self?.hotkeyReleased() }
         }
     }
 
+    /// The recording's length limit: a hard end that stops dictation `id` if it is still
+    /// listening, whatever state the rest of the controller is in.
+    private func startWatchdog(_ id: Int, limit: Int) {
+        watchdog?.cancel()
+        watchdog = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(limit))
+            guard !Task.isCancelled, let self, self.lifecycle.id == id, self.lifecycle.isListening else { return }
+            Self.log.notice("Dictation \(id) reached the \(limit) s limit; stopping it")
+            self.stop()
+            if self.lifecycle.id == id, self.lifecycle.isListening {
+                Self.log.fault("Dictation \(id) was still listening after the limit's stop; cancelling it")
+                self.cancel()
+            }
+        }
+    }
+
+    /// Escape: ends the current dictation at any stage. While listening the recording is
+    /// discarded. While transcribing the transcript is dropped when it lands, and the recording
+    /// stays on disk to retry (Home lists it).
     func cancel() {
-        guard phase.isActive else { return }
+        if lifecycle.isDelivering {
+            Self.log.notice("Dictation \(self.lifecycle.id): cancel while it was being pasted; too late")
+            return
+        }
+        guard case let (id, stage, session)? = lifecycle.cancel() else {
+            // Nothing is current; make sure nothing is left running either.
+            if phase.isActive {
+                Self.log.fault("Phase \(self.phase.label, privacy: .public) with no current dictation; resetting")
+                if capture.isRunning { capture.stop() }
+                phase = .idle
+            }
+            return
+        }
+        Self.log.notice("Dictation \(id) cancelled while \(stage.label, privacy: .public)")
+        // Its recording is on disk and being transcribed (not a measured one, nor a stop that
+        // went wrong before it got that far): it stays there to retry.
+        let keptToRetry = stage == .transcribing && measuredHandler == nil && transcription?.id == id
         if let handler = measuredHandler {
             measuredHandler = nil
             measuredRun += 1
@@ -264,13 +385,23 @@ final class DictationController {
             handler(.cancelled)
         }
         watchdog?.cancel()
+        deadline?.cancel()
         if capture.isRunning { capture.stop() }
         session?.cancel()
-        session = nil
+        // Still listening: the recording is thrown away. Once transcribing it is on disk already.
         if let kept { pending.drop(kept.item.id, writer: kept.writer) }
         kept = nil
-        hotkeys?.setCancelEnabled(false)
-        phase = .idle
+        if let transcription, transcription.id == id {
+            transcription.task.cancel()
+            if keptToRetry { keepToRetry(transcription.pendingID, because: "Cancelled while it was being transcribed") }
+        }
+        transcription = nil
+        transcribingNote = nil
+        if keptToRetry {
+            fail("Cancelled — saved to retry", quiet: true)
+        } else {
+            phase = .idle
+        }
     }
 
     func stop() {
@@ -278,10 +409,19 @@ final class DictationController {
             stopMeasured()
             return
         }
-        guard phase.isListening, let session, let kept else { return }
+        // Not listening: nothing to stop (transcribing ignores the triggers; Escape cancels).
+        guard case let (id, session)? = lifecycle.endListening() else { return }
         watchdog?.cancel()
-        hotkeys?.setCancelEnabled(false)
+        let kept = self.kept
         self.kept = nil
+        guard let session, let kept else {
+            // Never a silent no-op while listening: end it as Escape would.
+            Self.log.fault("Dictation \(id) had no \(session == nil ? "session" : "recording", privacy: .public) when it stopped; cancelling it")
+            session?.cancel()
+            self.kept = kept
+            cancel()
+            return
+        }
         let released = ContinuousClock.now
         let samples = capture.stop()
         let s = settings.settings
@@ -290,13 +430,13 @@ final class DictationController {
         switch RecordingGate.evaluate(stats) {
         case .tooShort:
             session.cancel()
-            self.session = nil
+            lifecycle.finish(id)
             pending.drop(kept.item.id, writer: kept.writer)
             fail("Too short — hold the shortcut while you speak", quiet: true)
             return
         case .silent:
             session.cancel()
-            self.session = nil
+            lifecycle.finish(id)
             pending.drop(kept.item.id, writer: kept.writer)
             fail("No speech detected")
             return
@@ -323,11 +463,11 @@ final class DictationController {
         let retried = RetryFlag()
         let progress: @Sendable (DictationRecovery.Progress) -> Void = { [weak self] progress in
             retried.set()
-            Task { @MainActor [weak self] in self?.show(progress) }
+            Task { @MainActor [weak self] in self?.show(progress, for: id) }
         }
         let deliver: @Sendable (TranscriptionOutput) async -> Bool = { [weak self] output in
             // A retry lands many seconds later, when the field read at release may be out of date.
-            await self?.complete(output, item: item, target: target, style: style, samples: samples, settings: s,
+            await self?.complete(output, id: id, item: item, target: target, style: style, samples: samples, settings: s,
                                  durationSeconds: stats.durationSeconds, released: released,
                                  retried: retried.isSet, fieldRead: retried.isSet ? nil : fieldRead) ?? false
         }
@@ -336,28 +476,93 @@ final class DictationController {
                 if placement == .neuralEngine { try await self?.waitForEngine() }
                 return try await session.finish(allSamples: samples)
             } catch {
-                // The engine never became ready: stop the session's live decoding too.
+                // The engine never became ready, or the dictation was cancelled: stop the
+                // session's live decoding too.
                 session.cancel()
                 throw error
             }
         }
-        Task { [weak self] in
+        let task = Task { [weak self] in
             let outcome = await recovery.run(item.id, live: live, routes: routes, policy: .live(timeoutSeconds: s.remoteTimeoutSeconds),
                                              progress: progress, deliver: deliver)
             guard let self else { return }
-            self.session = nil
-            self.transcribingNote = nil
+            if case .kept(let kept) = outcome {
+                Self.log.error("Dictation \(id) not transcribed; recording kept to retry: \(kept.lastError ?? "", privacy: .public)")
+                self.pending.reload()
+            }
+            // Delivered (complete() has finished it already), cancelled, timed out, or a newer
+            // dictation is under way: this one must not touch anything now.
+            guard self.lifecycle.finish(id) else {
+                if case .delivered = outcome {} else {
+                    Self.log.notice("Dictation \(id) finished after it was ended; nothing changed")
+                }
+                return
+            }
+            self.endTranscribing(id)
             switch outcome {
             case .delivered:
                 break
             case .noSpeech:
                 self.fail("No speech detected")
-            case .kept(let kept):
-                Self.log.error("Transcription failed; recording kept to retry: \(kept.lastError ?? "", privacy: .public)")
-                self.pending.reload()
+            case .kept:
                 self.fail("Couldn't transcribe — saved to retry", hold: .seconds(5))
             }
         }
+        transcription = (id, item.id, task)
+        startDeadline(id, recordingSeconds: stats.durationSeconds)
+    }
+
+    /// Gives up on dictation `id` if it is still transcribing at the deadline: the recording is
+    /// kept to retry, and the pill says so.
+    private func startDeadline(_ id: Int, recordingSeconds: Double) {
+        let s = settings.settings
+        let limit = DictationLifecycle<any TranscriptionSession>.transcribingDeadline(
+            recordingSeconds: recordingSeconds, engineReady: models.engineState.isReady,
+            remoteTimeoutSeconds: placement == .remoteHost ? s.remoteTimeoutSeconds : nil)
+        deadline?.cancel()
+        deadline = Task { [weak self] in
+            // Time asleep doesn't count: a dictation the Mac slept through isn't late.
+            try? await Task.sleep(for: limit, clock: .suspending)
+            guard !Task.isCancelled, let self, self.lifecycle.isTranscribing(id), self.lifecycle.finish(id) else { return }
+            Self.log.error("Dictation \(id) was still transcribing after \(limit, privacy: .public); giving up")
+            let measured = self.measuredHandler
+            if let transcription = self.transcription, transcription.id == id {
+                transcription.task.cancel()
+                self.keepToRetry(transcription.pendingID, because: "Took too long to transcribe")
+            }
+            self.measuredTask?.cancel()
+            self.endTranscribing(id)
+            if let measured {
+                self.measuredRun += 1
+                self.measuredHandler = nil
+                self.isMeasuring = false
+                self.phase = .idle
+                measured(.failed("Transcribing took too long."))
+            } else {
+                self.fail("Took too long — saved to retry", hold: .seconds(5))
+            }
+        }
+    }
+
+    /// A dictation given up on while transcribing goes to Home's list to retry now, rather than
+    /// once its cancelled transcription returns (which an engine call may take a while to do).
+    /// That run, when it does return, never delivers and only marks it failed again.
+    private func keepToRetry(_ pendingID: String, because reason: String) {
+        pending.store.update(pendingID) {
+            $0.state = .failed
+            $0.attempts += 1
+            $0.lastError = reason
+            $0.lastAttemptAt = Int64(Date().timeIntervalSince1970 * 1000)
+        }
+        pending.reload()
+    }
+
+    /// Dictation `id`, which has just been finished in `lifecycle`, lets go of what it held.
+    private func endTranscribing(_ id: Int) {
+        if transcription?.id == id { transcription = nil }
+        deadline?.cancel()
+        deadline = nil
+        transcribingNote = nil
     }
 
     // MARK: Measured recordings (the speed test)
@@ -376,29 +581,27 @@ final class DictationController {
             handler(.failed("Couldn't start the microphone: \(error.localizedDescription)"))
             return
         }
-        session = newSession
+        let id = lifecycle.begin(trigger, session: newSession)
         kept = nil
         measuredHandler = handler
         isMeasuring = true
         self.trigger = trigger
         resetTask?.cancel()
         phase = .listening(since: Date())
-        hotkeys?.setCancelEnabled(true)
         Sounds.play(.start, enabled: s.interactionSounds)
-        let limit = s.maxRecordingSeconds
-        watchdog = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(limit))
-            guard !Task.isCancelled else { return }
-            self?.stop()
-        }
+        startWatchdog(id, limit: s.maxRecordingSeconds)
     }
 
     /// Ends a measured recording: the same gate and transcription as a dictation, then the
     /// transcript goes to the handler and nowhere else. No retries: a failure is reported.
     private func stopMeasured() {
-        guard phase.isListening, let session, let handler = measuredHandler else { return }
+        guard let handler = measuredHandler, case let (id, session)? = lifecycle.endListening() else { return }
         watchdog?.cancel()
-        hotkeys?.setCancelEnabled(false)
+        guard let session else {
+            Self.log.fault("Measured dictation \(id) had no session when it stopped; cancelling it")
+            cancel()
+            return
+        }
         let released = ContinuousClock.now
         let samples = capture.stop()
         let s = settings.settings
@@ -407,7 +610,7 @@ final class DictationController {
         let verdict = RecordingGate.evaluate(stats)
         guard verdict == .accept else {
             session.cancel()
-            self.session = nil
+            lifecycle.finish(id)
             measuredHandler = nil
             isMeasuring = false
             phase = .idle
@@ -429,10 +632,10 @@ final class DictationController {
                 session.cancel()
                 result = .failure(error)
             }
-            // Cancelled while it was transcribing: the test has moved on.
-            guard let self, self.measuredRun == run, self.measuredHandler != nil else { return }
+            // Cancelled while it was transcribing, or it took too long: the test has moved on.
+            guard let self, self.measuredRun == run, self.measuredHandler != nil, self.lifecycle.finish(id) else { return }
             self.measuredTask = nil
-            self.session = nil
+            self.endTranscribing(id)
             self.measuredHandler = nil
             self.isMeasuring = false
             self.phase = .idle
@@ -445,14 +648,22 @@ final class DictationController {
                 handler(.failed(error.localizedDescription))
             }
         }
+        startDeadline(id, recordingSeconds: stats.durationSeconds)
     }
 
     /// The transcript is in: post-process, deliver, record in history (and for post-training),
     /// show the result. False when post-processing left no words, so nothing was delivered.
-    private func complete(_ output: TranscriptionOutput, item: PendingDictation, target: NSRunningApplication?, style: StyleChoice,
-                          samples: [Float], settings s: AppSettings, durationSeconds: Double, released: ContinuousClock.Instant,
-                          retried: Bool, fieldRead: Task<EditWatcher.FieldRead?, Never>?) async -> Bool {
+    private func complete(_ output: TranscriptionOutput, id: Int, item: PendingDictation, target: NSRunningApplication?,
+                          style: StyleChoice, samples: [Float], settings s: AppSettings, durationSeconds: Double,
+                          released: ContinuousClock.Instant, retried: Bool,
+                          fieldRead: Task<EditWatcher.FieldRead?, Never>?) async -> Bool {
         let transcribed = ContinuousClock.now
+        // Cancelled or timed out (the recording is kept to retry), or long since replaced by a
+        // newer dictation: a transcript that lands now is dropped.
+        guard lifecycle.isTranscribing(id), !Task.isCancelled else {
+            Self.log.notice("Dictation \(id)'s transcript arrived after it was ended; dropped")
+            return false
+        }
         transcribingNote = nil
         let destination = await style.destination(fallback: DictationDestination(bundleID: item.appBundleId, appName: item.appName))
         let resolution = style.resolve(destination, rules: s.styleRules)
@@ -462,8 +673,24 @@ final class DictationController {
         let cleanupMs = Int((ContinuousClock.now - cleanupStarted) / .milliseconds(1))
         let text = processed.plainText
         guard !text.isEmpty else { return false }
+        guard lifecycle.isTranscribing(id), !Task.isCancelled else {
+            Self.log.notice("Dictation \(id) was ended while its transcript was tidied; dropped")
+            return false
+        }
         let pasteStarted = ContinuousClock.now
-        let delivery = await deliver(text, html: processed.html, settings: s, target: target, retried: retried)
+        // The last moment Escape can stop it: from here on it is delivered (`beginDelivering`).
+        // Whether it may still be pasted is read then too: the screen may have locked while
+        // the keys or the focus were awaited.
+        let commit: () -> TextInserter.Commit = { [weak self] in
+            guard let self, !Task.isCancelled, self.lifecycle.beginDelivering(id) else { return .withdraw }
+            if let copyOnly = self.copyOnly, copyOnly.id == id { return .copyOnly(copyOnly.reason) }
+            return .deliver
+        }
+        guard let delivery = await deliver(text, html: processed.html, settings: s, target: target, retried: retried,
+                                           copyOnly: copyOnly?.id == id ? copyOnly?.reason : nil, commit: commit) else {
+            Self.log.notice("Dictation \(id) was cancelled before it was pasted; nothing was pasted")
+            return false
+        }
         let total = Int((ContinuousClock.now - released) / .milliseconds(1))
         let transcribeMs = Int((transcribed - released) / .milliseconds(1))
         let now = Date()
@@ -493,8 +720,15 @@ final class DictationController {
         let result = Result(text: text, words: WordCounter.count(text), delivery: delivery, latencyMs: total, placement: output.placement,
                             style: resolution)
         if delivery == .shownInApp { lastInAppResult = result }
+        // Delivered either way; but if it was cancelled while pasting (or a newer dictation has
+        // begun since), what the pill shows belongs to that now.
+        guard lifecycle.finish(id) else {
+            Self.log.notice("Dictation \(id) was delivered after it was ended; the pill is left alone")
+            return true
+        }
+        endTranscribing(id)
         phase = .done(result)
-        Self.log.info("Dictation \(durationSeconds, format: .fixed(precision: 1)) s → \(total) ms (model \(output.modelMs) ms)")
+        Self.log.notice("Dictation \(durationSeconds, format: .fixed(precision: 1)) s → \(total) ms (model \(output.modelMs) ms)")
         // "It's on the clipboard, press ⌘V" needs time to read; "Inserted" does not.
         if case .copied = delivery {
             scheduleReset(after: .seconds(4))
@@ -504,8 +738,8 @@ final class DictationController {
         return true
     }
 
-    private func show(_ progress: DictationRecovery.Progress) {
-        guard phase == .transcribing else { return }
+    private func show(_ progress: DictationRecovery.Progress, for id: Int) {
+        guard lifecycle.isTranscribing(id), phase == .transcribing else { return }
         switch progress {
         case .retrying(let attempt, let count): transcribingNote = "Retrying the host (\(attempt) of \(count))"
         case .transcribingOnThisMac: transcribingNote = "Transcribing on this Mac"
@@ -532,22 +766,36 @@ final class DictationController {
         }
     }
 
-    private func deliver(_ text: String, html: String?, settings s: AppSettings, target: NSRunningApplication?, retried: Bool) async -> Delivery {
+    /// Nil when the dictation was cancelled before anything was written or pasted. `copyOnly`
+    /// says why it must not be pasted, if it mustn't.
+    private func deliver(_ text: String, html: String?, settings s: AppSettings, target: NSRunningApplication?, retried: Bool,
+                         copyOnly: String?, commit: () -> TextInserter.Commit) async -> Delivery? {
+        // The screen locked, the Mac slept or the user switched: nothing is typed anywhere.
+        if let copyOnly {
+            guard case .withdraw = commit() else {
+                TextInserter.copy(text, html: html)
+                return .copied(copyOnly)
+            }
+            return nil
+        }
         // Our own window is frontmost (dashboard "Try dictation", onboarding): show it there.
         if target == nil || (NSApp.isActive && NSApp.keyWindow != nil) {
+            if case .withdraw = commit() { return nil }
             TextInserter.copy(text, html: html)
             return .shownInApp
         }
         // A retry can take many seconds: if the user has moved on to another app by then, never
         // type into it. (A first attempt is pasted, keeping the text on the clipboard, as before.)
         if retried, NSWorkspace.shared.frontmostApplication?.processIdentifier != target?.processIdentifier {
+            if case .withdraw = commit() { return nil }
             TextInserter.copy(text, html: html)
             return .copied("Copied — you'd switched apps")
         }
         switch await TextInserter.deliver(text, html: html, paste: s.insertAtCursor, restoreClipboard: s.restoreClipboard,
-                                          expectedApp: target?.processIdentifier) {
+                                          expectedApp: target?.processIdentifier, commit: commit) {
         case .pasted: return .pasted(app: target?.localizedName)
         case .copied(let reason): return .copied(reason)
+        case .withdrawn: return nil
         }
     }
 
@@ -665,6 +913,7 @@ final class DictationController {
 
     func showcase(_ phase: Phase, inAppResult: Result? = nil, liveText: String = "", trigger: Trigger = .hotkey, measuring: Bool = false) {
         resetTask?.cancel()
+        showcasing = true
         self.trigger = trigger
         isMeasuring = measuring
         self.phase = phase

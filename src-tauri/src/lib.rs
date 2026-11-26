@@ -7,6 +7,7 @@ mod audio;
 mod ax_context;
 mod clipboard;
 mod cursor_preview;
+mod dictation_lifecycle;
 // The edit watcher is macOS-only; its diffing stays platform-neutral and tested.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod edit_diff;
@@ -61,6 +62,10 @@ pub use host::run_transcription_host;
 
 use audio::{AudioService, LevelSample, Recording, StreamErrorCallback};
 use clipboard::ClipboardService;
+use dictation_lifecycle::{
+    recv_unless_cancelled, CancelDecision, DictationLifecycle, DictationSignals, EndReason, Expiry,
+    Phase, WaitError,
+};
 use models::{ModelPrepareProgress, ModelService, ModelStatus, SttModel};
 use notes::{NewNote, Note, NotesService};
 use post_processing::apply_transcript_post_processing;
@@ -81,7 +86,7 @@ use std::sync::{
     mpsc, Arc, Mutex,
 };
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Position, Size, State, WindowEvent,
 };
@@ -115,11 +120,11 @@ struct AppServices {
     audio: Mutex<AudioService>,
     clipboard: ClipboardService,
     models: ModelService,
-    /// Bumped on every recording start so the max-duration watchdog can tell
-    /// whether the session it armed for is still the active one.
-    recording_generation: AtomicU64,
+    /// Which dictation is current and where it is, so late work for one
+    /// dictation (its finish, a cancel, the max-duration watchdog, the
+    /// finishing deadline) never touches the next one.
+    dictations: Mutex<DictationLifecycle>,
     model_prepare_running: Arc<AtomicBool>,
-    transcription_cancel_requested: Arc<AtomicBool>,
     local_transcription_cancel: Mutex<Option<TranscriptionCancelHandle>>,
     settings: Mutex<SettingsService>,
     transcript_history: Mutex<TranscriptHistoryService>,
@@ -151,16 +156,27 @@ impl AppServices {
             .map(|service| service.current())
             .map_err(|_| "Settings service lock failed".to_string())
     }
+
+    /// Runs `f` on the dictation lifecycle. A poisoned lock is recovered: the
+    /// lifecycle is plain data, and refusing it would leave a recording that
+    /// nothing could stop.
+    fn lifecycle<R>(&self, f: impl FnOnce(&mut DictationLifecycle) -> R) -> R {
+        f(&mut self.dictations.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct BackendStatus {
     state: &'static str,
     message: &'static str,
+    /// The current dictation, so a pill that resyncs can still cancel it.
+    dictation_id: Option<u64>,
 }
 
 #[tauri::command]
 fn get_app_status(services: State<'_, AppServices>) -> BackendStatus {
+    let dictation_id = services.lifecycle(|lifecycle| lifecycle.active().map(|(id, _)| id));
     if services
         .audio
         .lock()
@@ -170,12 +186,14 @@ fn get_app_status(services: State<'_, AppServices>) -> BackendStatus {
         return BackendStatus {
             state: "recording",
             message: "Recording",
+            dictation_id,
         };
     }
 
     BackendStatus {
         state: "idle",
         message: "Ready",
+        dictation_id,
     }
 }
 
@@ -1201,19 +1219,89 @@ async fn delete_transcript_history_item(app: AppHandle, id: String) -> Result<()
     .await
 }
 
+/// What the pill needs from a confirmed recording start.
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RecordingStarted {
+    max_recording_seconds: u16,
+    /// Carried by every later request and event for this dictation.
+    dictation_id: u64,
+}
+
+/// How long a start waits for the previous dictation to finish unwinding
+/// (just cancelled, or delivering its text) before it gives up.
+const START_WAIT_FOR_FINISH: Duration = Duration::from_secs(3);
+
+/// The operation lock, waiting up to `wait` for it. A poisoned lock guards no
+/// data, so it is taken as free.
+fn lock_operation_within(
+    operation: &Mutex<()>,
+    wait: Duration,
+) -> Option<std::sync::MutexGuard<'_, ()>> {
+    let deadline = Instant::now() + wait;
+    loop {
+        match operation.try_lock() {
+            Ok(guard) => return Some(guard),
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => return Some(poisoned.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) if Instant::now() < deadline => {
+                thread::sleep(Duration::from_millis(20));
+            }
+            Err(std::sync::TryLockError::WouldBlock) => return None,
+        }
+    }
+}
+
+/// The message for a start that finds the speech model still held by an
+/// earlier dictation's abandoned finish.
+const TRANSCRIPTION_BUSY: &str =
+    "The speech model is still busy with the last dictation. Please try again in a moment.";
+
+/// The local transcription service, waiting up to `wait` for it. A finish
+/// that was cancelled or timed out may still hold it until its decode
+/// returns; nothing may wait on that indefinitely.
+fn lock_transcription_within(
+    services: &AppServices,
+    wait: Duration,
+) -> Result<std::sync::MutexGuard<'_, TranscriptionService>, String> {
+    let deadline = Instant::now() + wait;
+    loop {
+        match services.transcription.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                return Err("Transcription service lock failed".to_string())
+            }
+            Err(std::sync::TryLockError::WouldBlock) if Instant::now() < deadline => {
+                thread::sleep(Duration::from_millis(20));
+            }
+            Err(std::sync::TryLockError::WouldBlock) => return Err(TRANSCRIPTION_BUSY.to_string()),
+        }
+    }
+}
+
 #[tauri::command]
-async fn start_recording(app: AppHandle) -> Result<u16, String> {
+async fn start_recording(app: AppHandle) -> Result<RecordingStarted, String> {
     tauri::async_runtime::spawn_blocking(move || {
         start_recording_inner(app.clone(), app.state::<AppServices>())
     })
     .await
     .map_err(|e| e.to_string())?
 }
-fn start_recording_inner(app: AppHandle, services: State<'_, AppServices>) -> Result<u16, String> {
-    let _operation = services
-        .operation
-        .try_lock()
-        .map_err(|_| "Dictation is still finishing".to_string())?;
+fn start_recording_inner(
+    app: AppHandle,
+    services: State<'_, AppServices>,
+) -> Result<RecordingStarted, String> {
+    let _operation = lock_operation_within(&services.operation, START_WAIT_FOR_FINISH)
+        .ok_or_else(|| "Dictation is still finishing".to_string())?;
+    // A recording the max-duration watchdog claimed is waiting for this lock
+    // to commit: starting now would take its transcription session from it.
+    if let Some(previous) = services.lifecycle(|lifecycle| lifecycle.awaiting_commit()) {
+        emit_backend_event(
+            &app,
+            "info",
+            format!("Dictation {previous} is waiting to be committed; not starting another yet"),
+        );
+        return Err("Dictation is still finishing".to_string());
+    }
     edit_watch::flush(&app);
     let recording_active = services
         .audio
@@ -1224,9 +1312,6 @@ fn start_recording_inner(app: AppHandle, services: State<'_, AppServices>) -> Re
         return Err("Recording already in progress".to_string());
     }
 
-    services
-        .transcription_cancel_requested
-        .store(false, Ordering::SeqCst);
     let settings = services.settings_snapshot()?;
 
     let trace = note_debug::Trace::new(services.debug_capture_enabled.load(Ordering::SeqCst));
@@ -1330,10 +1415,7 @@ fn start_recording_inner(app: AppHandle, services: State<'_, AppServices>) -> Re
         TranscriptionLocation::Local => {
             let preview_tx =
                 start_transcript_preview_forwarder(app.clone(), settings.clone(), trace.clone());
-            let start = services
-                .transcription
-                .lock()
-                .map_err(|_| "Transcription service lock failed".to_string())?
+            let start = lock_transcription_within(&services, START_WAIT_FOR_FINISH)?
                 .start_session_traced(&settings, &services.models, Some(preview_tx), trace.clone());
             let start = match start {
                 Ok(start) => start,
@@ -1400,12 +1482,7 @@ fn start_recording_inner(app: AppHandle, services: State<'_, AppServices>) -> Re
     {
         invalidate_previews(&services);
         if settings.transcription_location == TranscriptionLocation::Local {
-            services
-                .transcription
-                .lock()
-                .map_err(|_| "Transcription service lock failed".to_string())?
-                .cancel_session();
-            clear_local_transcription_cancel(&services)?;
+            cancel_local_transcription_if_needed(&services)?;
         } else {
             cancel_remote_transcription_if_needed(&services)?;
         }
@@ -1426,14 +1503,23 @@ fn start_recording_inner(app: AppHandle, services: State<'_, AppServices>) -> Re
         let _ = usage_stats.note_recording_started(current_epoch_seconds());
     }
 
-    let generation = services.recording_generation.fetch_add(1, Ordering::SeqCst) + 1;
-    start_max_duration_watchdog(app.clone(), generation, settings.max_recording_seconds);
+    let (dictation, superseded) = services.lifecycle(|lifecycle| lifecycle.begin_recording());
+    if let Some((previous, phase)) = superseded {
+        emit_backend_event(
+            &app,
+            "warning",
+            format!(
+                "Dictation {previous} was still marked {phase:?} when dictation {dictation} started; it is superseded"
+            ),
+        );
+    }
+    start_max_duration_watchdog(app.clone(), dictation, settings.max_recording_seconds);
 
     emit_backend_event(
         &app,
         "info",
         format!(
-            "Recording started: location={:?}, model={:?}, gain={}x",
+            "Dictation {dictation}: recording started: location={:?}, model={:?}, gain={}x",
             settings.transcription_location, settings.model, settings.input_gain
         ),
     );
@@ -1444,7 +1530,10 @@ fn start_recording_inner(app: AppHandle, services: State<'_, AppServices>) -> Re
         }
     }
     cursor_guard.keep_visible = true;
-    Ok(settings.max_recording_seconds)
+    Ok(RecordingStarted {
+        max_recording_seconds: settings.max_recording_seconds,
+        dictation_id: dictation,
+    })
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -1498,10 +1587,15 @@ fn start_audio_level_forwarder(app: AppHandle) -> mpsc::SyncSender<LevelSample> 
 /// Grace past the frontend's own max-duration timer, so the watchdog only
 /// ever acts when the webview failed to stop the recording itself.
 const MAX_DURATION_WATCHDOG_GRACE: Duration = Duration::from_secs(2);
+/// When another stop holds the dictation, the watchdog waits this long and
+/// looks again, this many times, before it discards the recording itself.
+const MAX_DURATION_WATCHDOG_RETRY: Duration = Duration::from_secs(2);
+const MAX_DURATION_WATCHDOG_RETRIES: u32 = 5;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RecordingAutoStoppedEvent {
+    dictation_id: u64,
     committed: bool,
     message: String,
     /// Where the text went, when it was committed.
@@ -1532,7 +1626,7 @@ struct DictationOutcome {
 /// Backend enforcement of the recording cap. The frontend stops recordings on
 /// its own timer; if the webview is wedged, this thread commits the dictation
 /// through the real stop pipeline so capture can never silently run forever.
-fn start_max_duration_watchdog(app: AppHandle, generation: u64, max_recording_seconds: u16) {
+fn start_max_duration_watchdog(app: AppHandle, dictation: u64, max_recording_seconds: u16) {
     thread::Builder::new()
         .name("max-recording-watchdog".to_string())
         .spawn(move || {
@@ -1540,38 +1634,117 @@ fn start_max_duration_watchdog(app: AppHandle, generation: u64, max_recording_se
                 Duration::from_secs(u64::from(max_recording_seconds)) + MAX_DURATION_WATCHDOG_GRACE,
             );
             let services = app.state::<AppServices>();
-            if services.recording_generation.load(Ordering::SeqCst) != generation {
+            for attempt in 0..=MAX_DURATION_WATCHDOG_RETRIES {
+                if !services.lifecycle(|lifecycle| lifecycle.is_recording(dictation)) {
+                    return;
+                }
+                let still_recording = services
+                    .audio
+                    .lock()
+                    .map(|audio| audio.is_recording())
+                    .unwrap_or(false);
+                if !still_recording {
+                    // Capture ended outside the stop pipeline; nothing is live
+                    // to stop, so the dictation is simply over. Checked again
+                    // under the lock: a stop that has just begun finishing it
+                    // stopped capture itself, and owns it now.
+                    if services.lifecycle(|lifecycle| {
+                        lifecycle.is_recording(dictation) && lifecycle.end(dictation)
+                    }) {
+                        emit_backend_event(
+                            &app,
+                            "warning",
+                            format!("Dictation {dictation}: marked recording, but capture had already stopped"),
+                        );
+                    }
+                    return;
+                }
+                if attempt == 0 {
+                    emit_backend_event(
+                        &app,
+                        "warning",
+                        format!(
+                            "Dictation {dictation}: max recording duration reached; committing the dictation from the backend"
+                        ),
+                    );
+                }
+                let event = match perform_stop_and_transcribe(&app, &services) {
+                    // Another stop holds the dictation; look again shortly.
+                    Err(err) if err == FINISH_BUSY => {
+                        thread::sleep(MAX_DURATION_WATCHDOG_RETRY);
+                        continue;
+                    }
+                    Ok(outcome) => RecordingAutoStoppedEvent {
+                        dictation_id: dictation,
+                        committed: true,
+                        message: "Recording hit the maximum duration and was transcribed".to_string(),
+                        delivery: Some(outcome.delivery),
+                    },
+                    Err(err) => RecordingAutoStoppedEvent {
+                        dictation_id: dictation,
+                        committed: false,
+                        message: format!(
+                            "Recording hit the maximum duration but could not be transcribed: {err}"
+                        ),
+                        delivery: None,
+                    },
+                };
+                let _ = app.emit("recording-auto-stopped", event);
                 return;
             }
-            let still_recording = services
+            // Something other than a stop (a settings save, a model removal,
+            // host pairing) has held the dictation lock all this time. Capture
+            // must not run on: claim the recording so no other stop finishes
+            // it, stop capture now, keep the audio, and commit it once the
+            // lock is free.
+            let Some(signals) =
+                services.lifecycle(|lifecycle| lifecycle.claim_for_stop(dictation))
+            else {
+                return;
+            };
+            let captured = services
                 .audio
                 .lock()
-                .map(|audio| audio.is_recording())
-                .unwrap_or(false);
-            if !still_recording {
-                return;
-            }
-
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .stop();
             emit_backend_event(
                 &app,
                 "warning",
-                "Max recording duration reached; committing the dictation from the backend",
+                format!(
+                    "Dictation {dictation}: capture stopped at its maximum length while another task held the dictation; it will be transcribed once that task ends"
+                ),
             );
-            let event = match perform_stop_and_transcribe(&app, &services) {
-                Ok(outcome) => RecordingAutoStoppedEvent {
-                    committed: true,
-                    message: "Recording hit the maximum duration and was transcribed".to_string(),
-                    delivery: Some(outcome.delivery),
+            let _operation = services
+                .operation
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            // Still ours under the lock (a cancel meanwhile ends it): only then may it
+            // use the transcription session.
+            if services.lifecycle(|lifecycle| lifecycle.active())
+                != Some((dictation, dictation_lifecycle::Phase::Finishing))
+            {
+                emit_backend_event(
+                    &app,
+                    "info",
+                    format!("Dictation {dictation} ended while it waited to be committed; dropped"),
+                );
+                return;
+            }
+            let result = finish_dictation(&app, &services, dictation, &signals, Some(captured));
+            let _ = app.emit(
+                "recording-auto-stopped",
+                RecordingAutoStoppedEvent {
+                    dictation_id: dictation,
+                    committed: result.is_ok(),
+                    message: match &result {
+                        Ok(_) => "Recording hit the maximum duration and was transcribed".to_string(),
+                        Err(err) => format!(
+                            "Recording hit the maximum duration but could not be transcribed: {err}"
+                        ),
+                    },
+                    delivery: result.ok().map(|outcome| outcome.delivery),
                 },
-                Err(err) => RecordingAutoStoppedEvent {
-                    committed: false,
-                    message: format!(
-                        "Recording hit the maximum duration but could not be transcribed: {err}"
-                    ),
-                    delivery: None,
-                },
-            };
-            let _ = app.emit("recording-auto-stopped", event);
+            );
         })
         .ok();
 }
@@ -1585,6 +1758,20 @@ async fn stop_and_transcribe(app: AppHandle) -> Result<DictationOutcome, String>
     .map_err(|e| e.to_string())?
 }
 
+/// The error a stop returns while another stop already holds the dictation.
+const FINISH_BUSY: &str = "Dictation is already finishing";
+/// The error a dictation ends with when it passes its finishing deadline.
+const FINISH_TIMED_OUT: &str = "Transcription took too long and was stopped. Please try again.";
+/// How often the finishing deadline looks at whether its dictation is done.
+const FINISHING_DEADLINE_POLL: Duration = Duration::from_millis(250);
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DictationTimedOutEvent {
+    dictation_id: u64,
+    message: String,
+}
+
 /// The full dictation commit pipeline. Free of the command layer so both the
 /// `stop_and_transcribe` command and the max-duration watchdog can run it.
 fn perform_stop_and_transcribe(
@@ -1594,10 +1781,78 @@ fn perform_stop_and_transcribe(
     let _operation = services
         .operation
         .try_lock()
-        .map_err(|_| "Dictation is already finishing".to_string())?;
+        .map_err(|_| FINISH_BUSY.to_string())?;
+    let finishing = services.lifecycle(|lifecycle| lifecycle.begin_finishing());
+    let dictation = finishing.id;
+    emit_backend_event(
+        app,
+        "info",
+        if finishing.tracked {
+            format!("Dictation {dictation}: stopping")
+        } else {
+            format!("Dictation {dictation}: stop requested with no recording tracked")
+        },
+    );
+    finish_dictation(app, services, dictation, &finishing.signals, None)
+}
+
+/// Commits dictation `dictation` and ends it, with the operation lock held.
+/// `captured` is audio the watchdog already stopped; otherwise capture is
+/// stopped here.
+fn finish_dictation(
+    app: &AppHandle,
+    services: &AppServices,
+    dictation: u64,
+    signals: &DictationSignals,
+    captured: Option<Result<Recording, String>>,
+) -> Result<DictationOutcome, String> {
+    let result = commit_dictation(app, services, dictation, signals, captured);
+    let (ended_by, was_current) = services.lifecycle(|lifecycle| {
+        (lifecycle.end_reason(dictation), lifecycle.end(dictation))
+    });
+    if !was_current {
+        emit_backend_event(
+            app,
+            "warning",
+            format!("Dictation {dictation}: was no longer current when its stop returned"),
+        );
+    }
+    match result {
+        Ok(outcome) => {
+            emit_backend_event(app, "info", format!("Dictation {dictation}: delivered"));
+            Ok(outcome)
+        }
+        Err(_) if ended_by == Some(EndReason::TimedOut) => {
+            emit_backend_event(
+                app,
+                "error",
+                format!("Dictation {dictation}: ended after passing its finishing deadline"),
+            );
+            Err(FINISH_TIMED_OUT.to_string())
+        }
+        Err(err) => {
+            emit_backend_event(app, "info", format!("Dictation {dictation}: ended: {err}"));
+            Err(err)
+        }
+    }
+}
+
+/// The commit pipeline for dictation `dictation`, with the operation lock
+/// held. Its work watches `signals`, never another dictation's.
+fn commit_dictation(
+    app: &AppHandle,
+    services: &AppServices,
+    dictation: u64,
+    signals: &DictationSignals,
+    captured: Option<Result<Recording, String>>,
+) -> Result<DictationOutcome, String> {
     invalidate_previews(services);
     let cursor_session = {
-        let mut snapshot = services.cursor_snapshot.lock().map_err(|e| e.to_string())?;
+        // Plain data: a poisoned lock must not stop the recording stopping.
+        let mut snapshot = services
+            .cursor_snapshot
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if snapshot.phase == live_preview::Phase::Recording {
             snapshot.finishing();
             let _ = app.emit("cursor-preview-state", &*snapshot);
@@ -1608,7 +1863,15 @@ fn perform_stop_and_transcribe(
 
     let trace = services.debug_trace.lock().ok().and_then(|mut t| t.take());
     let format_decision = format_context::end_recording(&services.format_session);
-    let settings = services.settings_snapshot()?;
+    let settings = match services.settings_snapshot() {
+        Ok(settings) => settings,
+        Err(err) => {
+            // Without settings the recording cannot be finished, but it must
+            // still end: a stop never leaves the microphone live.
+            abort_live_recording(app, services, dictation, "warning", &err);
+            return Err(err);
+        }
+    };
     // Re-apply this session's screen-harvested vocabulary (set at recording
     // start) so the finish path sees the same hints the session started with.
     let settings = settings.with_session_vocabulary(
@@ -1618,8 +1881,20 @@ fn perform_stop_and_transcribe(
             .map(|terms| terms.clone())
             .unwrap_or_default(),
     );
-    let recording = stop_and_validate_recording(app, services, &settings)?;
+    let recording = match captured {
+        Some(captured) => validate_stopped_recording(app, services, &settings, captured)?,
+        None => stop_and_validate_recording(app, services, &settings)?,
+    };
     let stats = recording.stats();
+    start_finishing_deadline(
+        app.clone(),
+        dictation,
+        dictation_lifecycle::finishing_deadline(
+            settings.transcription_location != TranscriptionLocation::Local,
+            settings.remote_timeout_seconds,
+            stats.duration_seconds,
+        ),
+    );
 
     emit_backend_event(
         app,
@@ -1634,7 +1909,10 @@ fn perform_stop_and_transcribe(
     // runs, rather than in up to three serial reads after it.
     #[cfg(target_os = "macos")]
     let focused_read = start_focused_read(&settings);
-    let raw_transcription = finish_transcription_raw(app, services, &recording, &settings)?;
+    let raw_transcription =
+        finish_transcription_raw(app, services, &recording, &settings, signals)?;
+    // From here a deadline only stops the polish: the transcript is kept.
+    services.lifecycle(|lifecycle| lifecycle.transcribed(dictation));
     let transcribe_ms = released_at.elapsed().as_millis() as u64;
     let raw_transcript = raw_transcription.text;
     update_cursor_snapshot(app, |s| {
@@ -1728,7 +2006,7 @@ fn perform_stop_and_transcribe(
             caret_lead_in,
             &settings,
             frontmost_app.as_ref(),
-            &services.transcription_cancel_requested,
+            signals.polish_stop_flag(),
             final_span.as_ref(),
         ),
         None if settings.polish_provider == settings::PolishProvider::Local => {
@@ -1737,7 +2015,7 @@ fn perform_stop_and_transcribe(
                 &settings,
                 frontmost_app.as_ref(),
                 caret_before,
-                &services.transcription_cancel_requested,
+                signals.polish_stop_flag(),
                 final_span.as_ref(),
             )
         }
@@ -1755,10 +2033,7 @@ fn perform_stop_and_transcribe(
         polish::PolishDecision::Disabled | polish::PolishDecision::Skipped(_) => 0,
         _ => polish_started.elapsed().as_millis() as u64,
     };
-    if services
-        .transcription_cancel_requested
-        .load(Ordering::SeqCst)
-    {
+    if signals.is_cancelled() {
         return Err("Transcription was cancelled".into());
     }
     match &decision {
@@ -1824,10 +2099,7 @@ fn perform_stop_and_transcribe(
     }
     let transcript = processed.text;
 
-    if services
-        .transcription_cancel_requested
-        .load(Ordering::SeqCst)
-    {
+    if signals.is_cancelled() {
         return Err("Transcription was cancelled".into());
     }
     // Written after the text is delivered, but timed now: total_ms ends when
@@ -1878,9 +2150,14 @@ fn perform_stop_and_transcribe(
     #[cfg(not(target_os = "macos"))]
     let clipboard_text = transcript_clipboard_text(&transcript);
 
+    if signals.is_cancelled() {
+        return Err("Transcription was cancelled".into());
+    }
+    // From here the text is delivered: a cancel or the deadline can no longer
+    // end this dictation, and one that already has is not delivered.
     if services
-        .transcription_cancel_requested
-        .load(Ordering::SeqCst)
+        .lifecycle(|lifecycle| lifecycle.begin_delivery(dictation))
+        .is_err()
     {
         return Err("Transcription was cancelled".into());
     }
@@ -2291,12 +2568,22 @@ fn stop_and_validate_recording(
     services: &AppServices,
     settings: &Settings,
 ) -> Result<Recording, String> {
-    let recording = match services
+    let stopped = services
         .audio
         .lock()
         .map_err(|_| "Audio service lock failed".to_string())?
-        .stop()
-    {
+        .stop();
+    validate_stopped_recording(app, services, settings, stopped)
+}
+
+/// `stop_and_validate_recording` for capture that is already stopped.
+fn validate_stopped_recording(
+    app: &AppHandle,
+    services: &AppServices,
+    settings: &Settings,
+    stopped: Result<Recording, String>,
+) -> Result<Recording, String> {
+    let recording = match stopped {
         Ok(recording) => recording,
         Err(err) => {
             cancel_transcription_for_location(services, settings.transcription_location)?;
@@ -2374,33 +2661,25 @@ fn finish_transcription_raw(
     services: &AppServices,
     recording: &Recording,
     settings: &Settings,
+    signals: &DictationSignals,
 ) -> Result<RawTranscription, String> {
     let raw_transcription = match settings.transcription_location {
         TranscriptionLocation::Local => {
-            let (result, super_mode) = {
-                let mut transcription = services
-                    .transcription
-                    .lock()
-                    .map_err(|_| "Transcription service lock failed".to_string())?;
-                let result = transcription.finish_session(recording, settings, &services.models);
-                (result, transcription.take_super_mode_outcome())
-            };
+            let finished = finish_local_transcription(app, recording, settings, signals);
+            // This dictation's cancel handle; no other dictation can have
+            // set one while this one holds the operation lock.
             clear_local_transcription_cancel(services)?;
-            match result {
-                Ok(transcript) => RawTranscription {
+            match finished {
+                Ok((Ok(transcript), super_mode)) => RawTranscription {
                     text: transcript,
                     backend: remote_transcription::BACKEND_ID.to_string(),
                     super_mode,
                 },
-                Err(_)
-                    if services
-                        .transcription_cancel_requested
-                        .load(Ordering::SeqCst) =>
-                {
+                Ok((Err(_), _)) | Err(_) if signals.is_cancelled() => {
                     emit_backend_event(app, "info", "Transcription cancelled");
                     return Err("Transcription was cancelled".to_string());
                 }
-                Err(err) => return Err(err),
+                Ok((Err(err), _)) | Err(err) => return Err(err),
             }
         }
         TranscriptionLocation::RemoteHost | TranscriptionLocation::Cloud => {
@@ -2410,7 +2689,7 @@ fn finish_transcription_raw(
                 .map_err(|_| "Remote transcription service lock failed".to_string())?
                 .take()
                 .ok_or_else(|| "No remote transcription session is active".to_string())?
-                .finish()?;
+                .finish(signals.cancel_flag())?;
             RawTranscription {
                 super_mode: super_mode::outcome_from_response(&response),
                 text: response.text,
@@ -2419,15 +2698,73 @@ fn finish_transcription_raw(
         }
     };
 
-    if services
-        .transcription_cancel_requested
-        .load(Ordering::SeqCst)
-    {
+    if signals.is_cancelled() {
         emit_backend_event(app, "info", "Transcription cancelled");
         return Err("Transcription was cancelled".to_string());
     }
 
     Ok(raw_transcription)
+}
+
+/// How often a local finish checks whether its dictation was cancelled.
+const LOCAL_FINISH_POLL: Duration = Duration::from_millis(100);
+
+type LocalFinish = (Result<String, String>, Option<super_mode::SuperModeOutcome>);
+
+/// Finishes the local session on a thread of its own and waits for it until
+/// the dictation is cancelled or times out. A decode that never returns
+/// (the whole-recording fallback cannot be interrupted) then cannot keep this
+/// dictation, or the operation lock, past its deadline: the thread is left
+/// to finish on its own and its result is dropped. Until then it holds the
+/// transcription service, with only its own session in it; a new recording
+/// cannot start a session meanwhile and says the model is still busy.
+fn finish_local_transcription(
+    app: &AppHandle,
+    recording: &Recording,
+    settings: &Settings,
+    signals: &DictationSignals,
+) -> Result<LocalFinish, String> {
+    let (tx, rx) = mpsc::channel();
+    let worker_app = app.clone();
+    let worker_recording = recording.clone();
+    let worker_settings = settings.clone();
+    let worker_signals = signals.clone();
+    thread::Builder::new()
+        .name("local-transcription-finish".to_string())
+        .spawn(move || {
+            let services = worker_app.state::<AppServices>();
+            let finished = services
+                .transcription
+                .lock()
+                .map_err(|_| "Transcription service lock failed".to_string())
+                .and_then(|transcription| {
+                    // Cancelled before this thread got the service: the session in it
+                    // may already be the next recording's, so leave it alone.
+                    if worker_signals.is_cancelled() {
+                        Err("Transcription was cancelled".to_string())
+                    } else {
+                        Ok(transcription)
+                    }
+                })
+                .map(|mut transcription| {
+                    let result = transcription.finish_session(
+                        &worker_recording,
+                        &worker_settings,
+                        &services.models,
+                        worker_signals.cancel_flag(),
+                    );
+                    (result, transcription.take_super_mode_outcome())
+                });
+            let _ = tx.send(finished);
+        })
+        .map_err(|err| format!("Failed to start the transcription finish: {err}"))?;
+    match recv_unless_cancelled(&rx, signals.cancel_flag(), LOCAL_FINISH_POLL) {
+        Ok(finished) => finished,
+        Err(WaitError::Cancelled) => Err("Transcription was cancelled".to_string()),
+        Err(WaitError::Disconnected) => {
+            Err("The transcription finish stopped without a transcript".to_string())
+        }
+    }
 }
 
 fn stop_side_effect_free_test_capture(
@@ -2437,19 +2774,35 @@ fn stop_side_effect_free_test_capture(
     let _operation = services
         .operation
         .try_lock()
-        .map_err(|_| "Dictation is already finishing".to_string())?;
-    invalidate_previews(services);
-    services
-        .transcription_cancel_requested
-        .store(false, Ordering::SeqCst);
+        .map_err(|_| FINISH_BUSY.to_string())?;
+    let finishing = services.lifecycle(|lifecycle| lifecycle.begin_finishing());
+    let result = finish_test_capture(app, services, finishing.id, &finishing.signals);
+    services.lifecycle(|lifecycle| lifecycle.end(finishing.id));
+    result
+}
 
-    let settings = services.settings_snapshot()?;
+fn finish_test_capture(
+    app: &AppHandle,
+    services: &AppServices,
+    dictation: u64,
+    signals: &DictationSignals,
+) -> Result<SpeedTestCapture, String> {
+    invalidate_previews(services);
+
+    let settings = match services.settings_snapshot() {
+        Ok(settings) => settings,
+        Err(err) => {
+            abort_live_recording(app, services, dictation, "warning", &err);
+            return Err(err);
+        }
+    };
 
     let recording = stop_and_validate_recording(app, services, &settings)?;
     let stats = recording.stats();
 
     let started = std::time::Instant::now();
-    let transcript = finish_transcription_raw(app, services, &recording, &settings)?.text;
+    let transcript =
+        finish_transcription_raw(app, services, &recording, &settings, signals)?.text;
     let transcribe_ms = started.elapsed().as_millis().min(u128::from(u32::MAX)) as u32;
 
     Ok(build_capture_result(
@@ -2573,32 +2926,255 @@ fn preview_interaction_sound(sound: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Cancels dictation `dictation_id` (or, with none given, whichever one is
+/// current) in any state: a live recording is discarded, a finishing one is
+/// stopped at its next check and its result dropped. A cancel meant for an
+/// earlier dictation is ignored, so a late one cannot end the next recording.
 #[tauri::command]
-fn cancel_transcription(app: AppHandle, services: State<'_, AppServices>) -> Result<(), String> {
-    services
-        .transcription_cancel_requested
-        .store(true, Ordering::SeqCst);
-    invalidate_previews(&services);
+async fn cancel_transcription(app: AppHandle, dictation_id: Option<u64>) -> Result<(), String> {
+    run_blocking(app, move |app, services| {
+        cancel_dictation(app, services, dictation_id);
+        Ok(())
+    })
+    .await
+}
+
+/// How long a cancel of a live recording waits for the operation lock.
+const CANCEL_WAIT_FOR_LOCK: Duration = Duration::from_secs(3);
+
+fn cancel_dictation(app: &AppHandle, services: &AppServices, requested: Option<u64>) {
+    // A live recording is torn down under the operation lock, so no stop or
+    // start can slip in between the decision and the teardown and have its
+    // resources discarded instead. A finishing dictation holds that lock
+    // itself, so it is reached through its own signals and resources.
+    let wants_recording = || {
+        services.lifecycle(|lifecycle| {
+            matches!(lifecycle.active(), Some((id, Phase::Recording)) if requested.is_none_or(|r| r == id))
+        })
+    };
+    let mut operation = None;
+    if wants_recording() {
+        let deadline = Instant::now() + CANCEL_WAIT_FOR_LOCK;
+        while operation.is_none() && wants_recording() && Instant::now() < deadline {
+            operation = match services.operation.try_lock() {
+                Ok(guard) => Some(guard),
+                Err(std::sync::TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
+                Err(std::sync::TryLockError::WouldBlock) => {
+                    thread::sleep(Duration::from_millis(20));
+                    None
+                }
+            };
+        }
+    }
+    let (decision, resources) = services.lifecycle(|lifecycle| {
+        let decision = lifecycle.request_cancel(requested);
+        let resources = matches!(decision, CancelDecision::Finishing(_))
+            .then(|| take_finishing_resources(services));
+        (decision, resources)
+    });
+    match decision {
+        CancelDecision::Ignore(why) => emit_backend_event(
+            app,
+            "info",
+            match requested {
+                Some(id) => format!("Cancel for dictation {id} ignored: {why}"),
+                None => format!("Cancel ignored: {why}"),
+            },
+        ),
+        CancelDecision::Recording(id) => {
+            if operation.is_none() {
+                emit_backend_event(
+                    app,
+                    "warning",
+                    format!("Dictation {id}: another task held the dictation; cancelling the recording anyway"),
+                );
+            }
+            abort_live_recording(app, services, id, "info", "cancelled while recording");
+            services.lifecycle(|lifecycle| lifecycle.end(id));
+        }
+        CancelDecision::Finishing(id) => {
+            if let Some(resources) = resources {
+                resources.release(app);
+            }
+            emit_backend_event(
+                app,
+                "info",
+                format!("Dictation {id}: transcription cancellation requested"),
+            );
+        }
+    }
+    drop(operation);
+}
+
+/// What a finishing dictation holds that a cancel or the deadline must stop,
+/// taken together with the decision under the lifecycle lock. While that lock
+/// says the dictation is finishing, it still holds the operation lock, so no
+/// new recording can have replaced any of these.
+struct FinishingResources {
+    cursor_session: u64,
+    format_session: Option<Arc<format_context::FormatSession>>,
+}
+
+/// Interrupts the finishing dictation's local worker and previews, and
+/// returns what is left to release once the lifecycle lock is free. Call
+/// only inside `AppServices::lifecycle`, together with the decision.
+fn take_finishing_resources(services: &AppServices) -> FinishingResources {
+    invalidate_previews(services);
+    // A local polish pass stops at its next token once the dictation's
+    // signals are set, so the runtime stays loaded for the next dictation.
+    if let Some(handle) = services
+        .local_transcription_cancel
+        .lock()
+        .ok()
+        .and_then(|handle| handle.as_ref().cloned())
+    {
+        handle.cancel();
+    }
+    FinishingResources {
+        cursor_session: services
+            .cursor_snapshot
+            .lock()
+            .map(|s| s.session_id)
+            .unwrap_or(0),
+        format_session: format_context::current_session(&services.format_session),
+    }
+}
+
+impl FinishingResources {
+    fn release(self, app: &AppHandle) {
+        hide_cursor_session(app, self.cursor_session);
+        if let Some(session) = self.format_session {
+            session.stop();
+        }
+    }
+}
+
+/// Ends a live recording without transcribing it: the microphone is released
+/// and the transcription session dropped. Used by cancel, and by any stop path
+/// that cannot go on, so no failure leaves the microphone live.
+fn abort_live_recording(
+    app: &AppHandle,
+    services: &AppServices,
+    dictation: u64,
+    level: &'static str,
+    reason: &str,
+) {
+    let was_live = {
+        // Stopping is still right even if another thread panicked mid-update.
+        let mut audio = services
+            .audio
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let live = audio.is_recording();
+        if live {
+            let _ = audio.stop();
+        }
+        live
+    };
+    let _ = cancel_local_transcription_if_needed(services);
+    let _ = cancel_remote_transcription_if_needed(services);
+    invalidate_previews(services);
     let cursor_session = services
         .cursor_snapshot
         .lock()
         .map(|s| s.session_id)
         .unwrap_or(0);
-    hide_cursor_session(&app, cursor_session);
+    hide_cursor_session(app, cursor_session);
     format_context::end_recording(&services.format_session);
-    // A local polish pass stops at its next token once the cancel flags are
-    // set, so the runtime stays loaded for the next dictation.
-    if let Some(handle) = services
-        .local_transcription_cancel
-        .lock()
-        .map_err(|_| "Transcription cancellation lock failed".to_string())?
-        .as_ref()
-        .cloned()
-    {
-        handle.cancel();
+    emit_backend_event(
+        app,
+        level,
+        format!(
+            "Dictation {dictation}: {reason}; {}",
+            if was_live {
+                "the recording was discarded"
+            } else {
+                "no recording was live"
+            }
+        ),
+    );
+}
+
+/// Once the polish was stopped at the deadline, how long the rest of the
+/// commit may take before the dictation counts as hung.
+const POLISH_STOP_GRACE: Duration = Duration::from_secs(30);
+
+/// Sleeps while dictation `dictation` is finishing, for up to `wait`. True
+/// when it is still finishing at the end.
+fn still_finishing_after(services: &AppServices, dictation: u64, wait: Duration) -> bool {
+    let started = Instant::now();
+    loop {
+        if services.lifecycle(|lifecycle| lifecycle.active()) != Some((dictation, Phase::Finishing))
+        {
+            return false;
+        }
+        let left = wait.saturating_sub(started.elapsed());
+        if left.is_zero() {
+            return true;
+        }
+        thread::sleep(FINISHING_DEADLINE_POLL.min(left));
     }
-    emit_backend_event(&app, "info", "Transcription cancellation requested");
-    Ok(())
+}
+
+/// The last resort for a finish that hangs. Once `deadline` has passed with
+/// dictation `dictation` still finishing: if its transcript is ready, only
+/// the polish is stopped and the unpolished text is delivered; otherwise (or
+/// if it is still stuck `POLISH_STOP_GRACE` later) it ends with a clear
+/// error, and the pill is told directly in case the stop never returns.
+fn start_finishing_deadline(app: AppHandle, dictation: u64, deadline: Duration) {
+    thread::Builder::new()
+        .name("dictation-deadline".to_string())
+        .spawn(move || {
+            let services = app.state::<AppServices>();
+            let mut wait = deadline;
+            loop {
+                if !still_finishing_after(&services, dictation, wait) {
+                    return;
+                }
+                let (expiry, resources) = services.lifecycle(|lifecycle| {
+                    let expiry = lifecycle.expire(dictation);
+                    let resources =
+                        (expiry == Expiry::End).then(|| take_finishing_resources(&services));
+                    (expiry, resources)
+                });
+                match expiry {
+                    Expiry::NotCurrent => return,
+                    Expiry::StopPolish => {
+                        emit_backend_event(
+                            &app,
+                            "warning",
+                            format!(
+                                "Dictation {dictation}: passed its {}s deadline while polishing; delivering the transcript unpolished",
+                                deadline.as_secs()
+                            ),
+                        );
+                        wait = POLISH_STOP_GRACE;
+                    }
+                    Expiry::End => {
+                        if let Some(resources) = resources {
+                            resources.release(&app);
+                        }
+                        emit_backend_event(
+                            &app,
+                            "error",
+                            format!(
+                                "Dictation {dictation}: transcription passed its {}s deadline and was stopped",
+                                deadline.as_secs()
+                            ),
+                        );
+                        let _ = app.emit(
+                            "dictation-timed-out",
+                            DictationTimedOutEvent {
+                                dictation_id: dictation,
+                                message: FINISH_TIMED_OUT.to_string(),
+                            },
+                        );
+                        return;
+                    }
+                }
+            }
+        })
+        .ok();
 }
 
 /// Run an Accessibility read on an abandoned thread with a hard timeout: AX
@@ -3063,11 +3639,7 @@ fn cancel_transcription_for_location(
 }
 
 fn cancel_local_transcription_if_needed(services: &AppServices) -> Result<(), String> {
-    services
-        .transcription
-        .lock()
-        .map_err(|_| "Transcription service lock failed".to_string())?
-        .cancel_session();
+    lock_transcription_within(services, START_WAIT_FOR_FINISH)?.cancel_session();
     clear_local_transcription_cancel(services)?;
     Ok(())
 }
@@ -3135,9 +3707,8 @@ pub fn run() {
             audio: Mutex::new(AudioService::default()),
             clipboard: ClipboardService,
             models: ModelService::default(),
-            recording_generation: AtomicU64::new(0),
+            dictations: Mutex::new(DictationLifecycle::default()),
             model_prepare_running: Arc::new(AtomicBool::new(false)),
-            transcription_cancel_requested: Arc::new(AtomicBool::new(false)),
             local_transcription_cancel: Mutex::new(None),
             settings: Mutex::new(SettingsService::default()),
             transcript_history: Mutex::new(TranscriptHistoryService::default()),
@@ -3269,9 +3840,8 @@ pub fn run() {
             tauri::RunEvent::Exit => {
                 let services = app.state::<AppServices>();
                 services.local_models.cancel_download();
-                services
-                    .transcription_cancel_requested
-                    .store(true, Ordering::SeqCst);
+                // Stop whatever dictation is in flight.
+                services.lifecycle(|lifecycle| lifecycle.request_cancel(None));
                 invalidate_previews(&services);
                 services.local_models.unload();
             }
