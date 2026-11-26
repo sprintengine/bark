@@ -58,27 +58,25 @@ struct DashboardView: View {
                 .keyboardShortcut("k", modifiers: .command)
                 .hidden()
                 .accessibilityHidden(true)
-            // ⌘F: the thread list's own search field.
-            Button("Find") {
+            // ⌘F: in Settings the settings' search field, elsewhere the thread list's. One
+            // button, since of two with the same key equivalent SwiftUI only ever runs the first.
+            Button(model.section == .settings ? "Search Settings" : "Find") {
                 if !model.sidebarVisible { model.sidebarVisible = true }
-                if model.section == .settings { model.open(dictation: nil) }
-                model.searchFocusPending = true
+                if model.section == .settings {
+                    model.settingsSearchFocusPending = true
+                } else {
+                    model.searchFocusPending = true
+                }
             }
             .keyboardShortcut("f", modifiers: .command)
             .hidden()
             .accessibilityHidden(true)
-            // In Settings: ⌘F searches the settings, esc goes back to the dictations. A key
-            // equivalent beats the focused field, so esc is left to the search while it holds a
-            // query (it clears it) and to a pairing in progress (it cancels it).
+            // In Settings, esc goes back to the dictations. A key equivalent beats the focused
+            // field, so esc is left to the search while it holds a query (it clears it), to a
+            // pairing in progress (it cancels it) and to the ⌘K palette while it is open (it
+            // closes it).
             if model.section == .settings {
-                Button("Search Settings") {
-                    if !model.sidebarVisible { model.sidebarVisible = true }
-                    model.settingsSearchFocusPending = true
-                }
-                .keyboardShortcut("f", modifiers: .command)
-                .hidden()
-                .accessibilityHidden(true)
-                if model.settingsQuery.isEmpty && model.hostFinder.pairing == nil {
+                if model.settingsQuery.isEmpty && model.hostFinder.pairing == nil && !model.paletteOpen {
                     Button("Back") { model.open(dictation: nil) }
                         .keyboardShortcut(.cancelAction)
                         .hidden()
