@@ -144,6 +144,7 @@ final class AppModel {
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
         hotkeys.onFnPress = { [weak self] in self?.dictation.fnPressed() }
         hotkeys.onFnRelease = { [weak self] in self?.dictation.fnReleased() }
+        hotkeys.onPasteLast = { [weak self] in self?.pasteLast() }
 
         pending.onRecovered = { [weak self] words, copied, placement in
             self?.dictation.announceRecovered(words: words, copied: copied, placement: placement)
