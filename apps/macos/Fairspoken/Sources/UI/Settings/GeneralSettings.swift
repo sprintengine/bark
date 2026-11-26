@@ -20,6 +20,10 @@ enum GeneralSettings {
                 keywords: "hotkey keyboard key record") {
                 KeyboardShortcuts.Recorder(for: .dictation) { _ in model.mirrorShortcut() }
             },
+            Row("Paste last dictation", detail: "Pastes your last dictation again into the app in front. Clear it to turn it off.",
+                keywords: "hotkey keyboard key paste again repeat") {
+                KeyboardShortcuts.Recorder(for: .pasteLast)
+            },
             Row("Shortcut mode", detail: s.recordingShortcutMode == .toggle
                 ? "Press once to start and again to stop."
                 : "Hold the shortcut while you speak; let go to finish.",
@@ -130,6 +134,9 @@ private struct MicrophoneRow: View {
 private struct MicLevelRow: View {
     @Environment(AppModel.self) private var model
     @State private var testing = false
+    /// The capture's ownership token from `start`: a dictation that takes the microphone over
+    /// makes it stale, so stopping the test then leaves the dictation's recording alone.
+    @State private var token: Int?
 
     var body: some View {
         let live = testing || model.dictation.phase.isListening
@@ -143,17 +150,26 @@ private struct MicLevelRow: View {
                 .disabled(model.dictation.phase.isActive && !testing)
         }
         .onDisappear { if testing { toggle() } }
+        // A dictation started from the keyboard took the microphone over: the test is over.
+        .onChange(of: model.dictation.phase.isActive) { _, active in
+            if active && testing {
+                token = nil
+                testing = false
+            }
+        }
     }
 
     private func toggle() {
         if testing {
-            model.dictation.capture.stop()
+            if let token { model.dictation.capture.stop(owner: token) }
+            token = nil
             testing = false
         } else if model.permissions.microphone.isGranted {
             do {
-                try model.dictation.capture.start(deviceName: model.settings.settings.audioDevice, maxSeconds: 30, sink: nil)
+                token = try model.dictation.capture.start(deviceName: model.settings.settings.audioDevice, maxSeconds: 30, sink: nil)
                 testing = true
             } catch {
+                token = nil
                 testing = false
             }
         } else {
