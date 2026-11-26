@@ -53,11 +53,11 @@ struct SettingsView: View {
             }
         }
 
-        /// The sidebar's groups.
+        /// The sidebar's groups. Bark Server sits with Dictation, where it is used: a heading of its
+        /// own over its one row only repeated the row.
         static let groups: [(title: String?, tabs: [Tab])] = [
             ("Bark", [.general, .history]),
-            ("Dictation", [.transcription, .appStyles, .vocabulary]),
-            ("Bark Server", [.host]),
+            ("Dictation", [.transcription, .appStyles, .vocabulary, .host]),
             (nil, [.updates, .about]),
         ]
     }

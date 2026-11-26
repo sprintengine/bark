@@ -223,7 +223,8 @@ struct CommandPalette: View {
 
     private func dictationEntry(_ item: TranscriptHistoryItem) -> PaletteEntry {
         var meta = [DictationText.appName(item)]
-        if item.isBarkNote { meta.append("Note") } else if let style = DictationText.styleName(item.style) { meta.append(style) }
+        // The style, unless it only repeats the app ("Notes · Notes").
+        if item.isBarkNote { meta.append("Note") } else if let style = DictationText.styleName(item.style), style != meta[0] { meta.append(style) }
         let age = DictationText.age(item.date)
         meta.append(age == "now" ? "just now" : "\(age) ago")
         return PaletteEntry(id: "dictation-\(item.id)", group: .dictations, title: DictationText.title(item),

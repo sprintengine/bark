@@ -437,7 +437,7 @@ private struct ModelSection: View {
                     badge: Badge(state.isReady ? "Ready" : state.label,
                                  style: state.isReady ? .neutral : { if case .failed = state { return .error } else { return .neutral } }()),
                     detail: "Runs on this Mac. \(info.summary)") {
-                    Text(Format.bytes(info.approxBytes)).font(.mono(12)).foregroundStyle(Crystal.ink3)
+                    Text(Format.bytes(model.models.shownBytes(info))).font(.mono(12)).foregroundStyle(Crystal.ink3)
                 }
                 if case .downloading(let f) = state {
                     ProgressView(value: f).tint(Crystal.primary).padding(.horizontal, 16).padding(.bottom, 12)

@@ -183,7 +183,7 @@ private struct ModelChoiceRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text(Format.bytes(info.approxBytes))
+                    Text(Format.bytes(model.models.shownBytes(info)))
                     Text(item == .installed ? "this Mac" : "download")
                 }
                 .font(.mono(12))

@@ -50,7 +50,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         toggleItem.target = self
-        toggleItem.image = Self.symbol("mic")
+        toggleItem.image = Self.symbol("waveform")
         toggleItem.setShortcut(for: .dictation)
         menu.addItem(toggleItem)
         pasteLastItem.target = self
@@ -62,7 +62,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(pendingItem)
         menu.addItem(.separator())
 
-        microphoneItem.image = Self.symbol("speaker.wave.2")
+        microphoneItem.image = Self.symbol("mic")
         microphoneItem.submenu = NSMenu(title: "Microphone")
         menu.addItem(microphoneItem)
         locationItem.image = Self.symbol("laptopcomputer")
@@ -70,17 +70,20 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(locationItem)
         menu.addItem(.separator())
 
-        menu.addItem(entry("Open \(AppInfo.displayName)", #selector(openHome), "o"))
-        menu.addItem(entry("Settings…", #selector(openSettings), ","))
+        // Every row carries a symbol, so the titles line up down the whole menu.
+        menu.addItem(entry("Open \(AppInfo.displayName)", #selector(openHome), "o", symbol: "macwindow"))
+        menu.addItem(entry("Settings…", #selector(openSettings), ",", symbol: "gearshape"))
         updateItem.target = self
+        updateItem.image = Self.symbol("arrow.triangle.2.circlepath")
         menu.addItem(updateItem)
         menu.addItem(.separator())
-        menu.addItem(entry("Quit \(AppInfo.displayName)", #selector(quit), "q"))
+        menu.addItem(entry("Quit \(AppInfo.displayName)", #selector(quit), "q", symbol: "power"))
     }
 
-    private func entry(_ title: String, _ action: Selector, _ key: String) -> NSMenuItem {
+    private func entry(_ title: String, _ action: Selector, _ key: String, symbol: String? = nil) -> NSMenuItem {
         let i = NSMenuItem(title: title, action: action, keyEquivalent: key)
         i.target = self
+        if let symbol { i.image = Self.symbol(symbol) }
         return i
     }
 
@@ -137,7 +140,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func refresh() {
         let listening = model.dictation.phase.isListening
         toggleItem.title = listening ? "Stop Dictation" : "Start Dictation"
-        toggleItem.image = Self.symbol(listening ? "stop.circle" : "mic")
+        toggleItem.image = Self.symbol(listening ? "stop.circle" : "waveform")
         pasteLastItem.isEnabled = model.lastDictation != nil
         lastItem.isHidden = model.lastDictation == nil
         // The views' heights follow their content (the last dictation's text wraps to two lines).

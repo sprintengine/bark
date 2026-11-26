@@ -60,6 +60,10 @@ final class ModelLibrary {
     private(set) var activeModelID: String = SpeechModelCatalog.defaultModelID
     private(set) var items: [String: ItemState] = [:]
     private(set) var diskBytes: [String: Int64] = [:]
+
+    /// The size every screen shows for a model: its files on disk once installed, else the
+    /// catalogue's download size. One figure, so Home, Settings and Models never disagree.
+    func shownBytes(_ info: SpeechModelInfo) -> Int64 { diskBytes[info.id] ?? info.approxBytes }
     private(set) var lastLoadSeconds: Double?
     /// Why the last download of a model failed (says what and where), until the next try.
     private(set) var downloadErrors: [String: String] = [:]

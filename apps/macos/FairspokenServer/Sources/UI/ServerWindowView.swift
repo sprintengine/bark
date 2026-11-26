@@ -447,12 +447,14 @@ enum ServerFormat {
         return value >= 1000 ? String(format: "%.1f s", value / 1000) : "\(Int(value.rounded())) ms"
     }
 
+    /// Bark's spelling ("45s", "10m", "2h 36m", "3d 4h"), a zero remainder left off.
     static func duration(_ seconds: Double) -> String {
         let s = Int(seconds)
-        if s >= 86_400 { return "\(s / 86_400) d \(s % 86_400 / 3600) h" }
-        if s >= 3600 { return "\(s / 3600) h \(s % 3600 / 60) m" }
-        if s >= 60 { return "\(s / 60) m \(s % 60) s" }
-        return "\(s) s"
+        if s >= 86_400 {
+            let h = s % 86_400 / 3600
+            return h == 0 ? "\(s / 86_400)d" : "\(s / 86_400)d \(h)h"
+        }
+        return Format.duration(seconds)
     }
 
     static func ago(_ epochMs: Double, now: Date = Date()) -> String {
