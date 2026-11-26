@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn only_one_specific_address_gets_a_loopback_companion() {
         assert_eq!(
-            super::loopback_companion_addr("100.91.70.66:48173").as_deref(),
+            super::loopback_companion_addr("100.64.0.10:48173").as_deref(),
             Some("127.0.0.1:48173")
         );
         assert_eq!(

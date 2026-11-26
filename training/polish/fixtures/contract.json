@@ -19,11 +19,11 @@
    "user": "<spelling>Railway</spelling>\n<transcript>we deployed it to rail way</transcript>\n\nOutput only the cleaned transcript."
   },
   {
-   "transcript": "hi sam can you send the report by friday thanks conal",
+   "transcript": "hi sam can you send the report by friday thanks dev",
    "spelling": [],
    "format": "email",
    "tone": null,
-   "user": "<format>email</format>\n<transcript>hi sam can you send the report by friday thanks conal</transcript>\n\nOutput only the cleaned transcript."
+   "user": "<format>email</format>\n<transcript>hi sam can you send the report by friday thanks dev</transcript>\n\nOutput only the cleaned transcript."
   },
   {
    "transcript": "start a tor va statin 20 milligrams",

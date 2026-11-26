@@ -1837,7 +1837,7 @@ mod tests {
     }
     #[test]
     fn tagged_models_get_the_contract_without_examples() {
-        let raw = "hi sam we moved it to rail way thanks conal";
+        let raw = "hi sam we moved it to rail way thanks dev";
         let layout = Layout {
             format: Format::Email,
             tone: Tone::Formal,
