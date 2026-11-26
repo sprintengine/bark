@@ -79,14 +79,11 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, 
         if let section { controller.section = section }
         if window == nil {
             let hosting = NSHostingController(rootView: ServerWindowView().environment(controller).environment(updates))
-            hosting.sceneBridgingOptions = [.toolbars]
             let w = NSWindow(contentViewController: hosting)
             w.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             w.title = ServerInfo.displayName
             w.titleVisibility = .hidden
             w.titlebarAppearsTransparent = true
-            w.toolbar = NSToolbar(identifier: "server")
-            w.toolbarStyle = .unified
             w.isReleasedWhenClosed = false
             w.setContentSize(NSSize(width: 1360, height: 920))
             w.minSize = NSSize(width: 1120, height: 760)
@@ -108,7 +105,6 @@ final class ServerAppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, 
         guard let window else { return }
         let frame = window.frame
         let hosting = NSHostingController(rootView: ServerWindowView().environment(controller).environment(updates))
-        hosting.sceneBridgingOptions = [.toolbars]
         window.contentViewController = hosting
         window.setFrame(frame, display: true)
     }

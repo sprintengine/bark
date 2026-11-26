@@ -4,60 +4,37 @@ import FairspokenCore
 import FairspokenUpdates
 import SwiftUI
 
-/// Main window: the Crystal theme (design/crystal/README.md) with the server's garnet hint.
-/// Liquid Glass sidebar and toolbar; each page's cards share one `GlassEffectContainer`.
+/// Main window, in the same language as Bark: a solid true-black (or near-white) ground, a
+/// sidebar of sections divided from the page by one hairline, and a top bar with where you are
+/// and the server's controls. Nothing behind the window shows through.
 struct ServerWindowView: View {
     @Environment(ServerController.self) private var controller
     @Environment(UpdateController.self) private var updates
 
     var body: some View {
-        NavigationSplitView {
-            sidebar.navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 280)
-        } detail: {
-            ZStack {
-                PageBackground().backgroundExtensionEffect()
-                detail.transition(.opacity)
+        HStack(spacing: 0) {
+            ServerSidebar()
+                .frame(width: 232)
+                .frame(maxHeight: .infinity)
+                .overlay(alignment: .trailing) { Rectangle().fill(Crystal.hairline).frame(width: 1) }
+            VStack(spacing: 0) {
+                ServerTopBar()
+                    .background(Crystal.canvas)
+                    .zIndex(1)
+                ZStack {
+                    PageBackground()
+                    detail.transition(.opacity)
+                }
+                .animation(.smooth(duration: 0.25), value: controller.section)
+                .updateToast(updates, style: .server)
             }
-            .animation(.smooth(duration: 0.25), value: controller.section)
-            .updateToast(updates, style: .server)
-            .toolbar { toolbar }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // The sidebar's header and the top bar take the title bar's place, beside the traffic lights.
+        .ignoresSafeArea(.container, edges: .top)
+        .background(Crystal.canvas)
+        .tint(Crystal.primary)
         .frame(minWidth: 1120, minHeight: 760)
-    }
-
-    private var sidebar: some View {
-        List(selection: Binding<ServerController.Section?>(get: { controller.section }, set: { if let s = $0 { controller.section = s } })) {
-            Section {
-                ForEach(ServerController.Section.allCases) { section in
-                    // Configuration holds Updates, so it wears the pending-update badge.
-                    let updatePending = section == .configuration && updates.isUpdatePending
-                    Label(section.title, systemImage: section.symbol)
-                        .badge(updatePending ? 1 : 0)
-                        .tag(section)
-                        .accessibilityLabel(updatePending ? "\(section.title), update available" : section.title)
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .safeAreaInset(edge: .top) {
-            HStack(spacing: 10) {
-                FairspokenMark(size: 28, monochrome: Crystal.ink)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Bark").font(.headline).foregroundStyle(Crystal.ink)
-                    Text("Server").font(.subheadline).foregroundStyle(Crystal.serverAccent)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 6)
-            .padding(.bottom, 10)
-            .accessibilityElement(children: .combine)
-        }
-        .safeAreaInset(edge: .bottom) {
-            UpdateSidebarButton(updates: updates, style: .server)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
-        }
     }
 
     @ViewBuilder private var detail: some View {
@@ -73,41 +50,98 @@ struct ServerWindowView: View {
             }
         }
     }
+}
 
-    @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        ToolbarSpacer(.flexible)
-        ToolbarItem(placement: .primaryAction) {
-            ServingChip()
-        }
-        ToolbarSpacer(.fixed)
-        ToolbarItem(placement: .primaryAction) {
-            Picker("Data", selection: Binding(get: { controller.source }, set: { controller.source = $0 })) {
-                Text("Live").tag(ServerController.Source.live)
-                Text("Demo").tag(ServerController.Source.demo)
+/// The sections, with Bark Server's name beside the traffic lights and updates at the foot.
+/// ↑ and ↓ move between sections.
+private struct ServerSidebar: View {
+    @Environment(ServerController.self) private var controller
+    @Environment(UpdateController.self) private var updates
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Crystal.canvas)
+                    .frame(width: 20, height: 20)
+                    .background(Crystal.ink, in: .rect(cornerRadius: 6, style: .continuous))
+                Text("\(Text("Bark").fontWeight(.semibold).foregroundStyle(Crystal.ink)) \(Text("Server").foregroundStyle(Crystal.ink2))")
+                    .font(.system(size: 15))
+                Spacer(minLength: 0)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 130)
-            .help("Live shows this server; Demo shows a simulated one")
+            .padding(.leading, 90)
+            .frame(height: 52)
+            .background { Color.clear.contentShape(.rect).gesture(WindowDragGesture()) }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Bark Server")
+            .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 2) {
+                ForEach(ServerController.Section.allCases) { section in
+                    // Configuration holds Updates, so it wears the pending-update dot.
+                    SettingsNavItem(section.title, symbol: section.symbol, selected: controller.section == section,
+                                    badge: section == .configuration && updates.isUpdatePending) {
+                        controller.section = section
+                        focused = true
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+            .focusable()
+            .focused($focused)
+            .focusEffectDisabled()
+            .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                let all = ServerController.Section.allCases
+                if let i = all.firstIndex(of: controller.section) {
+                    controller.section = all[min(max(i + (press.key == .downArrow ? 1 : -1), 0), all.count - 1)]
+                }
+                return .handled
+            }
+            .accessibilityLabel("Sections")
+            Spacer(minLength: 0)
+            UpdateSidebarButton(updates: updates, style: .server)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
         }
-        ToolbarSpacer(.fixed)
-        ToolbarItem(placement: .primaryAction) {
+        .background(Crystal.canvas)
+    }
+}
+
+/// Where you are, then whether it's serving, Live or Demo, and Start or Stop.
+private struct ServerTopBar: View {
+    @Environment(ServerController.self) private var controller
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(controller.configIssue != nil ? "Configuration" : controller.section.title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Crystal.ink)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 12)
+            ServingChip()
+            SegmentedChoice("Data", selection: Binding(get: { controller.source }, set: { controller.source = $0 }),
+                            options: [.init(ServerController.Source.live, "Live"), .init(ServerController.Source.demo, "Demo")])
+                .help("Live shows this server; Demo shows a simulated one")
             let running = controller.runState.isRunning
             let disabled = controller.runState == .starting || controller.configIssue != nil
             // Starting is the window's one primary action; stopping is not.
             if running {
-                Button("Stop", systemImage: "stop.fill") { Task { await controller.stop() } }
-                    .labelStyle(.titleAndIcon)
-                    .buttonStyle(.glass)
+                Button { Task { await controller.stop() } } label: { Label("Stop", systemImage: "stop.fill") }
+                    .buttonStyle(OutlineButtonStyle())
                     .disabled(disabled)
                     .help("Stop serving")
             } else {
-                Button("Start serving", systemImage: "play.fill") { Task { await controller.start() } }
-                    .labelStyle(.titleAndIcon)
-                    .buttonStyle(.glassProminent)
-                    .tint(Crystal.serverAccent)
+                Button { Task { await controller.start() } } label: { Label("Start Serving", systemImage: "play.fill") }
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(disabled)
             }
         }
+        .padding(.leading, 24)
+        .padding(.trailing, 12)
+        .frame(height: 52)
+        .background { Color.clear.contentShape(.rect).gesture(WindowDragGesture()) }
     }
 }
 
@@ -119,13 +153,17 @@ private struct ServingChip: View {
         let state = controller.runState
         HStack(spacing: 8) {
             StatusDot(color: color(state), pulsing: state == .starting)
-            Text(title(state)).font(.callout.weight(.medium)).foregroundStyle(Crystal.ink)
+            Text(title(state)).fontWeight(.medium).foregroundStyle(Crystal.ink)
             if state.isRunning {
-                Text(controller.accessSummary).font(.callout).foregroundStyle(Crystal.ink2)
+                Text(controller.accessSummary).foregroundStyle(Crystal.ink2)
             }
         }
         .lineLimit(1)
-        .padding(.horizontal, 12)
+        .font(.system(size: 13))
+        .padding(.horizontal, 10)
+        .frame(height: 28)
+        .background(Crystal.well, in: .rect(cornerRadius: Radius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).strokeBorder(Crystal.input))
         .help(help(state))
         .accessibilityElement(children: .combine)
     }
@@ -177,18 +215,19 @@ struct StartProblemBanner: View {
                     if controller.portConflict != nil {
                         Text("Port").font(.callout).foregroundStyle(Crystal.ink2)
                         TextField("Port", value: $port, format: .number.grouping(.never))
-                            .textFieldStyle(.roundedBorder).font(.fsData()).frame(width: 80)
+                            .textFieldStyle(.plain).font(.mono(12.5)).padding(.horizontal, 8).frame(width: 80, height: 28)
+                            .background(Crystal.well, in: .rect(cornerRadius: Radius.control, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).strokeBorder(Crystal.input))
                             .labelsHidden()
                             .onSubmit(startOnPort)
-                        Button(busy ? "Starting…" : "Start on this port", action: startOnPort)
-                            .buttonStyle(.borderedProminent).tint(Crystal.serverAccent)
+                        Button(busy ? "Starting…" : "Start on This Port", action: startOnPort)
+                            .buttonStyle(PrimaryButtonStyle())
                             .disabled(busy || !(1...65_535).contains(port) || port == controller.configuration.port)
                     }
-                    Button("Try again") { Task { busy = true; await controller.start(); busy = false } }
-                        .buttonStyle(.bordered)
+                    Button("Try Again") { Task { busy = true; await controller.start(); busy = false } }
+                        .buttonStyle(OutlineButtonStyle())
                         .disabled(busy)
                 }
-                .buttonBorderShape(.capsule)
                 .padding(.leading, 26)
                 if let problem { ErrorLabel(text: problem).font(.caption).padding(.leading, 26) }
             }
@@ -237,12 +276,11 @@ private struct ConfigIssueView: View {
                     Text("Fix the file, or reset it. Resetting makes a new token, so clients pair again.")
                         .font(.callout).foregroundStyle(Crystal.ink2)
                     HStack {
-                        Button("Show in Finder", systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([controller.configURL]) }
-                            .buttonStyle(.bordered)
-                        Button("Reset to defaults") { Task { await controller.resetConfiguration() } }
-                            .buttonStyle(.borderedProminent).tint(Crystal.serverAccent)
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([controller.configURL]) }
+                            .buttonStyle(OutlineButtonStyle())
+                        Button("Reset to Defaults") { Task { await controller.resetConfiguration() } }
+                            .buttonStyle(PrimaryButtonStyle())
                     }
-                    .buttonBorderShape(.capsule)
                 }
             }
             .frame(maxWidth: 720, alignment: .leading)
@@ -252,8 +290,8 @@ private struct ConfigIssueView: View {
 
 // MARK: - Shared pieces
 
-/// A page: one `GlassEffectContainer` around every card, the standard margins and spacing,
-/// and why the server isn't serving, when a start failed.
+/// A page: the standard margins and spacing, and why the server isn't serving, when a start
+/// failed. Cards are opaque; nothing on a page is glass.
 struct CrystalPage<Content: View>: View {
     var scrolls = true
     @ViewBuilder var content: Content
@@ -268,16 +306,14 @@ struct CrystalPage<Content: View>: View {
     }
 
     private var stack: some View {
-        GlassEffectContainer(spacing: 6) {
-            VStack(alignment: .leading, spacing: 16) {
-                StartProblemBanner()
-                content
-            }
-                .padding(.horizontal, 28)
-                .padding(.top, 18)
-                .padding(.bottom, 28)
-                .frame(maxWidth: .infinity, maxHeight: scrolls ? nil : .infinity, alignment: .topLeading)
+        VStack(alignment: .leading, spacing: 16) {
+            StartProblemBanner()
+            content
         }
+        .padding(.horizontal, 32)
+        .padding(.top, 16)
+        .padding(.bottom, 28)
+        .frame(maxWidth: .infinity, maxHeight: scrolls ? nil : .infinity, alignment: .topLeading)
     }
 }
 
@@ -322,9 +358,10 @@ struct PageHeader<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: 26, weight: .semibold)).tracking(-0.4).foregroundStyle(Crystal.ink)
+                Text(title).font(TypeScale.title).tracking(-0.3).foregroundStyle(Crystal.ink)
+                    .accessibilityAddTraits(.isHeader)
                 if let subtitle {
-                    Text(subtitle).font(.body).foregroundStyle(Crystal.ink2).lineLimit(1)
+                    Text(subtitle).font(.system(size: 14)).foregroundStyle(Crystal.ink2).lineLimit(1)
                 }
             }
             Spacer()
@@ -344,7 +381,8 @@ extension PageHeader where Trailing == EmptyView {
 struct SectionTitle: View {
     var text: String
     var body: some View {
-        Text(text).font(.headline).foregroundStyle(Crystal.ink).padding(.top, 6)
+        Text(text).font(.system(size: 16, weight: .semibold)).foregroundStyle(Crystal.ink).padding(.top, 6)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -367,7 +405,7 @@ struct NoticeBanner: View {
                 Image(systemName: "info.circle").foregroundStyle(Crystal.ink2)
                 Text(notice).font(.callout).foregroundStyle(Crystal.ink)
                 Spacer()
-                Button("Dismiss") { controller.dismissNotice() }.buttonStyle(.borderless)
+                Button("Dismiss") { controller.dismissNotice() }.buttonStyle(GhostButtonStyle())
             }
             .padding(12)
             .crystalWell()
@@ -397,8 +435,7 @@ struct CopyButton: View {
                 Image(systemName: copied ? "checkmark" : "doc.on.doc").frame(width: 16)
             }
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
+        .buttonStyle(OutlineButtonStyle(compact: label == nil))
         .help("Copy")
         .accessibilityLabel(copied ? "Copied" : (label ?? "Copy"))
     }
