@@ -127,35 +127,7 @@ final class ScreenshotHarness {
             }
             windows.dashboard?.setContentSize(NSSize(width: 1180, height: 800))
         }
-        model.settingsTab = .transcription
-        windows.showDashboard(.settings)
-        try? await Task.sleep(for: .milliseconds(1000))
-        await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "settings-transcription-\(suffix)") }
-        // The same tab with Network device chosen (the sample host; no tailnet scan, so no real machines).
-        let location = model.settings.settings.transcriptionLocation
-        model.settings.update { $0.transcriptionLocation = .remoteHost }
-        model.hostStatus.refresh(force: true)
-        try? await Task.sleep(for: .milliseconds(800))
-        await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "settings-host-\(suffix)") }
-        model.settings.update { $0.transcriptionLocation = location }
-        // Entries learned from corrections beside the user's own (screenshot settings are never saved).
-        model.settings.update { s in
-            for term in ["Beaumont", "Niamh"] where !s.vocabularyHints.contains(term) {
-                s.vocabularyHints.append(term)
-                if term == "Niamh" { s.learnedVocabularyHints.append(term) }
-            }
-            if !s.transcriptCorrections.contains(where: { $0.from == "cloud code" }) {
-                s.transcriptCorrections.append(TranscriptCorrection(from: "h b a one c", to: "HbA1c"))
-                s.transcriptCorrections.append(TranscriptCorrection(from: "cloud code", to: "Claude Code", origin: .learned,
-                                                                    models: ["parakeet-tdt-0.6b-v3"]))
-            }
-        }
-        model.settingsTab = .vocabulary
-        try? await Task.sleep(for: .milliseconds(800))
-        await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "settings-vocabulary-\(suffix)") }
+        await settingsShots(suffix: suffix)
         windows.dashboard?.orderOut(nil)
     }
 
@@ -178,6 +150,15 @@ final class ScreenshotHarness {
             try? await Task.sleep(for: .milliseconds(1000))
             await freshFrame()
             if let window = windows.dashboard { await capture(window, as: "dictation-\(name)-\(suffix)") }
+        }
+        // Restyled from the actions card: the Slack message as Clean, by the real formatter.
+        if let slack = model.history.item("demo-1") {
+            model.restyle(slack, as: .clean)
+            model.open(dictation: "demo-1")
+            try? await Task.sleep(for: .milliseconds(1000))
+            await freshFrame()
+            if let window = windows.dashboard { await capture(window, as: "dictation-restyled-\(suffix)") }
+            model.history.showcase(DemoHistory.items())
         }
         // The changes folded away.
         model.open(dictation: "demo-0")
@@ -205,6 +186,85 @@ final class ScreenshotHarness {
         if let window = windows.dashboard { await capture(window, as: "sidebar-notes-\(suffix)") }
         model.historyFilter = .all
         model.open(dictation: nil)
+    }
+
+    /// Every settings page, the search, App styles with a preview open and its add sheet, and
+    /// Transcription with Bark Server chosen. Screenshot settings are never saved.
+    private func settingsShots(suffix: String) async {
+        model.history.showcase(DemoHistory.items())
+        // Entries learned from corrections beside the user's own, and a few style rules.
+        model.settings.update { s in
+            for term in ["Beaumont", "Niamh"] where !s.vocabularyHints.contains(term) {
+                s.vocabularyHints.append(term)
+                if term == "Niamh" { s.learnedVocabularyHints.append(term) }
+            }
+            if !s.transcriptCorrections.contains(where: { $0.from == "cloud code" }) {
+                s.transcriptCorrections.append(TranscriptCorrection(from: "h b a one c", to: "HbA1c"))
+                s.transcriptCorrections.append(TranscriptCorrection(from: "cloud code", to: "Claude Code", origin: .learned,
+                                                                    models: ["parakeet-tdt-0.6b-v3"]))
+            }
+            s.styleRules = StyleRules()
+            s.styleRules.setApp("com.apple.MobileSMS", appName: "Messages", style: .clean)
+            s.styleRules.setSite("docs.google.com", style: .document)
+        }
+        func shoot(_ tab: SettingsView.Tab, as name: String, wait: Int = 900) async {
+            model.settingsTab = tab
+            windows.showDashboard(.settings)
+            try? await Task.sleep(for: .milliseconds(wait))
+            await freshFrame()
+            if let window = windows.dashboard { await capture(window, as: "settings-\(name)-\(suffix)") }
+        }
+        model.settingsQuery = ""
+        for tab in SettingsView.Tab.allCases where tab != .appStyles {
+            await shoot(tab, as: tab.rawValue)
+        }
+        await captureScrolledToBottom(as: "settings-general-lower-\(suffix)")
+        model.settingsTab = .transcription
+        try? await Task.sleep(for: .milliseconds(500))
+        await captureScrolledToBottom(as: "settings-transcription-lower-\(suffix)")
+        // App styles: closed, then Mail's preview open.
+        model.appStylesOpenRow = nil
+        await shoot(.appStyles, as: "app-styles")
+        model.appStylesOpenRow = "com.apple.mail"
+        await shoot(.appStyles, as: "app-styles-preview")
+        await captureScrolledToBottom(as: "settings-app-styles-lower-\(suffix)")
+        model.appStylesOpenRow = "com.tinyspeck.slackmacgap"
+        try? await Task.sleep(for: .milliseconds(700))
+        await captureScrolledToBottom(as: "settings-app-styles-preview-casual-\(suffix)")
+        model.appStylesOpenRow = nil
+        model.appStylesAddPresented = true
+        try? await Task.sleep(for: .milliseconds(1200))
+        await captureSheet(as: "settings-app-styles-add-\(suffix)")
+        model.appStylesAddPresented = false
+        try? await Task.sleep(for: .milliseconds(600))
+        // Cleanup with one switch off, so Reset to Defaults shows.
+        model.settings.update { $0.cleanupSelfCorrections = false }
+        model.settingsTab = .transcription
+        try? await Task.sleep(for: .milliseconds(600))
+        await captureScrolledToBottom(as: "settings-transcription-cleanup-off-\(suffix)")
+        model.settings.update { $0.cleanupSelfCorrections = true }
+        // Bark Server chosen (the sample host; no tailnet scan, so no real machines).
+        let location = model.settings.settings.transcriptionLocation
+        let url = model.settings.settings.remoteUrl
+        model.settings.update {
+            $0.transcriptionLocation = .remoteHost
+            if $0.remoteUrl.isEmpty { $0.remoteUrl = "http://practice-mini.local:48173" }
+        }
+        model.hostStatus.refresh(force: true)
+        await shoot(.transcription, as: "transcription-server")
+        await shoot(.host, as: "host-in-use")
+        model.settings.update {
+            $0.transcriptionLocation = location
+            $0.remoteUrl = url
+        }
+        model.hostStatus.refresh(force: true)
+        // Search across pages.
+        model.settingsQuery = "paste"
+        await shoot(.general, as: "search")
+        model.settingsQuery = "zzz"
+        await shoot(.general, as: "search-empty")
+        model.settingsQuery = ""
+        model.settingsTab = .general
     }
 
     /// The Models library with a download in progress and a favourite, a model's detail sheet,
@@ -606,22 +666,23 @@ private struct PillShowcase: View {
 
 // MARK: - Demo history
 
-/// The dictations screenshots and `--demo` show: varied apps and styles, cleanup edits with
-/// fillers, a self-correction and a restart, a note written in Bark, a clipboard fallback, a
-/// website, a dictation run on Bark Server, and older items from before cleanup was recorded.
+/// The dictations screenshots and `--demo` show: varied apps and styles, a note written in Bark,
+/// a clipboard fallback, a website, a dictation run on Bark Server, a terminal, and one kept
+/// before cleanup was recorded. What was heard goes through the real pipeline in the sample's
+/// style, so the text, the edits and the timing are what Bark itself would produce.
 enum DemoHistory {
     struct Sample {
         var minutesAgo: Double
         var app: String
         var bundle: String
+        /// What the speech model heard (it punctuates as it goes); nil for a note or an old item.
         var raw: String?
-        var text: String
-        var style: String?
+        /// A note's text, or an old item's.
+        var text: String = ""
+        var style: DictationStyle.ID?
         var reason: String?
-        var edits: [CleanupEdit]? = nil
         var seconds: Double
         var ms: Int
-        var cleanupMs: Int? = nil
         var host: String? = nil
         var note = false
         var clipboard = false
@@ -630,83 +691,62 @@ enum DemoHistory {
 
     static let samples: [Sample] = [
         Sample(minutesAgo: 2, app: "Mail", bundle: "com.apple.mail",
-               raw: "um so can you send the revised quote to Aoife by Thursday, no wait, Friday, and copy in Declan, because he's sort of handling the kitchen side now",
-               text: "Hi Aoife,\n\nCould you send the revised quote by Friday, and copy in Declan? He is handling the kitchen side now.\n\nThanks,\nSam",
-               style: "email", reason: "Mail rule",
-               edits: [CleanupEdit(kind: .filler, removed: "um"), CleanupEdit(kind: .filler, removed: "so"),
-                       CleanupEdit(kind: .selfCorrection, removed: "Thursday, no wait, Friday", inserted: "Friday"),
-                       CleanupEdit(kind: .filler, removed: "sort of"),
-                       CleanupEdit(kind: .formatting, removed: "can you", inserted: "Could you"),
-                       CleanupEdit(kind: .formatting, removed: "", inserted: "Hi Aoife, … Thanks, Sam")],
-               seconds: 11.4, ms: 182, cleanupMs: 4),
+               raw: "Hi Aoife, um, so could you send the revised quote by Thursday, no wait, Friday, and copy in Declan? He's sort of handling the kitchen side now. Thanks, Sam.",
+               style: .email, reason: "Mail rule", seconds: 11.4, ms: 182),
         Sample(minutesAgo: 14, app: "Slack", bundle: "com.tinyspeck.slackmacgap",
-               raw: "running running ten minutes late start without me",
-               text: "running ten minutes late, start without me", style: "casual", reason: "Slack rule",
-               edits: [CleanupEdit(kind: .repetition, removed: "running", inserted: ""),
-                       CleanupEdit(kind: .punctuation, removed: "late", inserted: "late,")],
-               seconds: 3.1, ms: 96, cleanupMs: 1),
+               raw: "Um, running ten minutes late, start without me.", style: .casual, reason: "Slack rule", seconds: 3.1, ms: 96),
         Sample(minutesAgo: 41, app: "Xcode", bundle: "com.apple.dt.Xcode",
-               raw: "guard let session equals current session else return",
-               text: "guard let session = currentSession else { return }", style: "code", reason: "Xcode rule",
-               edits: [CleanupEdit(kind: .spokenCommand, removed: "equals", inserted: "="),
-                       CleanupEdit(kind: .formatting, removed: "current session", inserted: "currentSession"),
-                       CleanupEdit(kind: .formatting, removed: "return", inserted: "{ return }")],
-               seconds: 4.2, ms: 88, cleanupMs: 2),
+               raw: "Rename fetchQuote to, uh, loadQuote everywhere.", style: .code, reason: "Xcode rule", seconds: 4.2, ms: 88),
         Sample(minutesAgo: 70, app: "Messages", bundle: "com.apple.MobileSMS",
-               raw: "on the train now home by half six", text: "On the train now, home by half six", style: "casual",
-               reason: "Messages rule", edits: [CleanupEdit(kind: .punctuation, removed: "now", inserted: "now,")],
-               seconds: 2.9, ms: 91, cleanupMs: 1, clipboard: true),
+               raw: "Um, on the train now, home by half six.", style: .casual, reason: "Messages rule", seconds: 2.9, ms: 91,
+               clipboard: true),
         Sample(minutesAgo: 180, app: "Notes", bundle: "com.apple.Notes",
-               raw: "kitchen quote worktop two wall units uh fitters first week of March",
-               text: "Kitchen quote: worktop, two wall units\n- Fitters: first week of March", style: "notes", reason: "Notes rule",
-               edits: [CleanupEdit(kind: .filler, removed: "uh"),
-                       CleanupEdit(kind: .formatting, removed: "fitters", inserted: "- Fitters:")],
-               seconds: 9.8, ms: 141, cleanupMs: 3, remote: true),
+               raw: "Kitchen quote. Bullet point worktop. Bullet point two wall units. Bullet point, uh, fitters the first week of March.",
+               style: .notes, reason: "Notes rule", seconds: 9.8, ms: 141, remote: true),
         Sample(minutesAgo: 205, app: "Bark", bundle: "ie.fairspoken.mac", raw: nil,
-               text: "Ideas for the practice newsletter: flu clinic dates, the new nurse, parking.", style: nil, reason: nil,
-               seconds: 0, ms: 0, note: true),
+               text: "Ideas for the practice newsletter: flu clinic dates, the new nurse, parking.", seconds: 0, ms: 0, note: true),
         Sample(minutesAgo: 26 * 60, app: "Safari", bundle: "com.apple.Safari",
-               raw: "Q4 review retention is up four points I mean three points on last quarter",
-               text: "Q4 review: retention is up three points on last quarter.", style: "document", reason: "docs.google.com",
-               edits: [CleanupEdit(kind: .selfCorrection, removed: "four points I mean three points", inserted: "three points"),
-                       CleanupEdit(kind: .punctuation, removed: "review", inserted: "review:")],
-               seconds: 6.3, ms: 120, cleanupMs: 2, host: "docs.google.com"),
+               raw: "Q4 review. Retention is up, you know, four points, I mean three points, on last quarter.",
+               style: .document, reason: "docs.google.com", seconds: 6.3, ms: 120, host: "docs.google.com"),
         Sample(minutesAgo: 27 * 60, app: "Terminal", bundle: "com.apple.Terminal",
-               raw: "git checkout dash b fix slash quote totals", text: "git checkout -b fix/quote-totals", style: "code",
-               reason: "Terminal rule",
-               edits: [CleanupEdit(kind: .spokenCommand, removed: "dash b", inserted: "-b"),
-                       CleanupEdit(kind: .spokenCommand, removed: "fix slash quote totals", inserted: "fix/quote-totals")],
-               seconds: 3.4, ms: 84, cleanupMs: 1),
+               raw: "git checkout main", style: .verbatim, reason: "Terminal", seconds: 1.9, ms: 84),
         Sample(minutesAgo: 29 * 60, app: "Mail", bundle: "com.apple.mail",
-               raw: "thanks Declan Tuesday at ten works for me",
-               text: "Thanks Declan, Tuesday at ten works for me.", style: "email", reason: "You chose this",
-               edits: [CleanupEdit(kind: .punctuation, removed: "Declan", inserted: "Declan,")],
-               seconds: 3.6, ms: 101, cleanupMs: 1),
+               raw: "Thanks, Declan, um, Tuesday at ten works for me.", style: .email, reason: "You chose this", seconds: 3.6, ms: 101),
         Sample(minutesAgo: 3 * 24 * 60, app: "Socrates", bundle: "com.socrates.pms",
-               raw: "patient reports intermittent chest tightness on exertion for three weeks no radiation settles with rest",
-               text: "Patient reports intermittent chest tightness on exertion for three weeks, no radiation, settles with rest.",
-               style: "clean", reason: "Default", edits: [CleanupEdit(kind: .punctuation, removed: "weeks", inserted: "weeks,")],
-               seconds: 8.4, ms: 133, cleanupMs: 2),
+               raw: "Patient reports, um, intermittent chest tightness on exertion for three weeks, no radiation, settles with rest.",
+               style: .clean, reason: "Default", seconds: 8.4, ms: 133),
         Sample(minutesAgo: 9 * 24 * 60, app: "Outlook", bundle: "com.microsoft.Outlook", raw: nil,
                text: "Thanks for the update. I've attached the audit results and we can go through them on Friday.",
-               style: nil, reason: nil, seconds: 5.4, ms: 117),
+               seconds: 5.4, ms: 117),
     ]
 
     static func items(now: Date = Date()) -> [TranscriptHistoryItem] {
         samples.enumerated().map { i, s in
             let created = Int64((now.timeIntervalSince1970 - s.minutesAgo * 60) * 1000)
+            var text = s.text
+            var edits: [CleanupEdit]?
+            var cleanupMs: Int?
+            if let raw = s.raw, let style = s.style {
+                let started = ContinuousClock.now
+                let r = DictationPipeline.process(raw, context: PostProcessContext(
+                    appBundleID: s.bundle, vocabulary: ["Aoife", "Declan"], style: style, styleReason: s.reason,
+                    allowsMultiline: style != .verbatim, allowsRichText: style != .verbatim))
+                text = r.plainText
+                edits = r.edits
+                cleanupMs = max(1, Int((ContinuousClock.now - started) / .milliseconds(1)))
+            }
             var item = TranscriptHistoryItem(
-                id: "demo-\(i)", createdAt: created, text: s.text, backend: s.note ? "typed" : "parakeet",
+                id: "demo-\(i)", createdAt: created, text: text, backend: s.note ? "typed" : "parakeet",
                 location: s.remote ? "remote-host" : "local", durationSeconds: s.seconds,
                 timings: s.note ? nil : DictationTimings(transcribeMs: s.ms - 20, speechModelMs: s.ms - 60, totalMs: s.ms),
                 model: s.note ? nil : "parakeet-tdt-0.6b-v3", appName: s.app, appBundleId: s.bundle)
             item.rawText = s.raw
-            item.cleanupEdits = s.edits
-            item.style = s.style
-            item.styleReason = s.reason
+            item.cleanupEdits = edits
+            item.style = s.note ? DictationStyle.ID.notes.rawValue : s.style?.rawValue
+            item.styleReason = s.note ? "Note in Bark" : s.reason
             item.destinationHost = s.host
             item.isNote = s.note ? true : nil
-            item.cleanupMs = s.cleanupMs
+            item.cleanupMs = cleanupMs
             item.clipboardOnly = s.clipboard ? true : nil
             return item
         }
