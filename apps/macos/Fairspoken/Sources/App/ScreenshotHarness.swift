@@ -64,9 +64,10 @@ final class ScreenshotHarness {
                 // `--pill-only`: just the recording pill, for quick review of its states.
                 if !AppInfo.arguments.contains("--pill-only") {
                     await dashboardShots(suffix: name)
-                    await onboardingShots(suffix: name)
+                    // `--dashboard-only`: the main window alone, for quick review of the shell.
+                    if !AppInfo.arguments.contains("--dashboard-only") { await onboardingShots(suffix: name) }
                 }
-                await pillShots(suffix: name)
+                if !AppInfo.arguments.contains("--dashboard-only") { await pillShots(suffix: name) }
             }
             NSApp.terminate(nil)
         }
@@ -86,6 +87,7 @@ final class ScreenshotHarness {
             await freshFrame()
             if let window = windows.dashboard { await capture(window, as: "\(section.rawValue)-\(suffix)") }
         }
+        await dictationShots(suffix: suffix)
         await modelLinkShots(suffix: suffix)
         // Home's lower half: the recent dictations, the speech engine and the speed test.
         windows.showDashboard(.home)
@@ -101,19 +103,12 @@ final class ScreenshotHarness {
         if let window = windows.dashboard { await capture(window, as: "home-listening-\(suffix)") }
         feeder.cancel()
         model.dictation.showcase(.idle)
-        // The sidebar collapsed, through the action the toolbar's sidebar button and View › Hide
-        // Sidebar (⌃⌘S) send.
-        NSApp.sendAction(#selector(DashboardWindow.toggleSidebar(_:)), to: nil, from: nil)
+        // The sidebar collapsed, through the action View › Hide Sidebar (⌃⌘S) sends.
+        NSApp.sendAction(#selector(DashboardWindow.toggleDashboardSidebar(_:)), to: windows.dashboard, from: nil)
         try? await Task.sleep(for: .milliseconds(900))
         await freshFrame()
         if let window = windows.dashboard { await capture(window, as: "home-sidebar-hidden-\(suffix)") }
         model.sidebarVisible = true
-        // "See all": every dictation by day.
-        model.homeShowsAllDictations = true
-        try? await Task.sleep(for: .milliseconds(900))
-        await freshFrame()
-        if let window = windows.dashboard { await capture(window, as: "home-all-\(suffix)") }
-        model.homeShowsAllDictations = false
         // Before the first dictation.
         model.history.showcaseEmpty(true)
         model.dictation.showcaseClearResult()
@@ -162,6 +157,71 @@ final class ScreenshotHarness {
         await freshFrame()
         if let window = windows.dashboard { await capture(window, as: "settings-vocabulary-\(suffix)") }
         windows.dashboard?.orderOut(nil)
+    }
+
+    /// The thread list and the dictation view: an email with cleanup edits, code, a note, a
+    /// clipboard fallback, one kept before cleanup was recorded and one run on Bark Server; then
+    /// the list searched, and filtered to notes. Also checks, once, that a click in the top bar
+    /// reaches the app's own controls rather than the title bar.
+    private func dictationShots(suffix: String) async {
+        model.history.showcase(DemoHistory.items())
+        windows.showDashboard(.home)
+        if suffix == "light", let window = windows.dashboard { Self.probeTopBar(window) }
+        // Home with a row under the pointer: copy in place of the time.
+        model.showcaseHoveredRow = "demo-1"
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "home-row-hover-\(suffix)") }
+        model.showcaseHoveredRow = nil
+        let shots: [(String, String)] = [("demo-0", "email"), ("demo-2", "code"), ("demo-3", "clipboard"),
+                                         ("demo-4", "server"), ("demo-5", "note"), ("demo-10", "before-cleanup")]
+        for (id, name) in shots {
+            model.open(dictation: id)
+            try? await Task.sleep(for: .milliseconds(1000))
+            await freshFrame()
+            if let window = windows.dashboard { await capture(window, as: "dictation-\(name)-\(suffix)") }
+        }
+        // The changes folded away.
+        model.open(dictation: "demo-0")
+        UserDefaults.standard.set(false, forKey: "DictationChangesShown")
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "dictation-folded-\(suffix)") }
+        UserDefaults.standard.set(true, forKey: "DictationChangesShown")
+        // The actions card hidden from the top bar.
+        UserDefaults.standard.set(true, forKey: "DictationPanelHidden")
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "dictation-no-panel-\(suffix)") }
+        UserDefaults.standard.set(false, forKey: "DictationPanelHidden")
+        // Search and filter.
+        model.open(dictation: nil)
+        model.historyQuery = "quote"
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "sidebar-search-\(suffix)") }
+        model.historyQuery = ""
+        model.historyFilter = .notes
+        try? await Task.sleep(for: .milliseconds(900))
+        await freshFrame()
+        if let window = windows.dashboard { await capture(window, as: "sidebar-notes-\(suffix)") }
+        model.historyFilter = .all
+        model.open(dictation: nil)
+    }
+
+    /// Logs which view a click at the sidebar button and at the microphone picker would reach.
+    private static func probeTopBar(_ window: NSWindow) {
+        guard let frame = window.contentView?.superview else { return }
+        let h = frame.bounds.height
+        for (name, point) in [("sidebar button", NSPoint(x: 90, y: h - 26)),
+                              ("microphone picker", NSPoint(x: frame.bounds.width - 60, y: h - 26)),
+                              ("search field", NSPoint(x: 120, y: h - 74))] {
+            let hit = frame.hitTest(point)
+            var chain: [String] = []
+            var v: NSView? = hit
+            while let view = v, chain.count < 6 { chain.append(String(describing: type(of: view))); v = view.superview }
+            print("Top bar probe, \(name): \(chain.joined(separator: " < "))")
+        }
     }
 
     /// The Models library with a download in progress and a favourite, a model's detail sheet,
@@ -558,5 +618,114 @@ private struct PillShowcase: View {
             .padding(.top, 20)
         }
         .ignoresSafeArea()
+    }
+}
+
+// MARK: - Demo history
+
+/// The dictations screenshots and `--demo` show: varied apps and styles, cleanup edits with
+/// fillers, a self-correction and a restart, a note written in Bark, a clipboard fallback, a
+/// website, a dictation run on Bark Server, and older items from before cleanup was recorded.
+enum DemoHistory {
+    struct Sample {
+        var minutesAgo: Double
+        var app: String
+        var bundle: String
+        var raw: String?
+        var text: String
+        var style: String?
+        var reason: String?
+        var edits: [CleanupEdit]? = nil
+        var seconds: Double
+        var ms: Int
+        var cleanupMs: Int? = nil
+        var host: String? = nil
+        var note = false
+        var clipboard = false
+        var remote = false
+    }
+
+    static let samples: [Sample] = [
+        Sample(minutesAgo: 2, app: "Mail", bundle: "com.apple.mail",
+               raw: "um so can you send the revised quote to Aoife by Thursday, no wait, Friday, and copy in Declan, because he's sort of handling the kitchen side now",
+               text: "Hi Aoife,\n\nCould you send the revised quote by Friday, and copy in Declan? He is handling the kitchen side now.\n\nThanks,\nSam",
+               style: "email", reason: "Mail rule",
+               edits: [CleanupEdit(kind: .filler, removed: "um"), CleanupEdit(kind: .filler, removed: "so"),
+                       CleanupEdit(kind: .selfCorrection, removed: "Thursday, no wait, Friday", inserted: "Friday"),
+                       CleanupEdit(kind: .filler, removed: "sort of"),
+                       CleanupEdit(kind: .formatting, removed: "can you", inserted: "Could you"),
+                       CleanupEdit(kind: .formatting, removed: "", inserted: "Hi Aoife, … Thanks, Sam")],
+               seconds: 11.4, ms: 182, cleanupMs: 4),
+        Sample(minutesAgo: 14, app: "Slack", bundle: "com.tinyspeck.slackmacgap",
+               raw: "running running ten minutes late start without me",
+               text: "running ten minutes late, start without me", style: "casual", reason: "Slack rule",
+               edits: [CleanupEdit(kind: .repetition, removed: "running", inserted: ""),
+                       CleanupEdit(kind: .punctuation, removed: "late", inserted: "late,")],
+               seconds: 3.1, ms: 96, cleanupMs: 1),
+        Sample(minutesAgo: 41, app: "Xcode", bundle: "com.apple.dt.Xcode",
+               raw: "guard let session equals current session else return",
+               text: "guard let session = currentSession else { return }", style: "code", reason: "Xcode rule",
+               edits: [CleanupEdit(kind: .spokenCommand, removed: "equals", inserted: "="),
+                       CleanupEdit(kind: .formatting, removed: "current session", inserted: "currentSession"),
+                       CleanupEdit(kind: .formatting, removed: "return", inserted: "{ return }")],
+               seconds: 4.2, ms: 88, cleanupMs: 2),
+        Sample(minutesAgo: 70, app: "Messages", bundle: "com.apple.MobileSMS",
+               raw: "on the train now home by half six", text: "On the train now, home by half six", style: "casual",
+               reason: "Messages rule", edits: [CleanupEdit(kind: .punctuation, removed: "now", inserted: "now,")],
+               seconds: 2.9, ms: 91, cleanupMs: 1, clipboard: true),
+        Sample(minutesAgo: 180, app: "Notes", bundle: "com.apple.Notes",
+               raw: "kitchen quote worktop two wall units uh fitters first week of March",
+               text: "Kitchen quote: worktop, two wall units\n- Fitters: first week of March", style: "notes", reason: "Notes rule",
+               edits: [CleanupEdit(kind: .filler, removed: "uh"),
+                       CleanupEdit(kind: .formatting, removed: "fitters", inserted: "- Fitters:")],
+               seconds: 9.8, ms: 141, cleanupMs: 3, remote: true),
+        Sample(minutesAgo: 205, app: "Bark", bundle: "ie.fairspoken.mac", raw: nil,
+               text: "Ideas for the practice newsletter: flu clinic dates, the new nurse, parking.", style: nil, reason: nil,
+               seconds: 0, ms: 0, note: true),
+        Sample(minutesAgo: 26 * 60, app: "Safari", bundle: "com.apple.Safari",
+               raw: "Q4 review retention is up four points I mean three points on last quarter",
+               text: "Q4 review: retention is up three points on last quarter.", style: "document", reason: "docs.google.com",
+               edits: [CleanupEdit(kind: .selfCorrection, removed: "four points I mean three points", inserted: "three points"),
+                       CleanupEdit(kind: .punctuation, removed: "review", inserted: "review:")],
+               seconds: 6.3, ms: 120, cleanupMs: 2, host: "docs.google.com"),
+        Sample(minutesAgo: 27 * 60, app: "Terminal", bundle: "com.apple.Terminal",
+               raw: "git checkout dash b fix slash quote totals", text: "git checkout -b fix/quote-totals", style: "code",
+               reason: "Terminal rule",
+               edits: [CleanupEdit(kind: .spokenCommand, removed: "dash b", inserted: "-b"),
+                       CleanupEdit(kind: .spokenCommand, removed: "fix slash quote totals", inserted: "fix/quote-totals")],
+               seconds: 3.4, ms: 84, cleanupMs: 1),
+        Sample(minutesAgo: 29 * 60, app: "Mail", bundle: "com.apple.mail",
+               raw: "thanks Declan Tuesday at ten works for me",
+               text: "Thanks Declan, Tuesday at ten works for me.", style: "email", reason: "You chose this",
+               edits: [CleanupEdit(kind: .punctuation, removed: "Declan", inserted: "Declan,")],
+               seconds: 3.6, ms: 101, cleanupMs: 1),
+        Sample(minutesAgo: 3 * 24 * 60, app: "Socrates", bundle: "com.socrates.pms",
+               raw: "patient reports intermittent chest tightness on exertion for three weeks no radiation settles with rest",
+               text: "Patient reports intermittent chest tightness on exertion for three weeks, no radiation, settles with rest.",
+               style: "clean", reason: "Default", edits: [CleanupEdit(kind: .punctuation, removed: "weeks", inserted: "weeks,")],
+               seconds: 8.4, ms: 133, cleanupMs: 2),
+        Sample(minutesAgo: 9 * 24 * 60, app: "Outlook", bundle: "com.microsoft.Outlook", raw: nil,
+               text: "Thanks for the update. I've attached the audit results and we can go through them on Friday.",
+               style: nil, reason: nil, seconds: 5.4, ms: 117),
+    ]
+
+    static func items(now: Date = Date()) -> [TranscriptHistoryItem] {
+        samples.enumerated().map { i, s in
+            let created = Int64((now.timeIntervalSince1970 - s.minutesAgo * 60) * 1000)
+            var item = TranscriptHistoryItem(
+                id: "demo-\(i)", createdAt: created, text: s.text, backend: s.note ? "typed" : "parakeet",
+                location: s.remote ? "remote-host" : "local", durationSeconds: s.seconds,
+                timings: s.note ? nil : DictationTimings(transcribeMs: s.ms - 20, speechModelMs: s.ms - 60, totalMs: s.ms),
+                model: s.note ? nil : "parakeet-tdt-0.6b-v3", appName: s.app, appBundleId: s.bundle)
+            item.rawText = s.raw
+            item.cleanupEdits = s.edits
+            item.style = s.style
+            item.styleReason = s.reason
+            item.destinationHost = s.host
+            item.isNote = s.note ? true : nil
+            item.cleanupMs = s.cleanupMs
+            item.clipboardOnly = s.clipboard ? true : nil
+            return item
+        }
     }
 }
