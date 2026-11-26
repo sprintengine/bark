@@ -126,6 +126,8 @@ private struct ServerSummaryRow: View {
             }
             Button(model.settings.settings.remoteUrl.isEmpty ? "Choose…" : "Change…") { model.settingsTab = .host }.cardButton()
         }
+        // Configured but not in use: nothing else asks it, so ask once here (answers are kept 20 s).
+        .onAppear { status.refresh() }
     }
 }
 
@@ -306,6 +308,7 @@ private struct CurrentHostRow: View {
                 .cardButton()
                 .disabled(status.state == .checking)
         }
+        .onAppear { status.refresh() }
     }
 }
 
