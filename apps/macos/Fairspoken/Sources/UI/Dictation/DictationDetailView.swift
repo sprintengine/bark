@@ -257,6 +257,11 @@ private struct ChangesTable: View {
         return out
     }
 
+    /// A removed piece as it reads: without the comma or full stop that came off with it.
+    static func shown(_ s: String) -> String {
+        s.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: ",.;:"))
+    }
+
     static func quoted(_ list: [String]) -> String { list.map { "“\($0)”" }.joined(separator: ", ") }
 
     static func rows(_ item: TranscriptHistoryItem, diff: WordDiff?) -> [Row] {
@@ -267,13 +272,20 @@ private struct ChangesTable: View {
             guard let list = grouped[kind], !list.isEmpty else { continue }
             switch kind {
             case .filler, .repetition, .restart:
-                rows.append(Row(step: kind.stepName, result: text([("Removed ", false), (quoted(list.map(\.removed)), true)])))
+                rows.append(Row(step: kind.stepName, result: text([("Removed ", false), (quoted(list.map { shown($0.removed) }), true)])))
             case .selfCorrection, .spokenCommand, .vocabulary:
                 var parts: [(String, Bool)] = []
                 for (i, edit) in list.enumerated() {
                     if i > 0 { parts.append(("; ", false)) }
-                    parts.append(("“\(edit.removed)”", true))
-                    parts.append((" became \(edit.inserted)", false))
+                    let inserted = edit.inserted.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if inserted.isEmpty {
+                        // A correction keeps what followed the cue: the wrong part and the cue go.
+                        parts.append(("Took out ", false))
+                        parts.append(("“\(shown(edit.removed))”", true))
+                    } else {
+                        parts.append(("“\(shown(edit.removed))”", true))
+                        parts.append((" became \(edit.inserted == "\n" ? "a new line" : edit.inserted == "\n\n" ? "a new paragraph" : inserted)", false))
+                    }
                 }
                 rows.append(Row(step: kind.stepName, result: text(parts)))
             case .punctuation:
