@@ -24,6 +24,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let locationItem = NSMenuItem(title: "Transcribe On", action: nil, keyEquivalent: "")
     private let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(updateAction), keyEquivalent: "")
     static let menuWidth: CGFloat = 300
+    private var headerRoot = AnyView(EmptyView())
+    private var lastRoot = AnyView(EmptyView())
 
     init(model: AppModel, windows: WindowCoordinator) {
         self.model = model
@@ -38,10 +40,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func buildMenu() {
         menu.delegate = self
         menu.minimumWidth = Self.menuWidth
-        headerItem.view = Self.hosting(StatusMenuHeader().environment(model))
+        headerRoot = AnyView(StatusMenuHeader().environment(model))
+        lastRoot = AnyView(LastDictationCard(onCopy: { [weak self] in self?.copyLast() }).environment(model))
+        headerItem.view = Self.hosting(headerRoot)
         headerItem.setAccessibilityElement(true)
         menu.addItem(headerItem)
-        lastItem.view = Self.hosting(LastDictationCard(onCopy: { [weak self] in self?.copyLast() }).environment(model))
+        lastItem.view = Self.hosting(lastRoot)
         menu.addItem(lastItem)
         menu.addItem(.separator())
 
@@ -86,13 +90,20 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return image
     }
 
-    /// A view for a menu item: as wide as the menu, as tall as it needs.
-    private static func hosting(_ view: some View) -> NSView {
-        let host = NSHostingView(rootView: view.frame(width: menuWidth))
-        host.sizingOptions = [.intrinsicContentSize]
-        host.frame = NSRect(origin: .zero, size: host.fittingSize)
+    /// A view for a menu item: as wide as the menu (it stretches with it), as tall as it needs
+    /// at the menu's narrowest.
+    private static func hosting(_ view: AnyView) -> NSView {
+        let host = NSHostingView(rootView: view.frame(minWidth: menuWidth, maxWidth: .infinity, alignment: .leading))
+        host.sizingOptions = []
+        host.frame = NSRect(x: 0, y: 0, width: menuWidth, height: height(of: view))
         host.autoresizingMask = [.width]
         return host
+    }
+
+    /// The view's height at the menu's narrowest (a hosting view that doesn't size itself
+    /// can't be asked for it).
+    private static func height(of view: AnyView) -> CGFloat {
+        ceil(NSHostingController(rootView: view.frame(width: menuWidth)).sizeThatFits(in: NSSize(width: menuWidth, height: 1000)).height)
     }
 
     func update(for phase: DictationController.Phase) {
@@ -122,9 +133,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         pasteLastItem.isEnabled = model.lastDictation != nil
         lastItem.isHidden = model.lastDictation == nil
         // The views' heights follow their content (the last dictation's text wraps to two lines).
-        for view in [headerItem.view, lastItem.view].compactMap({ $0 }) {
-            view.frame.size.height = view.fittingSize.height
-        }
+        headerItem.view?.frame.size.height = Self.height(of: headerRoot)
+        lastItem.view?.frame.size.height = Self.height(of: lastRoot)
         let waiting = model.pending.items.count
         pendingItem.isHidden = waiting == 0
         pendingItem.title = waiting == 1 ? "1 Dictation Not Transcribed Yet…" : "\(waiting) Dictations Not Transcribed Yet…"
@@ -299,6 +309,14 @@ private struct LastDictationCard: View {
     var onCopy: () -> Void
     @State private var hovered = false
 
+    /// The words on one run of lines, from the line the title starts at (past a greeting).
+    static func preview(_ item: TranscriptHistoryItem) -> String {
+        let lines = item.text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let title = DictationText.title(item)
+        let start = lines.firstIndex(of: title) ?? 0
+        return lines[start...].joined(separator: " ")
+    }
+
     /// "2m ago", "just now".
     static func age(_ date: Date) -> String {
         let age = DictationText.age(date)
@@ -320,7 +338,7 @@ private struct LastDictationCard: View {
                             .frame(width: 22, height: 22)
                             .background(hovered ? Crystal.rowHover : .clear, in: .rect(cornerRadius: 6, style: .continuous))
                     }
-                    Text(item.text.split(whereSeparator: \.isNewline).joined(separator: " "))
+                    Text(Self.preview(item))
                         .font(.system(size: 13))
                         .foregroundStyle(Crystal.ink)
                         .lineLimit(2)
