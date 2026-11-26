@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         model?.settings.saveNow()
+        model?.history.flush()
     }
 
     @objc func showAbout() {

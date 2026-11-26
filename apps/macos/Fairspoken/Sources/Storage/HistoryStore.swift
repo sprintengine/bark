@@ -3,9 +3,9 @@ import FairspokenCore
 import Observation
 import OSLog
 
-/// Recent dictations (`transcript-history.json`, 50 items, Rust schema) and lifetime usage
-/// (`usage-stats.json`). Both import once from the Tauri app. Phase 1 replaces the simple
-/// list with full history/notes behind the same file formats.
+/// Dictations and notes (`transcript-history.json`, up to `TranscriptHistory.maxItems`, the Rust
+/// schema plus optional Mac-only fields) and lifetime usage (`usage-stats.json`). Both import
+/// once from the Tauri app. Files are written off the main thread, newest snapshot last.
 @Observable
 final class HistoryStore {
     private(set) var items: [TranscriptHistoryItem] = []
@@ -14,7 +14,10 @@ final class HistoryStore {
     @ObservationIgnored private var usageRaw: [String: JSONValue] = [:]
     @ObservationIgnored private let directory: URL
     @ObservationIgnored private let persists: Bool
-    private static let log = Logger(subsystem: AppInfo.bundleID, category: "history")
+    /// Writes in order, off the main thread: a 1,000-item history is too big to write on every
+    /// dictation while the UI waits.
+    @ObservationIgnored private let writer = DispatchQueue(label: "history-writer", qos: .utility)
+    nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ie.fairspoken.mac", category: "history")
 
     init(directory: URL = AppInfo.supportDirectory, persists: Bool = !AppInfo.isDemo) {
         self.directory = directory
@@ -61,6 +64,36 @@ final class HistoryStore {
         usage.measuredTypingWpm = wpm
     }
 
+    /// A note typed into Bark itself (Home's composer). Not counted in usage: nothing was dictated.
+    @discardableResult
+    func saveNote(_ text: String) -> TranscriptHistoryItem? {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return nil }
+        let note = TranscriptHistoryItem.note(clean)
+        items = TranscriptHistory.adding(note, to: items)
+        save()
+        return note
+    }
+
+    /// Puts back an item changed elsewhere (its text corrected, say), in place.
+    func replace(_ item: TranscriptHistoryItem) {
+        guard let i = items.firstIndex(where: { $0.id == item.id }) else { return }
+        items[i] = item
+        save()
+    }
+
+    /// The dictation view's composer: "change X to Y", "delete X", "add Y at the end". Updates
+    /// the item and adds the change to its edits; nil when the command isn't understood.
+    @discardableResult
+    func applyCorrection(_ command: String, to id: String) -> NoteEditCommand.Result? {
+        guard var item = items.first(where: { $0.id == id }),
+              let result = NoteEditCommand.apply(command, to: item.text) else { return nil }
+        item.text = result.text
+        item.cleanupEdits = (item.cleanupEdits ?? []) + result.edits
+        replace(item)
+        return result
+    }
+
     func delete(_ id: String) {
         items.removeAll { $0.id == id }
         save()
@@ -79,15 +112,22 @@ final class HistoryStore {
         return values[values.count / 2]
     }
 
+    /// Waits for queued writes (at quit).
+    func flush() { writer.sync {} }
+
     private func save() {
         guard persists else { return }
-        do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
-            try encoder.encode(items).write(to: historyURL, options: .atomic)
-            try JSONMerge.encode(usage, over: usageRaw).write(to: usageURL, options: .atomic)
-        } catch {
-            Self.log.error("Saving history failed: \(error.localizedDescription, privacy: .public)")
+        let items = items, usage = usage, usageRaw = usageRaw
+        let historyURL = historyURL, usageURL = usageURL
+        writer.async {
+            do {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
+                try encoder.encode(items).write(to: historyURL, options: .atomic)
+                try JSONMerge.encode(usage, over: usageRaw).write(to: usageURL, options: .atomic)
+            } catch {
+                Self.log.error("Saving history failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
