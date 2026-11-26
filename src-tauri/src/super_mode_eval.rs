@@ -175,7 +175,12 @@ fn dictate(
     };
     let released = Instant::now();
     let text = service
-        .finish_session(&recording, settings, models)
+        .finish_session(
+            &recording,
+            settings,
+            models,
+            &std::sync::atomic::AtomicBool::new(false),
+        )
         .unwrap_or_default();
     let release = released.elapsed();
     drop(preview_rx);

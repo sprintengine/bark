@@ -15,6 +15,17 @@ enum TextInserter {
     enum Outcome: Equatable {
         case pasted
         case copied(reason: String)
+        /// `commit` said no: nothing was written or pasted.
+        case withdrawn
+    }
+
+    /// What the dictation says at the moment its text is first written.
+    enum Commit {
+        case deliver
+        /// Copy it, never paste (the screen locked meanwhile, say), giving this reason.
+        case copyOnly(String)
+        /// Cancelled: write nothing.
+        case withdraw
     }
 
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "insert")
@@ -27,26 +38,44 @@ enum TextInserter {
     /// `expectedApp` is the app that was frontmost when recording started. If another app is in
     /// front now, the text is still pasted but the old clipboard is not put back, so the
     /// dictation stays recoverable if it landed somewhere unexpected.
-    static func deliver(_ text: String, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?) async -> Outcome {
+    /// `commit` is asked just before the text is first written anywhere (after the waits for
+    /// the keys and the focus). A dictation cancelled meanwhile (Escape) lands nowhere; one
+    /// that must not be pasted any more is copied. Once it says `deliver` or `copyOnly` the
+    /// dictation can no longer be cancelled.
+    static func deliver(_ text: String, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?,
+                        commit: () -> Commit = { .deliver }) async -> Outcome {
         let pasteboard = NSPasteboard.general
+        /// Nil to go on and paste; otherwise what became of it.
+        func committed(copyReason: String?) -> Outcome? {
+            switch commit() {
+            case .withdraw:
+                return .withdrawn
+            case .copyOnly(let reason):
+                write(text, to: pasteboard, transient: false)
+                return .copied(reason: reason)
+            case .deliver:
+                guard let copyReason else { return nil }
+                write(text, to: pasteboard, transient: false)
+                return .copied(reason: copyReason)
+            }
+        }
         guard paste else {
-            write(text, to: pasteboard, transient: false)
-            return .copied(reason: "Copied to clipboard")
+            return committed(copyReason: "Copied to clipboard") ?? .withdrawn
         }
         guard AXIsProcessTrusted() else {
-            write(text, to: pasteboard, transient: false)
-            return .copied(reason: "Copied — allow Accessibility to paste")
+            return committed(copyReason: "Copied — allow Accessibility to paste") ?? .withdrawn
         }
         // The target is checked after the wait: the user may switch apps while still releasing
         // the shortcut, and ⌘V goes to whatever is in front once it is up.
         await waitForModifierRelease(timeout: .milliseconds(800))
         if IsSecureEventInputEnabled() || focusedElementIsSecure() {
-            write(text, to: pasteboard, transient: false)
-            return .copied(reason: "Copied — secure field")
+            return committed(copyReason: "Copied — secure field") ?? .withdrawn
         }
 
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let focus = await probeFocus(of: front)
+        // Everything below writes the text somewhere.
+        if let outcome = committed(copyReason: nil) { return outcome }
         // The probe described an app that is no longer in front: don't paste blind.
         if NSWorkspace.shared.frontmostApplication?.processIdentifier != front {
             write(text, to: pasteboard, transient: false)

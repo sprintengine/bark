@@ -7,11 +7,17 @@ use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read};
 use std::net::IpAddr;
 use std::sync::mpsc::{self, Receiver, SyncSender};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const STREAM_CONTENT_TYPE: &str = "application/vnd.fairspoken.pcm-stream";
 const STREAM_CHANNEL_DEPTH: usize = 12;
+/// How often a remote finish checks whether its dictation was cancelled.
+const FINISH_CANCEL_POLL: Duration = Duration::from_millis(100);
+/// The error a cancelled remote finish returns; the commit path's own
+/// cancellation message, so callers treat both alike.
+pub const FINISH_CANCELLED: &str = "Transcription was cancelled";
 /// The health check is a tiny GET: a host that cannot answer it this quickly
 /// is unreachable for dictation too, so "Test" should say so promptly.
 const HEALTH_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -222,22 +228,38 @@ pub fn start_remote_streaming_session(
 }
 
 impl RemoteStreamingSession {
-    pub fn finish(mut self) -> Result<RemoteTranscriptionResponse, String> {
+    /// Ends the audio stream and waits for the host's transcript, for at most
+    /// `finish_timeout`. Setting `cancel` stops the wait within
+    /// `FINISH_CANCEL_POLL`, so a cancelled or timed-out dictation never waits
+    /// out a slow host.
+    pub fn finish(mut self, cancel: &AtomicBool) -> Result<RemoteTranscriptionResponse, String> {
         drop(self.audio_tx);
-        let result = match self.result_rx.recv_timeout(self.finish_timeout) {
-            Ok(result) => result,
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                // The worker is blocked on a host that stopped responding.
-                // Abandon it instead of joining — joining would hang the app
-                // exactly the way this timeout exists to prevent.
+        let deadline = Instant::now() + self.finish_timeout;
+        let result = loop {
+            if cancel.load(Ordering::SeqCst) {
+                // Abandon the worker, as on timeout below.
                 self.worker.take();
-                return Err(format!(
-                    "Remote transcription host did not respond within {}s of the recording ending",
-                    self.finish_timeout.as_secs()
-                ));
+                return Err(FINISH_CANCELLED.to_string());
             }
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                return Err("Remote streaming worker stopped without a transcript".to_string())
+            let wait = deadline
+                .saturating_duration_since(Instant::now())
+                .min(FINISH_CANCEL_POLL);
+            match self.result_rx.recv_timeout(wait) {
+                Ok(result) => break result,
+                Err(mpsc::RecvTimeoutError::Timeout) if Instant::now() < deadline => {}
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    // The worker is blocked on a host that stopped responding.
+                    // Abandon it instead of joining — joining would hang the app
+                    // exactly the way this timeout exists to prevent.
+                    self.worker.take();
+                    return Err(format!(
+                        "Remote transcription host did not respond within {}s of the recording ending",
+                        self.finish_timeout.as_secs()
+                    ));
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err("Remote streaming worker stopped without a transcript".to_string())
+                }
             }
         };
         if let Some(worker) = self.worker.take() {
@@ -802,6 +824,50 @@ mod tests {
         let started = std::time::Instant::now();
         session.cancel();
         assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    /// A session whose worker never answers, as with a host that hangs.
+    fn hung_session(finish_timeout: Duration) -> super::RemoteStreamingSession {
+        let (audio_tx, _audio_rx) = std::sync::mpsc::sync_channel(1);
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            // Holds the result sender open without ever sending.
+            std::thread::sleep(Duration::from_secs(30));
+            drop(result_tx);
+        });
+        super::RemoteStreamingSession {
+            audio_tx,
+            result_rx,
+            worker: Some(worker),
+            finish_timeout,
+        }
+    }
+
+    #[test]
+    fn finish_honours_its_timeout() {
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let started = std::time::Instant::now();
+        let err = hung_session(Duration::from_millis(300))
+            .finish(&cancel)
+            .expect_err("a hung host times out");
+        assert!(err.contains("did not respond"), "{err}");
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn cancel_stops_a_finish_waiting_on_a_hung_host() {
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let setter = cancel.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(150));
+            setter.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        let started = std::time::Instant::now();
+        let err = hung_session(Duration::from_secs(60))
+            .finish(&cancel)
+            .expect_err("cancel ends the wait");
+        assert_eq!(err, super::FINISH_CANCELLED);
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 
     #[test]

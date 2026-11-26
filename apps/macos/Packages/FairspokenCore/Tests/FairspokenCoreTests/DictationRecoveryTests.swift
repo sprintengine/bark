@@ -38,6 +38,31 @@ final class ScriptedTransport: HTTPTransport {
     }
 }
 
+/// Holds an async call until it is opened, ignoring cancellation.
+final class Gate: Sendable {
+    private let state = Mutex<(open: Bool, waiters: [CheckedContinuation<Void, Never>])>((false, []))
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let now = state.withLock { state -> Bool in
+                if state.open { return true }
+                state.waiters.append(continuation)
+                return false
+            }
+            if now { continuation.resume() }
+        }
+    }
+
+    func open() {
+        let waiters = state.withLock { state in
+            state.open = true
+            defer { state.waiters = [] }
+            return state.waiters
+        }
+        for waiter in waiters { waiter.resume() }
+    }
+}
+
 /// Collects what reached `deliver`.
 final class Delivered: Sendable {
     private let texts = Mutex<[String]>([])
@@ -344,6 +369,55 @@ struct DictationRecoveryTests {
         // The repaired header is a normal WAV now.
         let data = try store.wav("dictation-2")
         #expect(data[40..<44].elementsEqual(WAVFile.le32(16_000)))
+    }
+
+    /// Escape while transcribing, or the deadline: the run is cancelled while its live attempt
+    /// is still out. The transcript that lands afterwards is never delivered, nothing else is
+    /// tried, and the recording stays on disk to retry.
+    @Test func aCancelledRunKeepsTheRecordingAndDropsTheLateTranscript() async throws {
+        _ = try record()
+        let gate = Gate()
+        let delivered = Delivered()
+        let triedHere = Mutex(false)
+        let routes = TranscriptionRoutes(local: { _ in
+            triedHere.withLock { $0 = true }
+            return TranscriptionOutput(text: "Here.", modelMs: 1, model: "m", placement: .neuralEngine)
+        })
+        let recovery = self.recovery
+        let run = Task {
+            await recovery.run("dictation-1", live: {
+                // Like an engine call that doesn't stop when cancelled.
+                await gate.wait()
+                return TranscriptionOutput(text: "Too late.", modelMs: 1, model: "m", placement: .neuralEngine)
+            }, routes: routes, policy: .live(timeoutSeconds: 60), deliver: { delivered.add($0); return true })
+        }
+        run.cancel()
+        gate.open()
+        let outcome = await run.value
+        guard case .kept(let kept) = outcome else { Issue.record("expected the recording kept, got \(outcome)"); return }
+        #expect(kept.state == .failed)
+        #expect(kept.lastError?.contains("Stopped before it was transcribed") == true)
+        #expect(delivered.all.isEmpty)
+        #expect(!triedHere.withLock { $0 })
+        #expect(FileManager.default.fileExists(atPath: store.audioURL("dictation-1").path))
+    }
+
+    /// The controller refuses a transcript for a dictation that was cancelled while it was
+    /// being tidied: that is not "no speech", and the recording is not deleted.
+    @Test func aDeliveryRefusedBecauseOfCancellingIsNotNoSpeech() async throws {
+        _ = try record()
+        let recovery = self.recovery
+        let outcome = await Task {
+            await recovery.run("dictation-1", live: {
+                TranscriptionOutput(text: "Words.", modelMs: 1, model: "m", placement: .neuralEngine)
+            }, routes: TranscriptionRoutes(), policy: .live(timeoutSeconds: 60), deliver: { _ in
+                withUnsafeCurrentTask { $0?.cancel() }
+                return false
+            })
+        }.value
+        guard case .kept = outcome else { Issue.record("expected the recording kept, got \(outcome)"); return }
+        #expect(FileManager.default.fileExists(atPath: store.audioURL("dictation-1").path))
+        #expect(trash.received.isEmpty)
     }
 
     @Test func retryableErrors() {
