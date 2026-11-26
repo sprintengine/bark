@@ -438,7 +438,7 @@ Run as `…/Contents/MacOS/<executable> <flags>` (`Fairspoken` or `Fairspoken Se
 | both | `--screenshots <dir>` | Renders every screen in light and dark into `<dir>` and quits (`scripts/screenshots.sh`). The server uses a sample configuration and binds nothing |
 | both | `--screenshots <dir> --updates` | Captures the update UI instead: every update state, the toast and the Updates settings (simulated, no Sparkle) |
 | client | `--screenshots <dir> --dashboard-only` | Renders the main window's screens alone (no setup guide or pill), for quick review |
-| client | `--screenshots <dir> --speed-test` | Captures Home's speed-test card and every step of the test instead: typing, speaking, a kept result and a rough one (sample runs; nothing records) |
+| client | `--screenshots <dir> --speed-test` | Captures Home's time saved (typical and measured pace) and every step of the test instead: typing, speaking, a kept result and a rough one (sample runs; nothing records) |
 | client | `--selftest <wav> [--model id] [--host URL --token T]` | Headless end-to-end check of the engine, the streaming client and the SSE feed, with no microphone or TCC |
 | client | `--ax-probe [seconds]` | After the delay, says whether the edit watcher can read the focused field of the app in front (lengths and offsets only, never the text), before and after asking a Chromium-based app for its accessibility tree. Needs Accessibility |
 | client | `--show-dashboard` | Opens the dashboard at launch |
@@ -567,7 +567,7 @@ used, nothing is deleted without asking.
 
 ## Speed test
 
-Home invites you to type a short passage and then read it aloud, and keeps the last result (with a
+The test has you type a short passage and then read it aloud, and keeps the last result (with a
 retake). Typing is timed from the first key; net words per minute count five characters a word, and a
 skipped space is one mistake rather than a run of them (`SpeedTest` in FairspokenCore). Pasting and
 every automatic text change are off in the field. The reading is a *measured* recording: the
@@ -578,8 +578,8 @@ stats or the post-training folder, and the edit watcher never sees it. The trans
 word against the passage (`TranscriptComparison`); below 80% the run is shown as too rough and not
 kept, and so is one typed under 80% accurately or with a pause of over 15 s. A kept run goes to
 `speed-test.json` (the desktop app's file, imported once). Its typing speed is offered for time saved:
-chosen, it goes to `measuredTypingWpm` in `usage-stats.json`, so Home's "Typing would take" and "Time
-saved" count your own speed rather than the assumed 40 wpm (Home's card goes back to 40).
+chosen, it goes to `measuredTypingWpm` in `usage-stats.json`, so Home's "Time saved" counts your own
+speed rather than the assumed 40 wpm. Home's "Time saved" opens the test.
 
 ## Screenshots
 

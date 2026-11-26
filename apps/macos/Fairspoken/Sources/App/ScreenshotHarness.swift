@@ -7,7 +7,7 @@ import SwiftUI
 /// `--screenshots <dir>`: renders the real windows (demo data)
 /// in light and dark, captures each window's own pixels and quits. `--screenshots <dir> --updates`
 /// captures the update UI instead: every update state, the toast and Settings › Updates; `--speed-test` captures
-/// Home's speed-test card and every step of the test (sample runs, nothing recorded). Capturing our *own*
+/// Home's time saved before and after a test, and every step of the test (sample runs, nothing recorded). Capturing our *own*
 /// windows needs no Screen Recording permission, so this works from the command line.
 @MainActor
 final class ScreenshotHarness {
@@ -265,7 +265,7 @@ final class ScreenshotHarness {
         model.models.refresh()
     }
 
-    /// Home's speed-test card (inviting, then with a result) and each step of the test: typing
+    /// Home's time saved (at the typical pace, then at a measured one) and each step of the test: typing
     /// part-way, speaking (ready, listening, transcribing), and the results of a clean run and of a
     /// rough one. Sample runs: nothing records and nothing is saved.
     private func speedTestShots(suffix: String) async {
