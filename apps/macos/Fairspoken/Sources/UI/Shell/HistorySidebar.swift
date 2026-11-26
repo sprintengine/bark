@@ -32,15 +32,11 @@ struct HistorySidebar: View {
     }
 }
 
-/// Bark's glyph on a light tile, and its name in the system face.
+/// Bark's sheepdog, as on the app icon, and its name in the system face.
 struct Wordmark: View {
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "waveform")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Crystal.canvas)
-                .frame(width: 20, height: 20)
-                .background(Crystal.ink, in: .rect(cornerRadius: 6, style: .continuous))
+            BrandMark(size: 22)
             Text(AppInfo.displayName)
                 .font(.system(size: 15, weight: .semibold))
                 .tracking(-0.15)

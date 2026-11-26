@@ -403,12 +403,7 @@ enum AboutSettings {
 private struct AboutHeader: View {
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: "waveform")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Crystal.canvas)
-                .frame(width: 48, height: 48)
-                .background(Crystal.ink, in: .rect(cornerRadius: 12, style: .continuous))
-                .accessibilityHidden(true)
+            BrandMark(size: 48)
             VStack(alignment: .leading, spacing: 3) {
                 Text(AppInfo.displayName).font(.system(size: 22, weight: .semibold)).tracking(-0.33).foregroundStyle(Crystal.ink)
                 Text("Version \(AppInfo.version) (\(AppInfo.build))\(AppInfo.isDevBuild ? " · development build" : "")")

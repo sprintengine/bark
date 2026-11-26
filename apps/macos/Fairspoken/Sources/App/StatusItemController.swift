@@ -110,14 +110,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     func update(for phase: DictationController.Phase) {
-        let symbol: String
+        let symbol: String?
         switch phase {
         case .listening: symbol = "mic.fill"
         case .transcribing: symbol = "ellipsis.circle"
         case .failed: symbol = "exclamationmark.triangle"
-        default: symbol = "waveform"
+        default: symbol = nil
         }
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: AppInfo.displayName)
+        // At rest, the sheepdog: the app icon's markings knocked out of a tile, one colour so
+        // the menu bar can tint it.
+        let image = symbol.map { NSImage(systemSymbolName: $0, accessibilityDescription: AppInfo.displayName) }
+            ?? NSImage(named: "MenuBarMark")
+        image?.accessibilityDescription = AppInfo.displayName
         image?.isTemplate = true
         item.button?.image = image
         item.button?.contentTintColor = phase.isListening ? NSColor(Crystal.live) : nil
@@ -262,11 +266,7 @@ private struct StatusMenuHeader: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "waveform")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Crystal.canvas)
-                .frame(width: 20, height: 20)
-                .background(Crystal.ink, in: .rect(cornerRadius: 6, style: .continuous))
+            BrandMark(size: 22)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     if model.dictation.phase.isListening {

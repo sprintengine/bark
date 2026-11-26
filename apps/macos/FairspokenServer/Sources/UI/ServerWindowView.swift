@@ -62,11 +62,12 @@ private struct ServerSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Crystal.canvas)
-                    .frame(width: 20, height: 20)
-                    .background(Crystal.ink, in: .rect(cornerRadius: 6, style: .continuous))
+                // Bark Server's own icon, its sheepdog.
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 24, height: 24)
+                    .accessibilityHidden(true)
                 Text("\(Text("Bark").fontWeight(.semibold).foregroundStyle(Crystal.ink)) \(Text("Server").foregroundStyle(Crystal.ink2))")
                     .font(.system(size: 15))
                 Spacer(minLength: 0)
