@@ -108,6 +108,9 @@ struct Active {
     /// The raw transcript is ready; what is left is polish and delivery.
     transcribed: bool,
     polish_stopped: bool,
+    /// Claimed by the max-duration watchdog, which is waiting for the
+    /// dictation lock to commit it.
+    awaiting_commit: bool,
     signals: DictationSignals,
 }
 
@@ -119,6 +122,7 @@ impl Active {
             ended_by: None,
             transcribed: false,
             polish_stopped: false,
+            awaiting_commit: false,
             signals: DictationSignals::default(),
         }
     }
@@ -139,6 +143,20 @@ impl DictationLifecycle {
         self.last_id += 1;
         self.current = Some(Active::new(self.last_id, Phase::Recording));
         (self.last_id, superseded)
+    }
+
+    /// The recording the watchdog claimed and has yet to commit, unless it has
+    /// been cancelled since. A start must wait for it: it still needs the
+    /// transcription session.
+    pub fn awaiting_commit(&self) -> Option<u64> {
+        self.current
+            .as_ref()
+            .filter(|active| {
+                active.awaiting_commit
+                    && active.phase == Phase::Finishing
+                    && active.ended_by.is_none()
+            })
+            .map(|active| active.id)
     }
 
     /// The current dictation, if any.
@@ -189,6 +207,7 @@ impl DictationLifecycle {
                     && active.ended_by.is_none() =>
             {
                 active.phase = Phase::Finishing;
+                active.awaiting_commit = true;
                 Some(active.signals.clone())
             }
             _ => None,
@@ -562,12 +581,15 @@ mod tests {
         let signals = lifecycle.claim_for_stop(id).expect("live recording");
         assert_eq!(lifecycle.active(), Some((id, Phase::Finishing)));
         assert!(lifecycle.claim_for_stop(id).is_none());
+        assert_eq!(lifecycle.awaiting_commit(), Some(id));
         // A cancel while the claimed recording waits still reaches it.
         assert_eq!(
             lifecycle.request_cancel(Some(id)),
             CancelDecision::Finishing(id)
         );
         assert!(signals.is_cancelled());
+        // Once cancelled it holds up no start.
+        assert_eq!(lifecycle.awaiting_commit(), None);
         // A cancelled recording cannot be claimed.
         let (next, _) = lifecycle.begin_recording();
         lifecycle.request_cancel(Some(next));

@@ -1292,6 +1292,16 @@ fn start_recording_inner(
 ) -> Result<RecordingStarted, String> {
     let _operation = lock_operation_within(&services.operation, START_WAIT_FOR_FINISH)
         .ok_or_else(|| "Dictation is still finishing".to_string())?;
+    // A recording the max-duration watchdog claimed is waiting for this lock
+    // to commit: starting now would take its transcription session from it.
+    if let Some(previous) = services.lifecycle(|lifecycle| lifecycle.awaiting_commit()) {
+        emit_backend_event(
+            &app,
+            "info",
+            format!("Dictation {previous} is waiting to be committed; not starting another yet"),
+        );
+        return Err("Dictation is still finishing".to_string());
+    }
     edit_watch::flush(&app);
     let recording_active = services
         .audio
@@ -1708,6 +1718,18 @@ fn start_max_duration_watchdog(app: AppHandle, dictation: u64, max_recording_sec
                 .operation
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
+            // Still ours under the lock (a cancel meanwhile ends it): only then may it
+            // use the transcription session.
+            if services.lifecycle(|lifecycle| lifecycle.active())
+                != Some((dictation, dictation_lifecycle::Phase::Finishing))
+            {
+                emit_backend_event(
+                    &app,
+                    "info",
+                    format!("Dictation {dictation} ended while it waited to be committed; dropped"),
+                );
+                return;
+            }
             let result = finish_dictation(&app, &services, dictation, &signals, Some(captured));
             let _ = app.emit(
                 "recording-auto-stopped",
@@ -2715,6 +2737,15 @@ fn finish_local_transcription(
                 .transcription
                 .lock()
                 .map_err(|_| "Transcription service lock failed".to_string())
+                .and_then(|transcription| {
+                    // Cancelled before this thread got the service: the session in it
+                    // may already be the next recording's, so leave it alone.
+                    if worker_signals.is_cancelled() {
+                        Err("Transcription was cancelled".to_string())
+                    } else {
+                        Ok(transcription)
+                    }
+                })
                 .map(|mut transcription| {
                     let result = transcription.finish_session(
                         &worker_recording,
