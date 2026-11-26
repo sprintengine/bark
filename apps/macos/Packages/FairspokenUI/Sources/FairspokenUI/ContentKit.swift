@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Metrics for solid content surfaces (tables, lists, detail sheets): opaque cards with a 12 pt
-/// radius, hairline separators, 13 pt body text and compact rows. Kept in one place so a later
-/// restyle of the app's chrome changes them once.
+/// Metrics for content surfaces (tables, lists, detail sheets): opaque cards with a 12 pt
+/// radius, hairline separators, 13 pt body text and compact rows.
 public enum ContentMetrics {
     public static let cornerRadius: CGFloat = CardMetrics.radius
     public static let bodySize: CGFloat = 13
@@ -29,10 +28,8 @@ public struct ContentCard<Content: View>: View {
         self.content = content()
     }
 
-    @Environment(\.surfaceStyle) private var style
-
     public var body: some View {
-        let radius = style == .plain ? Plain.radius : ContentMetrics.cornerRadius
+        let radius = ContentMetrics.cornerRadius
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
             .padding(padding)
@@ -78,45 +75,53 @@ public struct ScoreBar: View {
     }
 }
 
-/// A compact text badge beside a name: EN, NEW, Recommended, In use.
+/// A compact text badge beside a name: Ready, EN, NEW, Recommended, Clipboard. 12 pt medium,
+/// 18 pt high, 4 pt corners, tinted at 14%.
 public struct Badge: View {
-    public enum Style { case neutral, accent, positive, outline }
+    public enum Style { case neutral, accent, positive, outline, info, warn, error }
     var text: String
+    var symbol: String?
     var style: Style
-    public init(_ text: String, style: Style = .neutral) {
+    public init(_ text: String, symbol: String? = nil, style: Style = .neutral) {
         self.text = text
+        self.symbol = symbol
         self.style = style
     }
 
     public var body: some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .lineLimit(1)
-            .fixedSize()
-            .foregroundStyle(foreground)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1.5)
-            .background(background, in: .rect(cornerRadius: 4, style: .continuous))
-            .overlay {
-                if style == .outline {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Crystal.ink3.opacity(0.6))
-                }
+        HStack(spacing: 4) {
+            if let symbol { Image(systemName: symbol).font(.system(size: 10, weight: .semibold)) }
+            Text(text)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .lineLimit(1)
+        .fixedSize()
+        .foregroundStyle(foreground)
+        .padding(.horizontal, 5)
+        .frame(height: 18)
+        .background(background, in: .rect(cornerRadius: 4, style: .continuous))
+        .overlay {
+            if style == .outline {
+                RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Crystal.input)
             }
+        }
     }
 
     private var foreground: Color {
         switch style {
-        case .neutral, .outline: Crystal.ink2
-        case .accent: Crystal.clientAccent
-        case .positive: Crystal.ok
+        case .neutral, .outline, .positive: Crystal.ink2
+        case .accent, .info: Crystal.info
+        case .warn: Crystal.warn
+        case .error: Crystal.error
         }
     }
 
     private var background: Color {
         switch style {
-        case .neutral: Crystal.well
-        case .accent: Crystal.clientAccent.opacity(0.08)
-        case .positive: Crystal.ok.opacity(0.12)
+        case .neutral, .positive: Crystal.keyFill
+        case .accent, .info: Crystal.info.opacity(0.14)
+        case .warn: Crystal.warn.opacity(0.12)
+        case .error: Crystal.recording.opacity(0.14)
         case .outline: .clear
         }
     }
@@ -144,8 +149,8 @@ public struct ContentSearchField: View {
         .font(.contentBody)
         .padding(.horizontal, 9)
         .frame(height: 28)
-        .background(Crystal.card, in: .rect(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Crystal.hairline))
+        .background(Crystal.well, in: .rect(cornerRadius: Radius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).strokeBorder(Crystal.input))
     }
 }
 
@@ -180,7 +185,7 @@ public struct ProgressStopButton: View {
     var fraction: Double?
     var tint: Color
     var action: () -> Void
-    public init(fraction: Double?, tint: Color = Crystal.clientAccent, action: @escaping () -> Void) {
+    public init(fraction: Double?, tint: Color = Crystal.primary, action: @escaping () -> Void) {
         self.fraction = fraction
         self.tint = tint
         self.action = action

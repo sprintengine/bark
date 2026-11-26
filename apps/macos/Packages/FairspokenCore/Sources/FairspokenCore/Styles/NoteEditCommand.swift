@@ -11,6 +11,19 @@ public enum NoteEditCommand {
         public var edits: [CleanupEdit]
     }
 
+    /// First words that start a command.
+    public static let verbs: Set<String> = ["change", "replace", "swap", "correct", "delete", "remove", "cut", "add", "append", "put"]
+
+    /// What a composer typed is a command rather than an edited copy of `text`: it starts with a
+    /// command verb that `text` itself doesn't start with, and it applies.
+    public static func command(_ typed: String, for text: String) -> Result? {
+        func firstWord(_ s: String) -> String? {
+            s.split(whereSeparator: \.isWhitespace).first.map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
+        }
+        guard let verb = firstWord(typed), verbs.contains(verb), firstWord(text) != verb else { return nil }
+        return apply(typed, to: text)
+    }
+
     public static func apply(_ command: String, to text: String) -> Result? {
         var c = command.trimmingCharacters(in: .whitespacesAndNewlines)
         while let last = c.last, ".!".contains(last) { c.removeLast() }

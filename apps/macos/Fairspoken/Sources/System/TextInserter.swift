@@ -26,11 +26,13 @@ enum TextInserter {
 
     /// `expectedApp` is the app that was frontmost when recording started. If another app is in
     /// front now, the text is still pasted but the old clipboard is not put back, so the
-    /// dictation stays recoverable if it landed somewhere unexpected.
+    /// dictation stays recoverable if it landed somewhere unexpected. With `requireExpectedApp`
+    /// (pasting a dictation again into its app) it is copied instead.
     ///
     /// With `html`, the pasteboard gets one item carrying both the HTML and the plain text, so
     /// apps that take rich text paste the layout and the rest paste the words.
-    static func deliver(_ text: String, html: String? = nil, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?) async -> Outcome {
+    static func deliver(_ text: String, html: String? = nil, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?,
+                        requireExpectedApp: Bool = false) async -> Outcome {
         let pasteboard = NSPasteboard.general
         func write(_ text: String, to pasteboard: NSPasteboard, transient: Bool) {
             Self.write(text, html: html, to: pasteboard, transient: transient)
@@ -66,6 +68,10 @@ enum TextInserter {
         }
 
         let switchedApps = expectedApp != nil && front != expectedApp
+        if switchedApps && requireExpectedApp {
+            write(text, to: pasteboard, transient: false)
+            return .copied(reason: switchedDuringCheckReason)
+        }
         let saved = restoreClipboard && !switchedApps ? snapshot(pasteboard) : nil
         // The layout was made for the app the recording started in: elsewhere, words only.
         Self.write(text, html: switchedApps ? nil : html, to: pasteboard, transient: saved != nil)

@@ -49,11 +49,16 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
     public var isNote: Bool?
     /// Time post-processing took.
     public var cleanupMs: Int?
+    /// True when nothing could take the paste and the text went to the clipboard instead.
+    public var clipboardOnly: Bool?
+    /// The post-training recording kept for it (`TrainingEntry.id`), so it can be transcribed again.
+    public var recordingID: String?
 
     public init(id: String, createdAt: Int64, text: String, backend: String, location: String, durationSeconds: Double,
                 timings: DictationTimings? = nil, model: String? = nil, appName: String? = nil, appBundleId: String? = nil,
                 rawText: String? = nil, cleanupEdits: [CleanupEdit]? = nil, style: String? = nil, styleReason: String? = nil,
-                destinationHost: String? = nil, isNote: Bool? = nil, cleanupMs: Int? = nil) {
+                destinationHost: String? = nil, isNote: Bool? = nil, cleanupMs: Int? = nil, clipboardOnly: Bool? = nil,
+                recordingID: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.text = text
@@ -71,14 +76,18 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
         self.destinationHost = destinationHost
         self.isNote = isNote
         self.cleanupMs = cleanupMs
+        self.clipboardOnly = clipboardOnly
+        self.recordingID = recordingID
     }
 
     /// A note typed (or dictated) into Bark itself, in the notes style.
     public static func note(_ text: String, rawText: String? = nil, edits: [CleanupEdit]? = nil, durationSeconds: Double = 0,
-                            at date: Date = Date(), cleanupMs: Int? = nil) -> TranscriptHistoryItem {
+                            at date: Date = Date(), cleanupMs: Int? = nil, appName: String? = nil,
+                            appBundleId: String? = nil) -> TranscriptHistoryItem {
         let ms = Int64(date.timeIntervalSince1970 * 1000)
-        return TranscriptHistoryItem(id: "note-\(ms)", createdAt: ms, text: text, backend: "note", location: "local",
-                                     durationSeconds: durationSeconds, rawText: rawText, cleanupEdits: edits,
+        return TranscriptHistoryItem(id: "note-\(ms)", createdAt: ms, text: text, backend: "typed", location: "local",
+                                     durationSeconds: durationSeconds, appName: appName, appBundleId: appBundleId,
+                                     rawText: rawText, cleanupEdits: edits,
                                      style: DictationStyle.ID.notes.rawValue, styleReason: "Note in Bark", isNote: true,
                                      cleanupMs: cleanupMs)
     }
@@ -103,6 +112,8 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
         destinationHost = c.lenient(String.self, .destinationHost)
         isNote = c.lenient(Bool.self, .isNote)
         cleanupMs = c.lenientInt(.cleanupMs)
+        clipboardOnly = c.lenient(Bool.self, .clipboardOnly)
+        recordingID = c.lenient(String.self, .recordingID)
     }
 
     /// The style as a value, when it is one this build knows.
@@ -110,6 +121,8 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
 
     public var date: Date { Date(timeIntervalSince1970: Double(createdAt) / 1000) }
     public var wordCount: Int { WordCounter.count(text) }
+    /// A note written in Bark, not a dictation into another app.
+    public var isBarkNote: Bool { isNote == true }
 }
 
 public enum TranscriptHistory {

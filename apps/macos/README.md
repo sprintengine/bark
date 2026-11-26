@@ -5,7 +5,7 @@ Swift packages:
 
 | App | Bundle id (Release / Debug) | What it is |
 |---|---|---|
-| **Bark** (`Bark.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a black-and-white dashboard with one pink accent beside a native, collapsible sidebar (Home, with the dog banner, Models, Post-training, Settings), a setup guide, a floating recording pill, and optional transcription on your own host |
+| **Bark** (`Bark.app`, scheme `Fairspoken`) | `ie.fairspoken.mac` / `.dev` | Menu-bar dictation: speech recognition on the Apple Neural Engine (Parakeet through FluidAudio, Whisper through WhisperKit; Core ML), a main window with the dictation history as a thread list down the left and each dictation opened as a conversation (true-black, one blue), a setup guide, a floating recording pill, and optional transcription on your own host |
 | **Bark Server** (`Bark Server.app`, scheme `FairspokenServer`) | `ie.fairspoken.server` / `.dev` | A transcription server for a practice or a team: the host protocol of `src-tauri/src/host/PROTOCOL.md` on Parakeet and the Neural Engine, with a live view of who is dictating, models, configuration and the address clients need |
 
 Bark (Mac), the Windows and Linux desktop app and the web dashboard all talk to Bark
@@ -165,6 +165,37 @@ node ../../shared/host-conformance/run.mjs --url http://127.0.0.1:48981 --token 
 real HTTP server, queue and workers over a stub engine, for protocol work without models.
 
 ## Bark (dictation client)
+
+### The window
+
+True-black ground, a thread list down the left, a conversation in the middle, and one blue for the
+thing you are about to do. Surfaces step up in white from black: cards and the composer at #111111,
+what you said at #1e1e1e, the selected row at #191a1d, with 8% white hairlines; text in three greys
+(#f5f5f5, #a3a3a3, #8f8f8f); the primary blue #346bf1; blue and orange for what was added and removed;
+red only for a live microphone. Corners are 8 pt (controls), 12 pt (cards) and 16 pt (the composer);
+type is the system font with system mono for data. Light mode keeps the same structure on a near-white
+ground. Every surface is opaque: nothing behind the window shows through. No gradients, no green.
+The tokens live in `FairspokenUI/Theme.swift` (`Crystal`, `Radius`, `TypeScale`), each with an
+Increase Contrast variant, and every text colour holds 4.5:1 on the surfaces it sits on.
+
+- **Sidebar.** Bark's name beside the traffic lights and the sidebar's button (⌃⌘S); search over the
+  history (⌘K; a filter for notes and for dictations that went to the clipboard); the history grouped
+  Today, Yesterday, Previous 7 days and Earlier. Each row: the app as a two-letter tile (a website by
+  its name), how long ago, the first line, and the style and word count; "Clipboard" when nothing could
+  take the paste; copy and retry under the pointer. ↑ and ↓ move through it, ⏎ edits the open one,
+  ⌫ deletes it after asking, esc goes back to Home. At the foot: the model and whether it's ready, then
+  Home, Models, Post-training and Settings.
+- **Home** is the new-dictation screen: how to dictate, a composer ("Try it here") to type or dictate
+  into and keep as a note (⌘⏎), the keyboard hints, the week in four numbers (words, time saved, which
+  opens the speed test, average pace, the share cleanup took out) and the model, with Bark Server when
+  one is set up. Before setup is finished, what's missing takes the numbers' place; dictations still to
+  transcribe come first.
+- **A dictation, opened**: what you said in a grey bubble with the words cleanup took out dimmed, what
+  was pasted as the reply, then "Cleaned up in N ms", which opens a table of the changes, the style and
+  why, and a word diff (blue added, orange removed; worked out from the words as heard when no edits
+  were recorded). Beside it an actions card: open the app, copy (⇧⌘C), paste again, edit, the style,
+  transcribe again from a kept post-training recording, delete. A composer docked at the bottom
+  corrects the text: click in, change it, ⏎ saves it to history.
 
 Settings › Transcription › **Network device** holds the host URL, token (Keychain) and timeout, a Test
 connection button and a status line such as "Using host: practice-mini.local:48173 · connected"
@@ -461,7 +492,8 @@ Run as `…/Contents/MacOS/<executable> <flags>` (`Fairspoken` or `Fairspoken Se
 | both | `--demo` | Sample data: the client's dictations and stats; the server window on the simulated practice server |
 | both | `--screenshots <dir>` | Renders every screen in light and dark into `<dir>` and quits (`scripts/screenshots.sh`). The server uses a sample configuration and binds nothing |
 | both | `--screenshots <dir> --updates` | Captures the update UI instead: every update state, the toast and the Updates settings (simulated, no Sparkle) |
-| client | `--screenshots <dir> --speed-test` | Captures Home's speed-test card and every step of the test instead: typing, speaking, a kept result and a rough one (sample runs; nothing records) |
+| client | `--screenshots <dir> --dashboard-only` | Renders the main window's screens alone (no setup guide or pill), for quick review |
+| client | `--screenshots <dir> --speed-test` | Captures Home's time saved (typical and measured pace) and every step of the test instead: typing, speaking, a kept result and a rough one (sample runs; nothing records) |
 | client | `--selftest <wav> [--model id] [--host URL --token T]` | Headless end-to-end check of the engine, the streaming client and the SSE feed, with no microphone or TCC |
 | client | `--ax-probe [seconds]` | After the delay, says whether the edit watcher can read the focused field of the app in front (lengths and offsets only, never the text), before and after asking a Chromium-based app for its accessibility tree. Needs Accessibility |
 | client | `--show-dashboard` | Opens the dashboard at launch |
@@ -510,15 +542,11 @@ address may bring up macOS's Local Network prompt the first time another device 
 - **Bundle ids:** `MV_BUNDLE_ID_BASE` in the same files; Debug appends `.dev` (`Config/Debug.xcconfig`).
   `Config/Server-{Debug,Release}.xcconfig` include the client's and then `Server.xcconfig`, so version,
   signing and Swift settings are shared.
-- **Brand:** `FairspokenUI` holds the palette (`Color.fs*` from `design/brand/README.md`: Copybook Blue,
-  Margin Red for the signal only, Limestone/Night, status colours) and the marks: `BrandMark` is the
-  app icon's sheepdog photo on its tile (the client's `BrandTile` image), and `DogMark` is the
-  one-colour mark traced from it (`design/brand/logo/dog/dog-mark.svg`), which `FairspokenMark` fits
-  to a square. The server follows the brand's Liquid Glass rules:
-  glass only on the control layer (sidebar, toolbar, constellation nodes); cards, tables and charts
-  are opaque. The client puts its sidebar on the window's frost and its content on solid cards
-  (`design/crystal/README.md` › Bark for Mac). Both app icons, `BrandTile` and
-  `DogMarkPaths.swift` come from `design/brand/_tools/gen-dog-icons.mjs`; the server's tile adds
+- **Brand:** `FairspokenUI` holds the tokens (`Crystal`, `Radius`, `TypeScale`; see *The window*) and
+  the marks: `BrandMark` is the app icon's sheepdog photo on its tile (the client's `BrandTile` image),
+  and `DogMark` is the one-colour mark traced from it (`design/brand/logo/dog/dog-mark.svg`), which
+  `FairspokenMark` fits to a square. Bark Server shares the tokens: the same opaque true-black ground,
+  cards and blue. Both app icons, `BrandTile` and `DogMarkPaths.swift` come from `design/brand/_tools/gen-dog-icons.mjs`; the server's tile adds
   faint ruled lines. No taglines anywhere.
 - **Wire identifiers** (per `PROTOCOL.md`): the `x-fairspoken-*` headers, the
   `application/vnd.fairspoken.pcm-stream` content type, `FAIRSPOKEN_HOST_*` and the client id `fairspoken-macos`.
@@ -537,7 +565,8 @@ Fairspoken/                      Bark
                                  DestinationReader (app, field and website for the style), EditWatcher + FieldReader
                                  (learning from corrections), hotkeys + Fn tap, sounds
   Sources/Storage/               settings.json / transcript-history.json / usage-stats.json / learned.json (Rust schemas), Keychain
-  Sources/UI/                    Home, Models, Settings, Onboarding, Pill
+  Sources/UI/                    Shell (window, sidebar, thread list), Home, Dictation (one opened), Models, Settings,
+                                 Onboarding, Pill
 FairspokenServer/                Bark Server
   Sources/App/                   main (app or --headless), delegate + menu bar, headless runner, login item, sleep guard, screenshots
   Sources/Engine/                FluidAudioBackend (the host's speech engine)
@@ -594,7 +623,7 @@ used, nothing is deleted without asking.
 
 ## Speed test
 
-Home invites you to type a short passage and then read it aloud, and keeps the last result (with a
+The test has you type a short passage and then read it aloud, and keeps the last result (with a
 retake). Typing is timed from the first key; net words per minute count five characters a word, and a
 skipped space is one mistake rather than a run of them (`SpeedTest` in FairspokenCore). Pasting and
 every automatic text change are off in the field. The reading is a *measured* recording: the
@@ -605,15 +634,18 @@ stats or the post-training folder, and the edit watcher never sees it. The trans
 word against the passage (`TranscriptComparison`); below 80% the run is shown as too rough and not
 kept, and so is one typed under 80% accurately or with a pause of over 15 s. A kept run goes to
 `speed-test.json` (the desktop app's file, imported once). Its typing speed is offered for time saved:
-chosen, it goes to `measuredTypingWpm` in `usage-stats.json`, so Home's "Typing would take" and "Time
-saved" count your own speed rather than the assumed 40 wpm (Home's card goes back to 40).
+chosen, it goes to `measuredTypingWpm` in `usage-stats.json`, so Home's "Time saved" counts your own
+speed rather than the assumed 40 wpm. Home's "Time saved" opens the test.
 
 ## Screenshots
 
 `scripts/screenshots.sh` writes these locally. Git ignores them, so they never reach the repository.
 
-`docs/screenshots/` (Bark, light and dark): `home`, `home-listening`, `home-all` (See all),
-`home-first-use` (before the first dictation), `models`, `models-library` (a download in progress and a
+`docs/screenshots/` (Bark, light and dark): `home`, `home-listening`, `home-row-hover`,
+`home-sidebar-hidden`, `home-first-use` (before the first dictation), `dictation-email` (cleanup edits,
+the change table and the word diff), `dictation-code`, `dictation-clipboard`, `dictation-server`,
+`dictation-note`, `dictation-before-cleanup`, `dictation-folded`, `dictation-no-panel`, `sidebar-search`,
+`sidebar-notes`, `models`, `models-library` (a download in progress and a
 favourite), `models-detail`, `models-link-open`, `models-link-saved`, `training`, `settings`,
 `settings-transcription`, `settings-host` (Network device), `settings-vocabulary`, every step of the setup
 guide (`onboarding-1-welcome` … `onboarding-7-finish`), and `pill` (every pill state, with and without text
