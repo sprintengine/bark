@@ -617,7 +617,14 @@ pub(super) fn transcribe_stream(
     let upload_finished_at = Instant::now();
     drop(sink);
     let duration_seconds = recording.stats().duration_seconds;
-    let text = transcription.finish_session(&recording, settings, models)?;
+    // The host finishes every upload it accepts; a client that gives up
+    // simply stops waiting for the reply.
+    let text = transcription.finish_session(
+        &recording,
+        settings,
+        models,
+        &std::sync::atomic::AtomicBool::new(false),
+    )?;
     Ok(StreamedTranscript {
         text,
         duration_seconds,
@@ -651,7 +658,12 @@ pub(super) fn transcribe_recording(
         }
     }
 
-    transcription.finish_session(&recording, settings, models)
+    transcription.finish_session(
+        &recording,
+        settings,
+        models,
+        &std::sync::atomic::AtomicBool::new(false),
+    )
 }
 
 #[cfg(test)]
