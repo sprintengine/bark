@@ -158,6 +158,7 @@ private struct Breadcrumb: View {
                     separator
                     Text(DictationText.title(item)).foregroundStyle(Crystal.ink).fontWeight(.medium)
                         .lineLimit(1).truncationMode(.tail)
+                        .frame(maxWidth: 440, alignment: .leading)
                 } else {
                     current("Home")
                 }
