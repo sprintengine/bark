@@ -44,6 +44,12 @@ final class AppModel {
     /// Set by ⌘K; the sidebar's search field takes the focus and clears it (also when the sidebar
     /// was hidden and the field appears only now).
     var searchFocusPending = false
+    /// "Paste last dictation" is under way (a second press waits for it to finish).
+    @ObservationIgnored var pastingLast = false
+    /// The ⌘K palette is open over the main window.
+    var paletteOpen = false
+    /// Screenshots: the palette opened with this query typed.
+    var showcasePaletteQuery: String?
     /// Home's composer: what's typed there and the dictations made into it, kept while you look
     /// at other screens.
     var homeDraft = ""
@@ -157,6 +163,7 @@ final class AppModel {
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
         hotkeys.onFnPress = { [weak self] in self?.dictation.fnPressed() }
         hotkeys.onFnRelease = { [weak self] in self?.dictation.fnReleased() }
+        hotkeys.onPasteLast = { [weak self] in self?.pasteLast() }
 
         pending.onRecovered = { [weak self] words, copied, placement in
             self?.dictation.announceRecovered(words: words, copied: copied, placement: placement)

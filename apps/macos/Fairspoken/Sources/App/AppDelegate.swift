@@ -30,12 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.dictation.onNeedsOnboarding = { [weak self] in self?.windows.showOnboarding(reset: false) }
 
         if let dir = AppInfo.screenshotDirectory {
-            harness = ScreenshotHarness(model: model, windows: windows, output: dir)
+            harness = ScreenshotHarness(model: model, windows: windows, statusItem: statusItem, output: dir)
             harness?.run()
             return
         }
         #if DEBUG
-        if AppInfo.arguments.contains("--pill-demo") {
+        if AppInfo.arguments.contains("--pill-demo") || AppInfo.arguments.contains("--pill-demo-paste") {
             PillDemo.run(model: model, pill: pill)
             return
         }

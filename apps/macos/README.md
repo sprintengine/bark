@@ -181,7 +181,7 @@ The tokens live in `FairspokenUI/Theme.swift` (`Crystal`, `Radius`, `TypeScale`)
 Increase Contrast variant, and every text colour holds 4.5:1 on the surfaces it sits on.
 
 - **Sidebar.** Bark's name beside the traffic lights and the sidebar's button (⌃⌘S); search over the
-  history (⌘K; a filter for notes and for dictations that went to the clipboard); the history grouped
+  history (⌘F; a filter for notes and for dictations that went to the clipboard; its ⌘K opens the palette); the history grouped
   Today, Yesterday, Previous 7 days and Earlier. Each row: the app as a two-letter tile (a website by
   its name), how long ago, the first line, and the style and word count; "Clipboard" when nothing could
   take the paste; copy and retry under the pointer. ↑ and ↓ move through it, ⏎ edits the open one,
@@ -202,6 +202,18 @@ Increase Contrast variant, and every text colour holds 4.5:1 on the surfaces it 
   corrects the text: click in, change it, ⏎ saves it to history. Typed over the text, a command
   ("change Tuesday to Friday", "delete really", "add see you then at the end") is applied instead,
   when what it names appears exactly once (`NoteEditCommand`).
+- **⌘K** opens a palette over the window: one field, results under small labels. Dictations by their
+  words and app (the words searched for underlined), then actions (new dictation, paste or copy the last
+  dictation, the model library), Settings pages, the speech model and the default style. Every word typed
+  must match; a whole word beats the start of one, which beats the middle; ties keep the newest first
+  (`PaletteSearch`). ↑↓ move, ⏎ opens, ⌘C copies a dictation's text, esc closes.
+- **The menu-bar menu** is a native menu led by two views of Bark's own: the status (ready or listening,
+  the model and where it runs, how to dictate) and the last dictation, which copies on a click. Then
+  Start Dictation and Paste Last Dictation with their shortcuts, the microphone and where transcription
+  runs (submenus), Open Bark, Settings, updates and Quit.
+- **Paste last dictation** (⌥⇧V, from the menu bar or ⌘K) pastes the newest dictation again into the app
+  in front, as Paste again does: only if that app is still in front when ⌘V goes and has a text field,
+  otherwise it is left on the clipboard. From Bark's own window it goes to the app it was dictated into.
 
 - **Settings** has its own sidebar in place of the thread list: search (⌘F; it matches rows on every
   page and shows them live, each page listed with how many rows match), the pages, and Back to Bark
@@ -223,6 +235,25 @@ Settings › **Bark Server** holds the host URL, token (Keychain) and timeout, s
 Tailscale network, a Test button and the server's state ("Reachable", "Not reachable")
 (one `GET /v1/health` when Settings or Home opens, or on Test; no background polling). Monitoring a
 host is Bark Server's job (or the web dashboard at the host's `/`); the client has no Server view.
+
+### The pill
+
+An opaque capsule floating above the app you're typing in: a solid card with a hairline ring and a soft
+shadow, nothing behind it showing through. While listening: cancel (×) with an "esc to cancel" hint, the
+red recording dot, a timer, the style this dictation will get and why ("Email · Mail rule"), a waveform
+that follows the microphone, and finish (✓). Then "Transcribing…" (with cancel; "Transcribing on this
+Mac" after the server failed), and what happened: "Pasted into Mail · 38 words" (with "via build-box"
+after a dictation on Bark Server), "Copied to the clipboard ⌘V to paste" with the reason when there is
+one, "Nothing heard", "Too short", "Couldn't transcribe · saved to retry", or, in red, "Microphone
+unavailable" with Retry (`PillPresentation`).
+
+Resting the pointer on the style chip (or clicking it) opens the styles for this dictation, with the
+current one ticked, "Back to …" after a choice, and "Always use … for <app or site>"
+(`StyleChipState`). A menu the pointer opened closes when the pointer leaves; one opened with a click
+stays until a choice, a click elsewhere or the end of the recording. Terminals and secure fields show
+"Verbatim" with a lock and no menu. The pill and the menu are non-activating panels that can't become
+key: their buttons take the first click (and the panel takes the mouse only over the capsule while it has
+buttons), so the app you were typing in keeps the keyboard focus and the paste lands there.
 
 ### Text while speaking
 
@@ -517,6 +548,8 @@ Run as `…/Contents/MacOS/<executable> <flags>` (`Fairspoken` or `Fairspoken Se
 | both | `--screenshots <dir>` | Renders every screen in light and dark into `<dir>` and quits (`scripts/screenshots.sh`). The server uses a sample configuration and binds nothing |
 | both | `--screenshots <dir> --updates` | Captures the update UI instead: every update state, the toast and the Updates settings (simulated, no Sparkle) |
 | client | `--screenshots <dir> --dashboard-only` | Renders the main window's screens alone (no setup guide or pill), for quick review |
+| client | `--screenshots <dir> --stage3` | Renders the pill, the menu-bar menu and the ⌘K palette alone, for quick review |
+| client | `--demo --pill-demo-paste [dir]` | Debug builds: with another app in front, a recording with no microphone aimed at it; rests on the style chip, picks Notes, lets a hover menu close, pins one with a click, then pastes a sample transcript, logging focus after each step (the real pointer with Accessibility, a stand-in without) |
 | client | `--screenshots <dir> --speed-test` | Captures Home's time saved (typical and measured pace) and every step of the test instead: typing, speaking, a kept result and a rough one (sample runs; nothing records) |
 | client | `--selftest <wav> [--model id] [--host URL --token T]` | Headless end-to-end check of the engine, the streaming client and the SSE feed, with no microphone or TCC |
 | client | `--ax-probe [seconds]` | After the delay, says whether the edit watcher can read the focused field of the app in front (lengths and offsets only, never the text), before and after asking a Chromium-based app for its accessibility tree. Needs Accessibility |
@@ -537,7 +570,7 @@ Bark:
 | Input Monitoring | Only for "hold fn to dictate" (a listen-only event tap) | System Settings › Privacy & Security › Input Monitoring |
 
 The setup guide (shown at first launch, whenever the microphone isn't allowed, and from Settings ›
-General › Setup guide or the menu bar) walks through: permissions with live status, a microphone test,
+General › Setup guide) walks through: permissions with live status, a microphone test,
 choosing a model from the catalogue (it downloads in the background), the shortcut, a place to try it,
 and a live checklist of what is set up, with a fix for anything that isn't. It always reopens at its
 first step, and closing or hiding it stops its microphone test. For hold-fn, also set
@@ -672,8 +705,11 @@ the change table and the word diff), `dictation-code`, `dictation-clipboard`, `d
 `sidebar-notes`, `models`, `models-library` (a download in progress and a
 favourite), `models-detail`, `models-link-open`, `models-link-saved`, `training`, `settings`,
 `settings-transcription`, `settings-host` (Network device), `settings-vocabulary`, every step of the setup
-guide (`onboarding-1-welcome` … `onboarding-7-finish`), and `pill` (every pill state, with and without text
-while speaking, with the keys that stop and cancel).
+guide (`onboarding-1-welcome` … `onboarding-7-finish`), `pill-states` (ready, listening with the style chip, with live
+words, a terminal locked to Verbatim, transcribing), `pill-outcomes` (pasted, via Bark Server, copied,
+nothing heard, too short, saved to retry, microphone unavailable), `pill-style-menu` (the chip's menu, and
+after a choice), `pill-levels`, `pill-scroll-*`, `menu-bar`, and `palette`, `palette-search` and
+`palette-settings` (⌘K as it opens and searching).
 
 `docs/screenshots/server-app/` (Bark Server, light and dark, demo simulator): `activity`
 (the live constellation with requests in flight), `clients`, `models`, `connect`, `configuration`.
