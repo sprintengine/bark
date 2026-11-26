@@ -39,6 +39,37 @@ extension AppModel {
         }
     }
 
+    /// The newest dictation (a note written in Bark isn't one).
+    var lastDictation: TranscriptHistoryItem? { history.items.first { !$0.isBarkNote } }
+
+    /// "Paste last dictation" (⌥⇧V, the menu bar, ⌘K): the newest dictation into the app in
+    /// front, with Paste again's care. It is pasted only if that app is still in front when ⌘V
+    /// goes, and only into a text field; otherwise it is left on the clipboard. From Bark's own
+    /// window it goes back to the app it was dictated into. The pill says what happened.
+    func pasteLast() {
+        guard !dictation.phase.isActive else { return }
+        guard let item = lastDictation else {
+            NSSound.beep()
+            return
+        }
+        guard let front = NSWorkspace.shared.frontmostApplication, front.bundleIdentifier != Bundle.main.bundleIdentifier else {
+            pasteAgain(item)
+            return
+        }
+        let s = settings.settings
+        let name = front.localizedName
+        Task { @MainActor in
+            let outcome = await TextInserter.deliver(item.text, paste: true, restoreClipboard: s.restoreClipboard,
+                                                     expectedApp: front.processIdentifier, requireExpectedApp: true)
+            let delivery: DictationController.Delivery = switch outcome {
+            case .pasted: .pasted(app: name)
+            case .copied(let reason): .copied(reason)
+            }
+            dictation.announce(.init(text: item.text, words: item.wordCount, delivery: delivery, latencyMs: 0,
+                                     placement: .neuralEngine))
+        }
+    }
+
     func canOpenApp(_ item: TranscriptHistoryItem) -> Bool {
         guard !item.isBarkNote, let bundle = item.appBundleId else { return false }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) != nil
