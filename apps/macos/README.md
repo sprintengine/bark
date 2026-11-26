@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Bark,Bark Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (297), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
+scripts/test.sh                       # unit tests: FairspokenCore (304), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Bark → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Bark Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Bark-<version>-macos-arm64.{zip,dmg}
@@ -195,7 +195,9 @@ Increase Contrast variant, and every text colour holds 4.5:1 on the surfaces it 
   why, and a word diff (blue added, orange removed; worked out from the words as heard when no edits
   were recorded). Beside it an actions card: open the app, copy (⇧⌘C), paste again, edit, the style,
   transcribe again from a kept post-training recording, delete. A composer docked at the bottom
-  corrects the text: click in, change it, ⏎ saves it to history.
+  corrects the text: click in, change it, ⏎ saves it to history. Typed over the text, a command
+  ("change Tuesday to Friday", "delete really", "add see you then at the end") is applied instead,
+  when what it names appears exactly once (`NoteEditCommand`).
 
 Settings › Transcription › **Network device** holds the host URL, token (Keychain) and timeout, a Test
 connection button and a status line such as "Using host: practice-mini.local:48173 · connected"
@@ -283,7 +285,7 @@ than a missed fix, so every rule needs clear evidence and anything ambiguous is 
 
 Quoted speech is never changed. Settings › Transcription has three switches (`cleanupFillers`,
 `cleanupSelfCorrections`, `cleanupSpokenCommands`, all on). The golden fixtures in
-`Packages/FairspokenCore/Tests/FairspokenCoreTests/Fixtures/cleanup-fixtures.jsonl` (342 cases, 176
+`Packages/FairspokenCore/Tests/FairspokenCoreTests/Fixtures/cleanup-fixtures.jsonl` (345 cases, 179
 of them must-not-change) report exact matches per category and a harm count of content words
 wrongly removed or added, which must stay at 0.
 
