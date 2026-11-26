@@ -579,17 +579,20 @@ public struct SettingsTextField: View {
     var prompt: String
     var secure: Bool
     var mono: Bool
+    var focusRequest: Int
     var onSubmit: () -> Void
     @FocusState private var focused: Bool
     @State private var hovered = false
 
+    /// `focusRequest`: the field takes the focus each time it changes.
     public init(_ label: String, text: Binding<String>, prompt: String, secure: Bool = false, mono: Bool = false,
-                onSubmit: @escaping () -> Void = {}) {
+                focusRequest: Int = 0, onSubmit: @escaping () -> Void = {}) {
         self.label = label
         _text = text
         self.prompt = prompt
         self.secure = secure
         self.mono = mono
+        self.focusRequest = focusRequest
         self.onSubmit = onSubmit
     }
 
@@ -615,6 +618,7 @@ public struct SettingsTextField: View {
         .contentShape(shape)
         .onTapGesture { focused = true }
         .onHover { hovered = $0 }
+        .onChange(of: focusRequest) { focused = true }
         .accessibilityLabel(label)
     }
 }

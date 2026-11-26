@@ -30,7 +30,10 @@ final class AppModel {
     }
 
     var section: Section = .home {
-        didSet { if section != .home { selectedDictationID = nil } }
+        didSet {
+            if section != .home { selectedDictationID = nil }
+            if section != .settings { settingsQuery = "" }
+        }
     }
     /// The dictation open in the main area (a row of the sidebar's thread list). Nil is Home,
     /// the new-dictation screen.
@@ -76,7 +79,10 @@ final class AppModel {
     var sidebarVisible = !UserDefaults.standard.bool(forKey: "SidebarHidden") {
         didSet { UserDefaults.standard.set(!sidebarVisible, forKey: "SidebarHidden") }
     }
-    var settingsTab: SettingsView.Tab = .general
+    /// The settings page. Going to a page leaves any settings search.
+    var settingsTab: SettingsView.Tab = .general {
+        didSet { settingsQuery = "" }
+    }
     /// The settings sidebar's search: every matching row from every page.
     var settingsQuery = ""
     /// Set by ⌘F in Settings; the settings search field takes the focus and clears it.

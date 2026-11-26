@@ -207,9 +207,10 @@ final class ScreenshotHarness {
             s.styleRules.setApp("com.apple.MobileSMS", appName: "Messages", style: .clean)
             s.styleRules.setSite("docs.google.com", style: .document)
         }
-        func shoot(_ tab: SettingsView.Tab, as name: String, wait: Int = 900) async {
+        func shoot(_ tab: SettingsView.Tab, as name: String, query: String = "", wait: Int = 900) async {
             model.settingsTab = tab
             windows.showDashboard(.settings)
+            model.settingsQuery = query
             try? await Task.sleep(for: .milliseconds(wait))
             await freshFrame()
             if let window = windows.dashboard { await capture(window, as: "settings-\(name)-\(suffix)") }
@@ -259,10 +260,8 @@ final class ScreenshotHarness {
         }
         model.hostStatus.refresh(force: true)
         // Search across pages.
-        model.settingsQuery = "paste"
-        await shoot(.general, as: "search")
-        model.settingsQuery = "zzz"
-        await shoot(.general, as: "search-empty")
+        await shoot(.general, as: "search", query: "paste")
+        await shoot(.general, as: "search-empty", query: "zzz")
         model.settingsQuery = ""
         model.settingsTab = .general
     }

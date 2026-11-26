@@ -51,7 +51,7 @@ enum AppStylesSettings {
 
 /// An app or a website in the list: one with the user's own rule, or one seen in history.
 struct StyleDestination: Identifiable, Equatable {
-    enum Kind: Equatable { case app(bundleID: String), site(host: String) }
+    enum Kind: Equatable { case app(bundleID: String), site(host: String, path: String?) }
     var kind: Kind
     var name: String
     var style: DictationStyle.ID
@@ -64,51 +64,60 @@ struct StyleDestination: Identifiable, Equatable {
     var id: String {
         switch kind {
         case .app(let bundleID): bundleID
-        case .site(let host): host
+        case .site(let host, let path): host + (path ?? "")
         }
     }
 
     var destination: DictationDestination {
         switch kind {
         case .app(let bundleID): DictationDestination(bundleID: bundleID, appName: name)
-        case .site(let host): DictationDestination(url: "https://\(host)/")
+        case .site(let host, let path): DictationDestination(url: "https://\(host)\(path ?? "/")")
         }
     }
 }
 
 enum StyleDestinations {
-    /// The user's rules first (apps, then sites), then what history went to most, at most 12 more.
+    /// The user's rules first (apps, then sites), then every app and site history went to, most
+    /// used first.
     @MainActor
     static func list(_ model: AppModel) -> [StyleDestination] {
         let rules = model.settings.settings.styleRules
         var out: [StyleDestination] = []
         var seen = Set<String>()
-        for rule in rules.apps.reversed() where seen.insert(rule.bundleID).inserted {
-            out.append(StyleDestination(kind: .app(bundleID: rule.bundleID), name: rule.appName ?? appName(rule.bundleID) ?? rule.bundleID,
-                                        style: rule.style, reason: "Your rule", hasRule: true))
+        func ruled(_ kind: StyleDestination.Kind, name: String, style: DictationStyle.ID) -> StyleDestination {
+            var d = StyleDestination(kind: kind, name: name, style: style, reason: "Your rule", hasRule: true)
+            // A terminal or a password manager stays Verbatim even with a rule.
+            let resolution = rules.resolve(d.destination)
+            if resolution.source == .forced {
+                d.forced = true
+                d.style = resolution.style
+                d.reason = resolution.reason
+            }
+            return d
         }
-        for rule in rules.sites.reversed() where rule.pathPrefix == nil && seen.insert(rule.host).inserted {
-            out.append(StyleDestination(kind: .site(host: rule.host), name: rule.host, style: rule.style, reason: "Your rule", hasRule: true))
+        for rule in rules.apps.reversed() where seen.insert(rule.bundleID).inserted {
+            out.append(ruled(.app(bundleID: rule.bundleID), name: rule.appName ?? appName(rule.bundleID) ?? rule.bundleID, style: rule.style))
+        }
+        for rule in rules.sites.reversed() where seen.insert(rule.id).inserted {
+            out.append(ruled(.site(host: rule.host, path: rule.pathPrefix), name: rule.host + (rule.pathPrefix ?? ""), style: rule.style))
         }
         // History: by how often each went there.
         var counts: [String: (count: Int, kind: StyleDestination.Kind, name: String)] = [:]
         for item in model.history.items where !item.isBarkNote {
             if let host = item.destinationHost, !host.isEmpty {
-                counts[host, default: (0, .site(host: host), host)].count += 1
+                counts[host, default: (0, .site(host: host, path: nil), host)].count += 1
             } else if let bundleID = item.appBundleId, !bundleID.isEmpty, bundleID != AppInfo.bundleID {
                 counts[bundleID, default: (0, .app(bundleID: bundleID), item.appName ?? bundleID)].count += 1
             }
         }
         let seenInHistory = counts.sorted { $0.value.count > $1.value.count || ($0.value.count == $1.value.count && $0.key < $1.key) }
-        var added = 0
-        for (key, entry) in seenInHistory where added < 12 && seen.insert(key).inserted {
+        for (key, entry) in seenInHistory where seen.insert(key).inserted {
             var d = StyleDestination(kind: entry.kind, name: entry.name, style: .clean, reason: "", hasRule: false)
             let resolution = rules.resolve(d.destination)
             d.style = resolution.style
             d.reason = reason(resolution, rules: rules, for: d.destination)
             d.forced = resolution.source == .forced
             out.append(d)
-            added += 1
         }
         return out
     }
@@ -215,6 +224,7 @@ private struct DestinationRow: View {
         .contextMenu {
             if destination.hasRule { Button("Remove Your Rule") { setRule(nil) } }
         }
+        .accessibilityAction(named: "Remove your rule") { if destination.hasRule { setRule(nil) } }
     }
 
     private func setRule(_ style: DictationStyle.ID?) {
@@ -222,8 +232,8 @@ private struct DestinationRow: View {
             switch destination.kind {
             case .app(let bundleID):
                 if let style { s.styleRules.setApp(bundleID, appName: destination.name, style: style) } else { s.styleRules.removeApp(bundleID) }
-            case .site(let host):
-                if let style { s.styleRules.setSite(host, style: style) } else { s.styleRules.removeSite(host) }
+            case .site(let host, let path):
+                if let style { s.styleRules.setSite(host, pathPrefix: path, style: style) } else { s.styleRules.removeSite(host, pathPrefix: path) }
             }
         }
     }
@@ -243,7 +253,7 @@ struct DestinationIcon: View {
                 } else {
                     AppMonogram(appName: destination.name, bundleID: bundleID, size: size)
                 }
-            case .site(let host):
+            case .site(let host, _):
                 AppMonogram(appName: DictationText.siteName(host), bundleID: host, size: size)
             }
         }
@@ -456,7 +466,8 @@ struct AddStyleRuleSheet: View {
                 .padding(.top, 16)
             SettingsGroup {
                 if kind == 0 {
-                    SettingsRow("App", detail: bundleID ?? "An app that's open now, or one from Applications.") {
+                    SettingsRow("App", detail: forced ? "Bark never reshapes what goes into \(appName): it is always Verbatim."
+                                                      : bundleID ?? "An app that's open now, or one from Applications.") {
                         SelectMenu(appName.isEmpty ? "Choose…" : appName, label: "App", minWidth: 180) {
                             ForEach(apps, id: \.id) { app in
                                 Button(app.name) { bundleID = app.id; appName = app.name; style = suggested }
@@ -498,7 +509,13 @@ struct AddStyleRuleSheet: View {
         host.trimmingCharacters(in: .whitespaces).isEmpty || cleanHost != nil ? nil : "That doesn't look like a website's address."
     }
 
-    private var canAdd: Bool { kind == 0 ? bundleID != nil : cleanHost != nil }
+    private var canAdd: Bool { kind == 0 ? bundleID != nil && !forced : cleanHost != nil }
+
+    /// A terminal or a password manager: a rule would never apply.
+    private var forced: Bool {
+        guard let bundleID else { return false }
+        return model.settings.settings.styleRules.resolve(DictationDestination(bundleID: bundleID, appName: appName)).source == .forced
+    }
 
     /// What the app gets today, as a starting point.
     private var suggested: DictationStyle.ID {

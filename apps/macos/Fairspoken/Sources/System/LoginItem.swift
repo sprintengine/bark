@@ -9,6 +9,8 @@ enum LoginItem {
     static var needsApproval: Bool { SMAppService.mainApp.status == .requiresApproval }
 
     static func set(_ enabled: Bool) throws {
+        // Demo and screenshot runs never change the real login items.
+        guard !AppInfo.isDemo else { return }
         if enabled {
             try SMAppService.mainApp.register()
         } else {

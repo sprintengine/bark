@@ -218,15 +218,7 @@ enum HistorySettings {
         let dictations = history.items.count - notes
         return [
             Section("Keep", rows: [
-                Row("Keep the last", detail: "Older dictations and notes are removed as new ones arrive. Your usage stats are kept either way.",
-                    keywords: "retention limit cap history count") {
-                    SelectMenu("\(Format.number(history.retentionLimit)) dictations", label: "Keep the last", minWidth: 150) {
-                        Picker("Keep the last", selection: Binding(get: { history.retentionLimit }, set: { history.setRetentionLimit($0) })) {
-                            ForEach(HistoryStore.retentionChoices, id: \.self) { Text("\(Format.number($0)) dictations").tag($0) }
-                        }
-                        .pickerStyle(.inline)
-                    }
-                },
+                Row(id: "keep", searchText: "Keep the last retention limit cap history count older removed", view: RetentionRow()),
                 Row("On this Mac",
                     detail: "\(Format.number(dictations)) dictation\(dictations == 1 ? "" : "s") and \(Format.number(notes)) note\(notes == 1 ? "" : "s"), in transcript-history.json.",
                     keywords: "file storage disk folder") {
@@ -237,6 +229,33 @@ enum HistorySettings {
                 Row(id: "delete-all", searchText: "Delete all dictations notes clear erase history remove", view: DeleteAllRow()),
             ]),
         ]
+    }
+}
+
+/// How many to keep. A smaller number that would remove dictations at once asks first.
+private struct RetentionRow: View {
+    @Environment(AppModel.self) private var model
+    @State private var pending: Int?
+
+    var body: some View {
+        let history = model.history
+        SettingsRow("Keep the last", detail: "Older dictations and notes are removed as new ones arrive. Your usage stats are kept either way.") {
+            SelectMenu("\(Format.number(history.retentionLimit)) dictations", label: "Keep the last", minWidth: 150) {
+                Picker("Keep the last", selection: Binding(get: { history.retentionLimit }, set: { limit in
+                    if history.items.count > limit { pending = limit } else { history.setRetentionLimit(limit) }
+                })) {
+                    ForEach(HistoryStore.retentionChoices, id: \.self) { Text("\(Format.number($0)) dictations").tag($0) }
+                }
+                .pickerStyle(.inline)
+            }
+        }
+        .confirmationDialog("Remove the \(Format.number(max(0, history.items.count - (pending ?? 0)))) oldest dictations and notes?",
+                            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
+                            presenting: pending) { limit in
+            Button("Keep the Last \(Format.number(limit))", role: .destructive) { history.setRetentionLimit(limit) }
+        } message: { _ in
+            Text("They are removed from this Mac now. This can't be undone.")
+        }
     }
 }
 

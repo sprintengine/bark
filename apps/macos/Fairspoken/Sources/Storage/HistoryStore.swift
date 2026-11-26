@@ -49,7 +49,7 @@ final class HistoryStore {
     /// Keeps the newest `limit` items from now on, dropping any older ones at once.
     func setRetentionLimit(_ limit: Int) {
         retentionLimit = max(1, min(limit, TranscriptHistory.maxItems))
-        UserDefaults.standard.set(retentionLimit, forKey: "HistoryRetentionLimit")
+        if persists { UserDefaults.standard.set(retentionLimit, forKey: "HistoryRetentionLimit") }
         if items.count > retentionLimit {
             trimToRetention()
             save()

@@ -381,10 +381,12 @@ private struct RowField: View {
     var prompt: String
     var secure = false
     var width: CGFloat = 260
+    var focusRequest = 0
     var onSubmit: () -> Void = {}
 
     var body: some View {
-        SettingsTextField(label, text: $text, prompt: prompt, secure: secure, onSubmit: onSubmit).frame(width: width)
+        SettingsTextField(label, text: $text, prompt: prompt, secure: secure, focusRequest: focusRequest, onSubmit: onSubmit)
+            .frame(width: width)
     }
 }
 
@@ -423,12 +425,13 @@ private struct AddressRow: View {
 private struct TokenRow: View {
     @Environment(AppModel.self) private var model
     @State private var token = ""
+    @State private var focusRequest = 0
 
     var body: some View {
         let finder = model.hostFinder
         let waiting = finder.needsToken.map { $0.url.absoluteString == model.settings.settings.remoteUrl && token.isEmpty } ?? false
         SettingsRow("Token", detail: waiting ? "\(finder.needsToken?.name ?? "This server") needs its token." : "From Bark Server › Connect, on the server.") {
-            RowField(label: "Token", text: $token, prompt: "Paste the token", secure: true) {
+            RowField(label: "Token", text: $token, prompt: "Paste the token", secure: true, focusRequest: focusRequest) {
                 model.settings.remoteToken = token
                 model.hostStatus.refresh(force: true)
             }
@@ -437,5 +440,7 @@ private struct TokenRow: View {
         .onChange(of: token) { _, v in model.settings.remoteToken = v }
         // Pairing writes the token; show it here too.
         .onChange(of: model.settings.remoteToken) { _, v in if token != v { token = v } }
+        // A server that needs its token: the field waits for it.
+        .onChange(of: finder.needsToken) { _, host in if host != nil { focusRequest += 1 } }
     }
 }

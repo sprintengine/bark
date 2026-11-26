@@ -501,18 +501,32 @@ private struct ActionRow<Icon: View>: View {
 }
 
 /// The dictation's style, and a menu to restyle it: the formatter runs again on what was heard
-/// and the result is saved. "Always use" makes the style the rule for its app or site.
+/// and the result is saved, after asking when the text was edited since. "Always use" makes the
+/// style the rule for its app or site. A terminal's dictation is always Verbatim, so it has no menu.
 private struct StyleMenuRow: View {
     var item: TranscriptHistoryItem
     @Environment(AppModel.self) private var model
     @State private var hovered = false
+    @State private var pending: DictationStyle.ID?
 
     var body: some View {
         let current = item.styleID
+        if model.isStyleForced(item) {
+            InfoRow(symbolView: AnyView(TypeGlyph(size: 15, color: Crystal.ink2)), title: "Verbatim", detail: "always",
+                    help: "Bark never reshapes what goes into a terminal or a password field.")
+        } else {
+            menu(current: current)
+        }
+    }
+
+    private func menu(current: DictationStyle.ID?) -> some View {
         let target = model.alwaysUseTarget(for: item)
-        Menu {
-            Picker("Restyle as", selection: Binding(get: { current ?? .clean }, set: { model.restyle(item, as: $0) })) {
-                ForEach(DictationStyle.all) { style in Text(style.name).tag(style.id) }
+        return Menu {
+            Picker("Restyle as", selection: Binding<DictationStyle.ID?>(get: { current }, set: { picked in
+                guard let picked, picked != current else { return }
+                if model.hasEditsSinceFormatting(item) { pending = picked } else { model.restyle(item, as: picked) }
+            })) {
+                ForEach(DictationStyle.all) { style in Text(style.name).tag(Optional(style.id)) }
             }
             .pickerStyle(.inline)
             if let current, let target {
@@ -541,6 +555,13 @@ private struct StyleMenuRow: View {
         .help(item.styleReason.map { "Chosen by: \($0). Restyle as another style." } ?? "Restyle as another style")
         .accessibilityLabel("Style, \(current?.displayName ?? "none")")
         .accessibilityHint("Restyles this dictation from what you said")
+        .confirmationDialog("Restyle as \(pending?.displayName ?? "")?",
+                            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
+                            presenting: pending) { style in
+            Button("Restyle") { model.restyle(item, as: style) }
+        } message: { _ in
+            Text("Restyling starts again from what you said, so your changes to the text are replaced.")
+        }
     }
 
     /// The style is already what the rules give its app or site.

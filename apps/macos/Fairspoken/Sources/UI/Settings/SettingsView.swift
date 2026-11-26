@@ -77,6 +77,10 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear { model.permissions.beginPolling() }
         .onDisappear { model.permissions.endPolling() }
+        // Hold fn was turned on before Input Monitoring was allowed: the tap couldn't start then.
+        .onChange(of: model.permissions.inputMonitoring) { _, status in
+            if status.isGranted { model.applyFnSetting() }
+        }
     }
 }
 

@@ -56,7 +56,9 @@ struct DashboardView: View {
             .keyboardShortcut("k", modifiers: .command)
             .hidden()
             .accessibilityHidden(true)
-            // In Settings: ⌘F searches the settings, esc goes back to the dictations.
+            // In Settings: ⌘F searches the settings, esc goes back to the dictations. A key
+            // equivalent beats the focused field, so esc is left to the search while it holds a
+            // query (it clears it) and to a pairing in progress (it cancels it).
             if model.section == .settings {
                 Button("Search Settings") {
                     if !model.sidebarVisible { model.sidebarVisible = true }
@@ -65,13 +67,12 @@ struct DashboardView: View {
                 .keyboardShortcut("f", modifiers: .command)
                 .hidden()
                 .accessibilityHidden(true)
-                Button("Back") {
-                    model.settingsQuery = ""
-                    model.open(dictation: nil)
+                if model.settingsQuery.isEmpty && model.hostFinder.pairing == nil {
+                    Button("Back") { model.open(dictation: nil) }
+                        .keyboardShortcut(.cancelAction)
+                        .hidden()
+                        .accessibilityHidden(true)
                 }
-                .keyboardShortcut(.cancelAction)
-                .hidden()
-                .accessibilityHidden(true)
             }
         }
         .onAppear { if model.settings.settings.transcriptionLocation == .remoteHost { model.hostStatus.refresh() } }
