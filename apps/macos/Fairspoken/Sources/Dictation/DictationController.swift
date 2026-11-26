@@ -652,7 +652,13 @@ final class DictationController {
         }
         let pasteStarted = ContinuousClock.now
         // The last moment Escape can stop it: from here on it is delivered (`beginDelivering`).
-        let commit: () -> Bool = { [weak self] in !Task.isCancelled && self?.lifecycle.beginDelivering(id) == true }
+        // Whether it may still be pasted is read then too: the screen may have locked while
+        // the keys or the focus were awaited.
+        let commit: () -> TextInserter.Commit = { [weak self] in
+            guard let self, !Task.isCancelled, self.lifecycle.beginDelivering(id) else { return .withdraw }
+            if let copyOnly = self.copyOnly, copyOnly.id == id { return .copyOnly(copyOnly.reason) }
+            return .deliver
+        }
         guard let delivery = await deliver(text, settings: s, target: target, retried: retried,
                                            copyOnly: copyOnly?.id == id ? copyOnly?.reason : nil, commit: commit) else {
             Self.log.notice("Dictation \(id) was cancelled before it was pasted; nothing was pasted")
@@ -727,23 +733,25 @@ final class DictationController {
     /// Nil when the dictation was cancelled before anything was written or pasted. `copyOnly`
     /// says why it must not be pasted, if it mustn't.
     private func deliver(_ text: String, settings s: AppSettings, target: NSRunningApplication?, retried: Bool, copyOnly: String?,
-                         commit: () -> Bool) async -> Delivery? {
+                         commit: () -> TextInserter.Commit) async -> Delivery? {
         // The screen locked, the Mac slept or the user switched: nothing is typed anywhere.
         if let copyOnly {
-            guard commit() else { return nil }
-            TextInserter.copy(text)
-            return .copied(copyOnly)
+            guard case .withdraw = commit() else {
+                TextInserter.copy(text)
+                return .copied(copyOnly)
+            }
+            return nil
         }
         // Our own window is frontmost (dashboard "Try dictation", onboarding): show it there.
         if target == nil || (NSApp.isActive && NSApp.keyWindow != nil) {
-            guard commit() else { return nil }
+            if case .withdraw = commit() { return nil }
             TextInserter.copy(text)
             return .shownInApp
         }
         // A retry can take many seconds: if the user has moved on to another app by then, never
         // type into it. (A first attempt is pasted, keeping the text on the clipboard, as before.)
         if retried, NSWorkspace.shared.frontmostApplication?.processIdentifier != target?.processIdentifier {
-            guard commit() else { return nil }
+            if case .withdraw = commit() { return nil }
             TextInserter.copy(text)
             return .copied("Copied — you'd switched apps")
         }
