@@ -217,12 +217,61 @@ public struct StyleResolution: Equatable, Sendable {
     }
 }
 
+/// The kinds of app and site Bark has a style for out of the box (`StyleRules.builtInApps` and
+/// `builtInSites`). The user can give a whole kind another style (Settings › App styles).
+public enum StyleCategory: String, Codable, Sendable, CaseIterable, Identifiable {
+    case email, chat, notes, documents, code
+
+    public var id: String { rawValue }
+
+    public var name: String {
+        switch self {
+        case .email: "Email"
+        case .chat: "Chat"
+        case .notes: "Notes"
+        case .documents: "Documents"
+        case .code: "Code"
+        }
+    }
+
+    /// A few of the apps and sites in it, for the settings row.
+    public var examples: String {
+        switch self {
+        case .email: "Mail, Outlook, Gmail and other webmail"
+        case .chat: "Slack, Messages, WhatsApp, Discord, Teams"
+        case .notes: "Notes, Obsidian, Bear"
+        case .documents: "Pages, Word, Google Docs, Notion"
+        case .code: "Xcode, VS Code, Cursor, GitHub"
+        }
+    }
+
+    /// The style Bark gives the kind unless the user changes it.
+    public var builtInStyle: DictationStyle.ID {
+        switch self {
+        case .email: .email
+        case .chat: .casual
+        case .notes: .notes
+        case .documents: .document
+        case .code: .code
+        }
+    }
+
+    /// The kind a built-in default belongs to: each kind has its own built-in style.
+    public static func of(builtIn style: DictationStyle.ID) -> StyleCategory? {
+        allCases.first { $0.builtInStyle == style }
+    }
+}
+
 /// Which style each destination gets: the user's per-app rule, then the user's per-site rule,
-/// then Bark's defaults (by site, then by app), then the user's default style (`clean`).
+/// then Bark's defaults (by site, then by app, each as the user set its kind), then the user's
+/// default style (`clean`).
 public struct StyleRules: Codable, Equatable, Sendable {
     public var defaultStyle: DictationStyle.ID = .clean
     public var apps: [AppStyleRule] = []
     public var sites: [SiteStyleRule] = []
+    /// The user's style for a whole kind of app (`StyleCategory` raw value → style). A kind not
+    /// listed keeps its built-in style.
+    public var categories: [String: DictationStyle.ID] = [:]
 
     public static let maxRules = 200
 
@@ -237,6 +286,25 @@ public struct StyleRules: Codable, Equatable, Sendable {
         defaultStyle = c.lenient(DictationStyle.ID.self, .defaultStyle) ?? .clean
         apps = c.lenient([LenientElement<AppStyleRule>].self, .apps)?.compactMap(\.value) ?? []
         sites = c.lenient([LenientElement<SiteStyleRule>].self, .sites)?.compactMap(\.value) ?? []
+        let rawCategories = c.lenient([String: String].self, .categories) ?? [:]
+        categories = rawCategories.reduce(into: [:]) { out, pair in
+            if StyleCategory(rawValue: pair.key) != nil, let style = DictationStyle.ID(rawValue: pair.value) { out[pair.key] = style }
+        }
+    }
+
+    /// The style a kind of app gets: the user's choice, else the built-in one.
+    public func style(for category: StyleCategory) -> DictationStyle.ID {
+        categories[category.rawValue] ?? category.builtInStyle
+    }
+
+    /// Gives a whole kind of app a style; its built-in style clears the choice.
+    public mutating func setCategory(_ category: StyleCategory, style: DictationStyle.ID) {
+        categories[category.rawValue] = style == category.builtInStyle ? nil : style
+    }
+
+    /// A built-in default as the user has set its kind.
+    func categoryStyle(_ builtIn: DictationStyle.ID) -> DictationStyle.ID {
+        StyleCategory.of(builtIn: builtIn).map(style(for:)) ?? builtIn
     }
 
     /// Trimmed, blank and duplicate rules dropped (the later one wins), hosts lowercased.
@@ -359,11 +427,11 @@ public struct StyleRules: Codable, Equatable, Sendable {
                 return make(best.style, "Your rule for \(best.host)", .site)
             }
             if let builtIn = Self.builtInSiteStyle(host: host, path: path) {
-                return make(builtIn, host, .builtInSite)
+                return make(categoryStyle(builtIn), host, .builtInSite)
             }
         }
         if let builtIn = Self.builtInAppStyle(bundleID: d.bundleID) {
-            return make(builtIn, "\(d.appName ?? "App") rule", .builtInApp)
+            return make(categoryStyle(builtIn), "\(d.appName ?? "App") rule", .builtInApp)
         }
         return make(defaultStyle, defaultStyle == .clean ? "Default" : "Your default", .global)
     }
