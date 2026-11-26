@@ -61,7 +61,7 @@ struct ConnectView: View {
                         Image(systemName: "slider.horizontal.3").foregroundStyle(Crystal.ink2)
                         Text("Custom: listening on \(controller.configuration.bindAddr)").font(.callout).foregroundStyle(Crystal.ink2)
                         Button("Advanced settings") { controller.section = .configuration }
-                            .buttonStyle(.borderless).foregroundStyle(Crystal.serverAccent)
+                            .buttonStyle(OutlineButtonStyle(compact: true))
                     }
                 } else if access == .tailnet && port != HostConfiguration.defaultPort {
                     Label("Find hosts only looks on port \(String(HostConfiguration.defaultPort)). On your other devices, enter \(controller.shareableEndpoint?.url ?? "this address") under Enter address manually.",
@@ -152,19 +152,18 @@ private struct PortRow: View {
                     .labelsHidden()
                     .onSubmit(apply)
                 if draft != saved {
-                    Button("Cancel") { draft = saved; problem = nil }.buttonStyle(.bordered)
+                    Button("Cancel") { draft = saved; problem = nil }.buttonStyle(OutlineButtonStyle())
                     Button(saving ? "Applying…" : (controller.runState.isRunning ? "Apply and restart" : "Apply"), action: apply)
-                        .buttonStyle(.borderedProminent).tint(Crystal.serverAccent)
+                        .buttonStyle(PrimaryButtonStyle())
                         .disabled(saving || !(1...65_535).contains(draft))
                         .keyboardShortcut(.defaultAction)
                 } else if saved != HostConfiguration.defaultPort {
                     Button("Use \(String(HostConfiguration.defaultPort))") { draft = HostConfiguration.defaultPort; apply() }
-                        .buttonStyle(.borderless).foregroundStyle(Crystal.serverAccent)
+                        .buttonStyle(OutlineButtonStyle(compact: true))
                         .help("The port Find hosts looks on")
                 }
                 Spacer(minLength: 0)
             }
-            .buttonBorderShape(.capsule)
             if let problem { ErrorLabel(text: problem).font(.caption) }
         }
         .onAppear { draft = saved }
@@ -207,30 +206,29 @@ private struct PairingPasswordRow: View {
                     if !password.isEmpty {
                         Button("Turn off") { submit("") }.buttonStyle(.borderless).foregroundStyle(Crystal.ink2)
                     }
-                    Button("Cancel") { editing = false; problem = nil }.buttonStyle(.bordered)
+                    Button("Cancel") { editing = false; problem = nil }.buttonStyle(OutlineButtonStyle())
                     Button(saving ? "Saving…" : "Save", action: save)
-                        .buttonStyle(.borderedProminent).tint(Crystal.serverAccent)
+                        .buttonStyle(PrimaryButtonStyle())
                         .disabled(saving || HostConfiguration.pairingPasswordProblem(draft) != nil)
                         .keyboardShortcut(.defaultAction)
                 } else if password.isEmpty {
                     Text("Not set, so devices can't pair").font(.body).foregroundStyle(Crystal.ink3)
                     Spacer(minLength: 0)
                     Button("Set password", action: startEditing)
-                        .buttonStyle(.borderedProminent).tint(Crystal.serverAccent)
+                        .buttonStyle(PrimaryButtonStyle())
                 } else {
                     Text(reveal ? password : String(repeating: "•", count: min(password.count, 16)))
                         .font(.fsData(.body, weight: .medium)).foregroundStyle(Crystal.ink)
                         .textSelection(.enabled)
                     Spacer(minLength: 0)
                     Button { reveal.toggle() } label: { Image(systemName: reveal ? "eye.slash" : "eye").frame(width: 16) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(OutlineButtonStyle())
                         .help(reveal ? "Hide" : "Show")
                         .accessibilityLabel(reveal ? "Hide password" : "Show password")
                     CopyButton(value: password)
-                    Button("Change", action: startEditing).buttonStyle(.bordered)
+                    Button("Change", action: startEditing).buttonStyle(OutlineButtonStyle())
                 }
             }
-            .buttonBorderShape(.capsule)
             if let problem { ErrorLabel(text: problem).font(.caption) }
         }
         .padding(.horizontal, 14)
@@ -309,7 +307,7 @@ private struct QRCard: View {
                 }
                 if let url = controller.dashboardURL, let open = URL(string: url) {
                     Button("Open dashboard", systemImage: "safari") { NSWorkspace.shared.open(open) }
-                        .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.small)
+                        .buttonStyle(OutlineButtonStyle(compact: true))
                         .disabled(!controller.runState.isRunning)
                 }
             }

@@ -84,9 +84,7 @@ struct OnboardingView: View {
         HStack(spacing: 10) {
             if step != .welcome && step != .finish {
                 Button("Back") { go(to: SetupGuide.step(before: step, engineUsable: model.modelProgress.engineUsable)) }
-                    .buttonStyle(.borderless)
-                    .controlSize(.large)
-                    .foregroundStyle(Crystal.ink2)
+                    .buttonStyle(GhostButtonStyle())
             }
             Spacer()
             secondary
@@ -99,8 +97,7 @@ struct OnboardingView: View {
     @ViewBuilder private var secondary: some View {
         if step == .model, !model.modelProgress.canContinue {
             Button("Skip for Now") { advance() }
-                .controlSize(.large)
-                .buttonBorderShape(.capsule)
+                .buttonStyle(OutlineButtonStyle())
                 .help("Carry on without a model. The last step shows what's left.")
         }
     }
@@ -167,8 +164,8 @@ private struct StepProgress: View {
             VStack(spacing: 8) {
                 HStack(spacing: 4) {
                     ForEach(Array(steps.enumerated()), id: \.offset) { i, _ in
-                        Capsule().fill(i <= index ? Crystal.clientAccent : Crystal.hairline)
-                            .frame(width: 36, height: 4)
+                        Capsule().fill(i < index ? Crystal.ink2 : i == index ? Crystal.ink : Crystal.input)
+                            .frame(width: 36, height: 3)
                     }
                 }
                 Text("Step \(index + 1) of \(steps.count) · \(step.title)")
@@ -187,14 +184,15 @@ private struct StepHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 30, weight: .bold)).tracking(-0.5).foregroundStyle(Crystal.ink)
+            Text(title).font(.system(size: 28, weight: .semibold)).tracking(-0.5).foregroundStyle(Crystal.ink)
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle).font(.system(size: 15)).foregroundStyle(Crystal.ink2)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, SettingsMetrics.rowH)
         .padding(.top, 12)
-        .padding(.bottom, 22)
+        .padding(.bottom, 24)
     }
 }
 
@@ -235,8 +233,9 @@ private struct PermissionsStep: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             StepHeader(title: "Allow access", subtitle: "\(AppInfo.displayName) asks only for what dictation needs. You can change these in System Settings at any time.")
+            SettingsGroup {
             PermissionCard(kind: .microphone, tile: Crystal.Tile.red, symbol: "mic.fill", title: "Microphone",
                            detail: model.settings.settings.transcriptionLocation == .remoteHost
                                ? "Hears you only while you dictate. Audio goes only to your network device."
@@ -247,6 +246,7 @@ private struct PermissionsStep: View {
             if model.settings.settings.fnPushToTalk {
                 PermissionCard(kind: .inputMonitoring, tile: Crystal.Tile.gray, symbol: "keyboard.fill", title: "Input Monitoring",
                                detail: "Lets you hold fn to dictate.", required: false)
+            }
             }
         }
     }
@@ -263,13 +263,13 @@ private struct PermissionCard: View {
 
     var body: some View {
         let status = model.permissions.status(kind)
-        Card(padding: 16) {
+        Group {
             HStack(alignment: .center, spacing: 14) {
-                IconTile(symbol, color: tile, size: 36)
+                IconTile(symbol, color: tile, size: 32)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
-                        Badge(required ? "Required" : "Optional", style: required ? .accent : .neutral)
+                        Text(title).font(.system(size: 14, weight: .medium)).foregroundStyle(Crystal.ink)
+                        Badge(required ? "Required" : "Optional", style: required ? .info : .neutral)
                     }
                     Text(detail).font(TypeScale.meta).foregroundStyle(Crystal.ink2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -278,15 +278,17 @@ private struct PermissionCard: View {
                 Group {
                     if status.isGranted {
                         Label("Allowed", systemImage: "checkmark.circle.fill")
-                            .font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ok)
+                            .font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink2)
                     } else if kind == .microphone, status == .denied {
-                        Button("Open Settings") { model.permissions.openSettings(kind) }
+                        Button("Open Settings") { model.permissions.openSettings(kind) }.cardButton()
                     } else {
-                        Button("Allow") { model.permissions.request(kind) }
+                        Button("Allow") { model.permissions.request(kind) }.cardButton()
                     }
                 }
                 .frame(minWidth: 96, alignment: .trailing)
             }
+            .padding(.horizontal, SettingsMetrics.rowH)
+            .padding(.vertical, 14)
         }
         .accessibilityElement(children: .combine)
     }
@@ -304,13 +306,11 @@ private struct MicrophoneStep: View {
     var body: some View {
         let test = model.micTest
         let check = test.check(permission: AppModel.permission(model.permissions.microphone), deviceCount: names.count)
-        VStack(alignment: .leading, spacing: 8) {
-            StepHeader(title: "Test your microphone", subtitle: "Say a few words. The waveform should move as you speak.")
-            Card(padding: 20) {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack {
-                        Text("Microphone").font(TypeScale.body).foregroundStyle(Crystal.ink2)
-                        Spacer()
+        VStack(alignment: .leading, spacing: 0) {
+            StepHeader(title: "Test your microphone", subtitle: "Say a few words. The bars should move as you speak.")
+            SettingsGroup {
+                SettingsRow("Microphone", detail: "Bark listens on this one only while you dictate.") {
+                    SelectMenu(Microphones.displayName(for: model.settings.settings.audioDevice), label: "Microphone", minWidth: 200) {
                         Picker("Microphone", selection: Binding(get: { model.settings.settings.audioDevice }, set: { v in
                             model.settings.update { $0.audioDevice = v }
                             restart()
@@ -318,18 +318,20 @@ private struct MicrophoneStep: View {
                             Text("System default\(defaultName.map { " (\($0))" } ?? "")").tag("")
                             ForEach(names, id: \.self) { Text($0).tag($0) }
                         }
-                        .labelsHidden()
-                        .fixedSize()
+                        .pickerStyle(.inline)
                     }
-                    LevelBars(meter: test.meter, active: test.running, bars: 44,
-                              color: check == .hearing ? Crystal.clientAccent : Crystal.ink2, minHeight: 4)
-                        .frame(height: 72)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
-                        .frame(maxWidth: .infinity)
-                        .background(Crystal.well, in: .rect(cornerRadius: 10, style: .continuous))
-                    MicCheckLine(check: check, retry: restart)
                 }
+                LevelBars(meter: test.meter, active: test.running, bars: 44,
+                          color: check == .hearing ? Crystal.ink : Crystal.ink3, minHeight: 4)
+                    .frame(height: 64)
+                    .padding(.horizontal, SettingsMetrics.rowH)
+                    .padding(.vertical, 18)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityHidden(true)
+                MicCheckLine(check: check, retry: restart)
+                    .padding(.horizontal, SettingsMetrics.rowH)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 52)
             }
         }
         .onAppear {
@@ -378,7 +380,7 @@ private struct MicCheckLine: View {
 
     private var tint: Color {
         switch check {
-        case .hearing: Crystal.ok
+        case .hearing: Crystal.ink
         case .listening, .idle: Crystal.ink2
         default: Crystal.warn
         }
@@ -399,10 +401,10 @@ private struct MicCheckLine: View {
 
     @ViewBuilder private var action: some View {
         switch check {
-        case .needsPermission: Button("Allow") { model.permissions.request(.microphone) }
-        case .denied: Button("Open Settings") { model.permissions.openSettings(.microphone) }
-        case .noDevice, .failed, .silent: Button("Try Again", action: retry)
-        case .idle: Button("Start Test", action: retry)
+        case .needsPermission: Button("Allow") { model.permissions.request(.microphone) }.cardButton()
+        case .denied: Button("Open Settings") { model.permissions.openSettings(.microphone) }.cardButton()
+        case .noDevice, .failed, .silent: Button("Try Again", action: retry).cardButton()
+        case .idle: Button("Start Test", action: retry).cardButton()
         case .listening, .hearing: EmptyView()
         }
     }
@@ -417,26 +419,28 @@ private struct ModelStep: View {
         let chosen = SpeechModelCatalog.resolve(model.settings.settings.model).id
         let choices = SetupGuide.modelChoices(from: SpeechModelCatalog.all, defaultID: SpeechModelCatalog.defaultModelID,
                                               including: chosen)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             StepHeader(title: "Choose a speech model",
                        subtitle: "It runs on this Mac, so nothing you say is uploaded. The recommended model suits most people; you can change it any time in Models.")
             if model.modelProgress == .remote {
-                Card(padding: 16) {
-                    Label("You're transcribing on a network device, so this Mac needs no model.", systemImage: "server.rack")
-                        .font(TypeScale.body).foregroundStyle(Crystal.ink)
+                SettingsGroup {
+                    SettingsRow("Transcribing on Bark Server", detail: "Your server does the listening, so this Mac needs no model.")
                 }
             } else {
                 // The recommendation first; the alternatives one click away.
                 let recommended = choices.filter { $0.id == SpeechModelCatalog.defaultModelID }
                 let others = choices.filter { $0.id != SpeechModelCatalog.defaultModelID }
-                ForEach(recommended) { info in ModelChoiceCard(info: info, chosen: info.id == chosen) }
-                ModelProgressLine()
-                    .padding(.vertical, 6)
-                SectionHeading("Other models") {
-                    Text("All \(SpeechModelCatalog.all.count) are in Models").font(TypeScale.meta).foregroundStyle(Crystal.ink3)
+                SettingsGroup {
+                    ForEach(recommended) { info in ModelChoiceCard(info: info, chosen: info.id == chosen) }
                 }
-                .padding(.top, 4)
-                ForEach(others) { info in ModelChoiceCard(info: info, chosen: info.id == chosen) }
+                ModelProgressLine()
+                    .padding(.horizontal, SettingsMetrics.rowH)
+                    .padding(.top, 12)
+                SettingsSection("Other models") {
+                    Text("All \(SpeechModelCatalog.all.count) are in Models").font(.system(size: 12)).foregroundStyle(Crystal.ink3)
+                } content: {
+                    ForEach(others) { info in ModelChoiceCard(info: info, chosen: info.id == chosen) }
+                }
             }
         }
         .onAppear {
@@ -459,14 +463,12 @@ private struct ModelChoiceCard: View {
             model.useModel(info.id)
         } label: {
             HStack(alignment: .center, spacing: 14) {
-                Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 17))
-                    .foregroundStyle(chosen ? Crystal.clientAccent : Crystal.ink3)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(info.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
-                        .lineLimit(1)
-                    HStack(spacing: 4) {
-                        if info.id == SpeechModelCatalog.defaultModelID { Badge("Recommended", style: .accent) }
+                RadioMark(on: chosen)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(info.name).font(.system(size: 14, weight: .medium)).foregroundStyle(Crystal.ink)
+                            .lineLimit(1)
+                        if info.id == SpeechModelCatalog.defaultModelID { Badge("Recommended", style: .info) }
                         if !info.name.contains(info.engine.label) { Badge(info.engine.label) }
                         if info.englishOnly { Badge("EN", style: .outline).help("English only") }
                     }
@@ -487,17 +489,13 @@ private struct ModelChoiceCard: View {
                 }
                 .fixedSize()
             }
-            .padding(14)
+            .padding(.horizontal, SettingsMetrics.rowH)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(hovered ? Crystal.rowHover : .clear)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .cardSurface(selected: chosen ? Crystal.clientAccent.opacity(0.8) : nil)
-        .overlay {
-            if hovered && !chosen {
-                RoundedRectangle(cornerRadius: CardMetrics.radius, style: .continuous).fill(Crystal.rowHover).allowsHitTesting(false)
-            }
-        }
         .onHover { hovered = $0 }
         .accessibilityAddTraits(chosen ? .isSelected : [])
     }
@@ -505,7 +503,7 @@ private struct ModelChoiceCard: View {
     @ViewBuilder private func stateLabel(_ state: ModelLibrary.ItemState) -> some View {
         Group {
             switch state {
-            case .installed: Label("Downloaded", systemImage: "checkmark").foregroundStyle(Crystal.ok)
+            case .installed: Label("Downloaded", systemImage: "checkmark").foregroundStyle(Crystal.ink2)
             case .downloading(let f): Text("Downloading \(Int(f * 100))%").foregroundStyle(Crystal.ink2).monospacedDigit()
             case .unpacking, .compiling: Text("Preparing…").foregroundStyle(Crystal.ink2)
             case .available: Text(Format.bytes(info.approxBytes)).foregroundStyle(Crystal.ink2).monospacedDigit()
@@ -525,9 +523,9 @@ private struct ModelProgressLine: View {
         case .preparing(let fraction):
             VStack(alignment: .leading, spacing: 6) {
                 if let fraction {
-                    ProgressView(value: fraction).tint(Crystal.clientAccent)
+                    ProgressView(value: fraction).tint(Crystal.ink2)
                 } else {
-                    ProgressView().progressViewStyle(.linear).tint(Crystal.clientAccent)
+                    ProgressView().progressViewStyle(.linear).tint(Crystal.ink2)
                 }
                 Text(fraction.map { "Downloading \(info.shortName): \(Int($0 * 100))% of \(Format.bytes(info.approxBytes)). You can carry on; it finishes in the background." }
                      ?? "Getting \(info.shortName) ready. You can carry on.")
@@ -535,7 +533,7 @@ private struct ModelProgressLine: View {
             }
         case .ready:
             Label("\(info.shortName) is ready.", systemImage: "checkmark.circle.fill")
-                .font(TypeScale.body).foregroundStyle(Crystal.ok)
+                .font(TypeScale.body).foregroundStyle(Crystal.ink2)
         case .failed(let message):
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Crystal.error)
@@ -564,6 +562,7 @@ private struct ModelProgressLine: View {
                     model.models.clearDownloadError(info.id)
                     model.useModel(info.id)
                 }
+                .cardButton()
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -581,99 +580,81 @@ private struct ShortcutStep: View {
 
     var body: some View {
         let s = model.settings.settings
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             StepHeader(title: "Your shortcut",
                        subtitle: "Use it in any app to start dictating. Press \(SetupGuide.keyLabel(HotkeyController.cancelShortcutSymbols ?? "⎋")) to cancel.")
-            Card(padding: 20) {
-                VStack(spacing: 16) {
+            SettingsGroup {
+                VStack(spacing: 0) {
                     if HotkeyController.hasShortcut {
                         ShortcutCaps(description: HotkeyController.currentShortcutSymbols, large: true)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 24)
                     } else {
                         Label("No shortcut is set. Record one below.", systemImage: "exclamationmark.triangle.fill")
                             .font(TypeScale.body).foregroundStyle(Crystal.warn)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                    }
-                    HStack {
-                        Text("Record a new shortcut").font(TypeScale.body).foregroundStyle(Crystal.ink2)
-                        Spacer()
-                        KeyboardShortcuts.Recorder(for: .dictation) { _ in model.mirrorShortcut() }
+                            .padding(.vertical, 24)
                     }
                 }
+                SettingsRow("Record a new shortcut", detail: "Click, then press the keys you want.") {
+                    KeyboardShortcuts.Recorder(for: .dictation) { _ in model.mirrorShortcut() }
+                }
             }
-            HStack(spacing: 8) {
-                ModeCard(mode: .pushToTalk, symbol: "hand.point.down.fill", title: "Hold to talk",
-                         detail: "Hold the keys while you speak. Let go to insert.")
-                ModeCard(mode: .toggle, symbol: "playpause.fill", title: "Press to start and stop",
-                         detail: "Press once to start, and again to insert.")
+            SettingsSection("How it works") {
+                ModeCard(mode: .pushToTalk, title: "Hold to talk", detail: "Hold the keys while you speak. Let go to insert.")
+                ModeCard(mode: .toggle, title: "Press to start and stop", detail: "Press once to start, and again to insert.")
             }
-            .fixedSize(horizontal: false, vertical: true)
-            Card(padding: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Also hold fn to dictate").font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink)
-                            Text(s.fnPushToTalk && model.permissions.inputMonitoring.isGranted ? "Input Monitoring is allowed."
-                                 : "Needs Input Monitoring.")
-                                .font(TypeScale.meta).foregroundStyle(Crystal.ink2)
-                        }
-                        Spacer()
-                        if s.fnPushToTalk && !model.permissions.inputMonitoring.isGranted {
-                            Button("Allow") { model.permissions.request(.inputMonitoring) }
-                        }
-                        Toggle("Also hold fn to dictate", isOn: Binding(get: { s.fnPushToTalk }, set: { v in
-                            model.settings.update { $0.fnPushToTalk = v }
-                            if v && !model.permissions.inputMonitoring.isGranted { model.permissions.request(.inputMonitoring) }
-                            model.applyFnSetting()
-                        }))
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .tint(Crystal.clientAccent)
+            SettingsSection(nil) {
+                SettingsRow("Also hold fn to dictate",
+                            detail: s.fnPushToTalk && Permissions.globeKeyAction != 0
+                                ? "fn is set to “\(Permissions.globeKeyActionName)”. Set it to Do Nothing in Keyboard settings."
+                                : s.fnPushToTalk && model.permissions.inputMonitoring.isGranted ? "Input Monitoring is allowed." : "Needs Input Monitoring.") {
+                    if s.fnPushToTalk && !model.permissions.inputMonitoring.isGranted {
+                        Button("Allow") { model.permissions.request(.inputMonitoring) }.cardButton()
                     }
-                    if s.fnPushToTalk {
-                        if Permissions.globeKeyAction != 0 {
-                            Label("fn is set to “\(Permissions.globeKeyActionName)”. Set it to Do Nothing in Keyboard settings.",
-                                  systemImage: "exclamationmark.triangle")
-                                .font(TypeScale.meta).foregroundStyle(Crystal.warn)
-                        }
-                    }
+                    Toggle("Also hold fn to dictate", isOn: Binding(get: { s.fnPushToTalk }, set: { v in
+                        model.settings.update { $0.fnPushToTalk = v }
+                        if v && !model.permissions.inputMonitoring.isGranted { model.permissions.request(.inputMonitoring) }
+                        model.applyFnSetting()
+                    }))
+                    .labelsHidden()
+                    .toggleStyle(.settingsSwitch)
                 }
             }
         }
     }
 }
 
+/// A shortcut mode as a radio row.
 private struct ModeCard: View {
     var mode: RecordingShortcutMode
-    var symbol: String
     var title: String
     var detail: String
     @Environment(AppModel.self) private var model
+    @State private var hovered = false
 
     var body: some View {
         let selected = model.settings.settings.recordingShortcutMode == mode
         Button {
             model.settings.update { $0.recordingShortcutMode = mode }
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    IconTile(symbol, color: selected ? Crystal.clientAccent : Crystal.Tile.gray, size: 28)
-                    Spacer()
-                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 16)).foregroundStyle(selected ? Crystal.clientAccent : Crystal.ink3)
+            HStack(spacing: 14) {
+                RadioMark(on: selected)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 14, weight: .medium)).foregroundStyle(Crystal.ink)
+                    Text(detail).font(.system(size: 12)).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
                 }
-                Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
-                Text(detail).font(TypeScale.meta).foregroundStyle(Crystal.ink2).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.horizontal, SettingsMetrics.rowH)
+            .padding(.vertical, 12)
+            .background(hovered ? Crystal.rowHover : .clear)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .cardSurface(selected: selected ? Crystal.clientAccent.opacity(0.8) : nil)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .onHover { hovered = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -703,7 +684,7 @@ private struct TryItStep: View {
 
     var body: some View {
         let mode = model.settings.settings.recordingShortcutMode
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             StepHeader(title: "Try it",
                        subtitle: "Click the message box, then \(mode == .pushToTalk ? "hold" : "press") \(HotkeyController.currentShortcutSymbols) and say something.")
             VStack(spacing: 0) {
@@ -711,7 +692,9 @@ private struct TryItStep: View {
                 Hairline()
                 composer
             }
-            .cardSurface()
+            .background(Crystal.card, in: .rect(cornerRadius: Radius.composer, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.composer, style: .continuous).strokeBorder(Crystal.hairline))
+            .composerShadow()
             .padding(.bottom, 4)
             if let lastError {
                 Label("\(lastError). Try again, or go back to test the microphone.", systemImage: "exclamationmark.triangle.fill")
@@ -749,8 +732,8 @@ private struct TryItStep: View {
                         VStack(alignment: .trailing, spacing: 4) {
                             Bubble(text: message.text, mine: true)
                             if let stats = message.stats {
-                                Label(stats, systemImage: "checkmark.circle.fill")
-                                    .font(.system(size: 11, weight: .medium)).foregroundStyle(Crystal.ok)
+                                Text(stats)
+                                    .font(.mono(11)).foregroundStyle(Crystal.ink3)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -800,7 +783,7 @@ private struct TryItStep: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(minHeight: 36)
-            .background(Crystal.well, in: .rect(cornerRadius: 10, style: .continuous))
+            .background(Crystal.well, in: .rect(cornerRadius: Radius.control, style: .continuous))
             DictateButton(dictation: dictation, size: 32) { dictation.toggleFromUI() }
                 .disabled(!model.models.engineState.isReady && model.modelProgress != .remote)
         }
@@ -825,12 +808,14 @@ private struct Bubble: View {
     var mine: Bool
 
     var body: some View {
+        // What you said sits in the grey bubble, as in a dictation's thread; Bark's prompt is plain.
         Text(text)
-            .font(TypeScale.body)
-            .foregroundStyle(mine ? Crystal.onAccent : Crystal.ink)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(mine ? Crystal.clientAccent : Crystal.well, in: .rect(cornerRadius: 14, style: .continuous))
+            .font(.system(size: 14))
+            .lineSpacing(3)
+            .foregroundStyle(mine ? Crystal.ink : Crystal.ink2)
+            .padding(.horizontal, mine ? 14 : 2)
+            .padding(.vertical, mine ? 10 : 2)
+            .background(mine ? Crystal.message : .clear, in: .rect(cornerRadius: Radius.composer, style: .continuous))
             .frame(maxWidth: 420, alignment: mine ? .trailing : .leading)
             .textSelection(.enabled)
     }
@@ -847,22 +832,18 @@ private struct FinishStep: View {
     var body: some View {
         let items = model.setupChecklist(micHeard: micHeard)
         let ready = SetupGuide.isReady(items)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             StepHeader(title: ready ? "You're all set" : "Almost there",
                        subtitle: ready
                            ? "\(model.settings.settings.recordingShortcutMode == .pushToTalk ? "Hold" : "Press") \(HotkeyController.currentShortcutSymbols) in any app to dictate. \(AppInfo.displayName) lives in the menu bar."
                            : "\(AppInfo.displayName) can't dictate until the items marked below are done.")
-            Card(padding: 6) {
-                VStack(spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        if index > 0 { Hairline(inset: 48) }
-                        ChecklistRow(item: item, go: go)
-                    }
-                }
+            SettingsGroup {
+                ForEach(items) { item in ChecklistRow(item: item, go: go) }
             }
             Text("To keep recordings for training a model on your voice, turn on “Save recordings to improve models” in Settings › General.")
                 .font(TypeScale.meta).foregroundStyle(Crystal.ink3)
-                .padding(.top, 8)
+                .padding(.horizontal, SettingsMetrics.rowH)
+                .padding(.top, 10)
         }
     }
 }
@@ -877,7 +858,7 @@ private struct ChecklistRow: View {
             Image(systemName: symbol).font(.system(size: 18)).foregroundStyle(tint).frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
+                    Text(title).font(.system(size: 14, weight: .medium)).foregroundStyle(Crystal.ink)
                     if !item.required { Badge("Optional") }
                 }
                 Text(detail).font(TypeScale.meta).foregroundStyle(Crystal.ink2).lineLimit(2)
@@ -885,8 +866,8 @@ private struct ChecklistRow: View {
             Spacer(minLength: 8)
             fix
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
+        .padding(.horizontal, SettingsMetrics.rowH)
+        .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
     }
 
@@ -927,7 +908,7 @@ private struct ChecklistRow: View {
 
     private var tint: Color {
         switch item.state {
-        case .done: Crystal.ok
+        case .done: Crystal.ink
         case .pending: item.required ? Crystal.warn : Crystal.ink3
         case .problem: Crystal.error
         }
@@ -938,18 +919,18 @@ private struct ChecklistRow: View {
             switch item.kind {
             case .microphone:
                 if model.permissions.microphone == .denied {
-                    Button("Open Settings") { model.permissions.openSettings(.microphone) }
+                    Button("Open Settings") { model.permissions.openSettings(.microphone) }.cardButton()
                 } else {
-                    Button("Allow") { model.permissions.request(.microphone) }
+                    Button("Allow") { model.permissions.request(.microphone) }.cardButton()
                 }
             case .model:
                 if case .preparing = model.modelProgress {
                     ProgressView().controlSize(.small)
                 } else {
-                    Button("Fix") { go(.model) }
+                    Button("Fix") { go(.model) }.cardButton()
                 }
-            case .accessibility: Button("Allow") { model.permissions.request(.accessibility) }
-            case .micHeard: Button("Test") { go(.microphone) }
+            case .accessibility: Button("Allow") { model.permissions.request(.accessibility) }.cardButton()
+            case .micHeard: Button("Test") { go(.microphone) }.cardButton()
             }
         }
     }

@@ -37,7 +37,7 @@ struct SpeedTestSheet: View {
 
     private func header(_ test: SpeedTestController) -> some View {
         HStack(alignment: .center, spacing: 12) {
-            IconTile("gauge.with.needle.fill", color: Crystal.clientAccent, size: 34)
+            IconTile("gauge.with.needle.fill", color: Crystal.ink2, size: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Speed test").font(.system(size: 17, weight: .semibold)).foregroundStyle(Crystal.ink)
                 Text("How much faster is your voice than your keyboard?").font(TypeScale.meta).foregroundStyle(Crystal.ink2)
@@ -48,7 +48,7 @@ struct SpeedTestSheet: View {
     }
 }
 
-/// "1 Type · 2 Speak · 3 Results", the current one in the accent.
+/// "1 Type · 2 Speak · 3 Results", the current one brightest.
 private struct StepDots: View {
     var step: SpeedTestController.Step
 
@@ -59,12 +59,12 @@ private struct StepDots: View {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, item in
                 HStack(spacing: 5) {
                     ZStack {
-                        Circle().fill(i <= index ? Crystal.clientAccent : Crystal.well)
+                        Circle().fill(i == index ? Crystal.ink : i < index ? Crystal.selected : Crystal.well)
                         if i < index {
-                            Image(systemName: "checkmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Crystal.onAccent)
+                            Image(systemName: "checkmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Crystal.ink2)
                         } else {
                             Text("\(i + 1)").font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(i == index ? Crystal.onAccent : Crystal.ink3)
+                                .foregroundStyle(i == index ? Crystal.canvas : Crystal.ink3)
                         }
                     }
                     .frame(width: 16, height: 16)
@@ -150,9 +150,7 @@ private struct LinkButton: View {
 
     var body: some View {
         Button(title, action: action)
-            .buttonStyle(.plain)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(Crystal.clientAccent)
+            .buttonStyle(GhostButtonStyle())
     }
 }
 
@@ -441,9 +439,7 @@ private struct ResultsStep: View {
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(Crystal.ink)
                 if test.isNewBest && SpeedTest.isKeepable(o) {
-                    Text("New best").font(.system(size: 11, weight: .semibold)).foregroundStyle(Crystal.onAccent)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Crystal.clientAccent, in: .capsule)
+                    Badge("New best", symbol: "star.fill", style: .info)
                 }
             }
             if o.secondsSaved >= 1 {
@@ -523,7 +519,7 @@ private struct ResultsStep: View {
                 } else {
                     HStack(spacing: 8) {
                         Image(systemName: "house")
-                        LinkButton("Use \(o.typing.wpm) wpm for time saved on Home") { test.adoptTypingSpeed() }
+                        Button("Use \(o.typing.wpm) wpm for Time Saved on Home") { test.adoptTypingSpeed() }.buttonStyle(OutlineButtonStyle(compact: true))
                         Text("now \(test.typingSpeedInUse.map { "\($0) wpm, an earlier test" } ?? "\(Int(UsageStats.typingWPM)) wpm, a typical pace")")
                             .foregroundStyle(Crystal.ink3)
                     }

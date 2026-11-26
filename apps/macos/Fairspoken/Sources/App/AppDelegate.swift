@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showAbout() {
         windows.showDashboard(.settings)
+        model.settingsQuery = ""
         model.settingsTab = .about
     }
 

@@ -35,10 +35,35 @@ final class HistoryStore {
     }
 
     var historyURL: URL { directory.appendingPathComponent("transcript-history.json") }
+
+    /// How many dictations and notes are kept (Settings › History), at most
+    /// `TranscriptHistory.maxItems`. A Mac-only preference, so it lives in the app's defaults.
+    private(set) var retentionLimit = HistoryStore.savedRetentionLimit
+    static let retentionChoices = [100, 250, 500, TranscriptHistory.maxItems]
+
+    private static var savedRetentionLimit: Int {
+        let saved = UserDefaults.standard.integer(forKey: "HistoryRetentionLimit")
+        return saved > 0 ? min(saved, TranscriptHistory.maxItems) : TranscriptHistory.maxItems
+    }
+
+    /// Keeps the newest `limit` items from now on, dropping any older ones at once.
+    func setRetentionLimit(_ limit: Int) {
+        retentionLimit = max(1, min(limit, TranscriptHistory.maxItems))
+        if persists { UserDefaults.standard.set(retentionLimit, forKey: "HistoryRetentionLimit") }
+        if items.count > retentionLimit {
+            trimToRetention()
+            save()
+        }
+    }
+
+    private func trimToRetention() {
+        if items.count > retentionLimit { items.removeLast(items.count - retentionLimit) }
+    }
     var usageURL: URL { directory.appendingPathComponent("usage-stats.json") }
 
     func add(_ item: TranscriptHistoryItem) {
         items = TranscriptHistory.adding(item, to: items)
+        trimToRetention()
         usage.record(words: item.wordCount, recordingSeconds: item.durationSeconds, at: item.date)
         save()
     }
@@ -89,6 +114,7 @@ final class HistoryStore {
         guard !trimmed.isEmpty else { return nil }
         let note = TranscriptHistoryItem.note(trimmed, at: date, appName: AppInfo.displayName, appBundleId: AppInfo.bundleID)
         items = TranscriptHistory.adding(note, to: items)
+        trimToRetention()
         save()
         return note.id
     }

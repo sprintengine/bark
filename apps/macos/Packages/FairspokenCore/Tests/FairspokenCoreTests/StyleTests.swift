@@ -125,6 +125,34 @@ struct StyleFormatterTests {
 
 @Suite("Style rules")
 struct StyleRulesTests {
+    @Test func categoryStyleReplacesTheBuiltInDefaultForTheWholeKind() {
+        var rules = StyleRules()
+        rules.setCategory(.chat, style: .clean)
+        #expect(rules.resolve(.init(bundleID: "com.tinyspeck.slackmacgap", appName: "Slack")).style == .clean)
+        #expect(rules.resolve(.init(bundleID: "com.apple.MobileSMS", appName: "Messages")).style == .clean)
+        #expect(rules.resolve(.init(bundleID: "com.apple.Safari", url: "https://app.slack.com/client")).style == .clean)
+        // Other kinds, the user's own rules and terminals are untouched.
+        #expect(rules.resolve(.init(bundleID: "com.apple.mail")).style == .email)
+        rules.setApp("com.tinyspeck.slackmacgap", style: .verbatim)
+        #expect(rules.resolve(.init(bundleID: "com.tinyspeck.slackmacgap")).style == .verbatim)
+        #expect(rules.resolve(.init(bundleID: "com.apple.Terminal")).style == .verbatim)
+        // Its built-in style clears the choice.
+        rules.setCategory(.chat, style: .casual)
+        #expect(rules.categories.isEmpty)
+        #expect(rules.style(for: .chat) == .casual)
+    }
+
+    @Test func categoriesRoundTripAndUnknownOnesAreDropped() throws {
+        var rules = StyleRules()
+        rules.setCategory(.email, style: .clean)
+        let data = try JSONEncoder().encode(rules)
+        #expect(try JSONDecoder().decode(StyleRules.self, from: data) == rules)
+        let odd = try JSONDecoder().decode(StyleRules.self, from: Data(#"{"categories":{"email":"notes","fax":"clean","chat":"shouting"}}"#.utf8))
+        #expect(odd.categories == ["email": .notes])
+        let old = try JSONDecoder().decode(StyleRules.self, from: Data(#"{"defaultStyle":"casual"}"#.utf8))
+        #expect(old.categories.isEmpty && old.defaultStyle == .casual)
+    }
+
     @Test func builtInDefaults() {
         let rules = StyleRules()
         #expect(rules.resolve(.init(bundleID: "com.apple.mail", appName: "Mail")).style == .email)

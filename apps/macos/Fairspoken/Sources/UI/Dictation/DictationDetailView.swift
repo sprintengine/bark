@@ -257,6 +257,11 @@ private struct ChangesTable: View {
         return out
     }
 
+    /// A removed piece as it reads: without the comma or full stop that came off with it.
+    static func shown(_ s: String) -> String {
+        s.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: ",.;:"))
+    }
+
     static func quoted(_ list: [String]) -> String { list.map { "“\($0)”" }.joined(separator: ", ") }
 
     static func rows(_ item: TranscriptHistoryItem, diff: WordDiff?) -> [Row] {
@@ -267,13 +272,20 @@ private struct ChangesTable: View {
             guard let list = grouped[kind], !list.isEmpty else { continue }
             switch kind {
             case .filler, .repetition, .restart:
-                rows.append(Row(step: kind.stepName, result: text([("Removed ", false), (quoted(list.map(\.removed)), true)])))
+                rows.append(Row(step: kind.stepName, result: text([("Removed ", false), (quoted(list.map { shown($0.removed) }), true)])))
             case .selfCorrection, .spokenCommand, .vocabulary:
                 var parts: [(String, Bool)] = []
                 for (i, edit) in list.enumerated() {
                     if i > 0 { parts.append(("; ", false)) }
-                    parts.append(("“\(edit.removed)”", true))
-                    parts.append((" became \(edit.inserted)", false))
+                    let inserted = edit.inserted.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if inserted.isEmpty {
+                        // A correction keeps what followed the cue: the wrong part and the cue go.
+                        parts.append(("Took out ", false))
+                        parts.append(("“\(shown(edit.removed))”", true))
+                    } else {
+                        parts.append(("“\(shown(edit.removed))”", true))
+                        parts.append((" became \(edit.inserted == "\n" ? "a new line" : edit.inserted == "\n\n" ? "a new paragraph" : inserted)", false))
+                    }
                 }
                 rows.append(Row(step: kind.stepName, result: text(parts)))
             case .punctuation:
@@ -412,10 +424,7 @@ private struct ActionsCard: View {
             }
             ActionRow(label: "Edit text", accessory: .keys("⏎")) { icon("pencil") } action: { model.editRequest += 1 }
             Rectangle().fill(Crystal.hairline).frame(height: 1).padding(.horizontal, 2).padding(.vertical, 6)
-            if let style = DictationText.styleName(item.style) {
-                InfoRow(symbolView: AnyView(TypeGlyph(size: 15, color: Crystal.ink2)), title: style, detail: "style",
-                        help: item.styleReason.map { "Chosen by: \($0)" })
-            }
+            StyleMenuRow(item: item)
             if model.retryingDictations.contains(item.id) {
                 InfoRow(symbolView: AnyView(ProgressView().controlSize(.small)), title: "Transcribing again", detail: nil, help: nil)
             } else if model.canRetry(item) {
@@ -423,6 +432,7 @@ private struct ActionsCard: View {
                     icon("arrow.counterclockwise")
                 } action: { model.retry(item) }
             }
+            AddToDictionaryRow(item: item)
             ActionRow(label: "Delete", accessory: .keys("⌫"), destructive: true) {
                 Image(systemName: "trash").font(.system(size: 14)).foregroundStyle(Crystal.error)
             } action: { confirmDelete = true }
@@ -487,6 +497,121 @@ private struct ActionRow<Icon: View>: View {
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
         .accessibilityLabel(detail.map { "\(label) \($0)" } ?? label)
+    }
+}
+
+/// The dictation's style, and a menu to restyle it: the formatter runs again on what was heard
+/// and the result is saved, after asking when the text was edited since. "Always use" makes the
+/// style the rule for its app or site. A terminal's dictation is always Verbatim, so it has no menu.
+private struct StyleMenuRow: View {
+    var item: TranscriptHistoryItem
+    @Environment(AppModel.self) private var model
+    @State private var hovered = false
+    @State private var pending: DictationStyle.ID?
+
+    var body: some View {
+        let current = item.styleID
+        if model.isStyleForced(item) {
+            InfoRow(symbolView: AnyView(TypeGlyph(size: 15, color: Crystal.ink2)), title: "Verbatim", detail: "always",
+                    help: "Bark never reshapes what goes into a terminal or a password field.")
+        } else {
+            menu(current: current)
+        }
+    }
+
+    private func menu(current: DictationStyle.ID?) -> some View {
+        let target = model.alwaysUseTarget(for: item)
+        return Menu {
+            Picker("Restyle as", selection: Binding<DictationStyle.ID?>(get: { current }, set: { picked in
+                guard let picked, picked != current else { return }
+                if model.hasEditsSinceFormatting(item) { pending = picked } else { model.restyle(item, as: picked) }
+            })) {
+                ForEach(DictationStyle.all) { style in Text(style.name).tag(Optional(style.id)) }
+            }
+            .pickerStyle(.inline)
+            if let current, let target {
+                Divider()
+                Button("Always Use \(current.displayName) in \(target.label)") { model.alwaysUseStyle(of: item) }
+                    .disabled(alreadyTheRule(current))
+            }
+        } label: {
+            HStack(spacing: 10) {
+                TypeGlyph(size: 15, color: Crystal.ink2).frame(width: 18)
+                Text(current?.displayName ?? "No style").foregroundStyle(Crystal.ink)
+                Text("style").foregroundStyle(Crystal.ink2)
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Crystal.ink2)
+            }
+            .font(.system(size: 14))
+            .padding(.horizontal, 8)
+            .frame(height: 34)
+            .background(hovered ? Crystal.selected : .clear, in: .rect(cornerRadius: 6, style: .continuous))
+            .contentShape(.rect)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .onHover { hovered = $0 }
+        .help(item.styleReason.map { "Chosen by: \($0). Restyle as another style." } ?? "Restyle as another style")
+        .accessibilityLabel("Style, \(current?.displayName ?? "none")")
+        .accessibilityHint("Restyles this dictation from what you said")
+        .confirmationDialog("Restyle as \(pending?.displayName ?? "")?",
+                            isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
+                            presenting: pending) { style in
+            Button("Restyle") { model.restyle(item, as: style) }
+        } message: { _ in
+            Text("Restyling starts again from what you said, so your changes to the text are replaced.")
+        }
+    }
+
+    /// The style is already what the rules give its app or site.
+    private func alreadyTheRule(_ style: DictationStyle.ID) -> Bool {
+        let resolution = model.settings.settings.styleRules.resolve(model.destination(of: item))
+        return (resolution.source == .app || resolution.source == .site) && resolution.style == style
+    }
+}
+
+/// "Add “Aoife” to Dictionary" for a name-like word in the text, or a field to type one.
+private struct AddToDictionaryRow: View {
+    var item: TranscriptHistoryItem
+    @Environment(AppModel.self) private var model
+    @State private var asking = false
+    @State private var word = ""
+
+    var body: some View {
+        let candidate = model.dictionaryCandidate(in: item)
+        ActionRow(label: candidate.map { "Add “\($0)” to Dictionary" } ?? "Add to Dictionary…", accessory: .none) {
+            Image(systemName: "book.closed").font(.system(size: 14)).foregroundStyle(Crystal.ink2)
+        } action: {
+            if let candidate {
+                model.addToDictionary(candidate)
+            } else {
+                word = ""
+                asking = true
+            }
+        }
+        .contextMenu {
+            Button("Add Another Word…") { word = candidate ?? ""; asking = true }
+        }
+        .popover(isPresented: $asking, arrowEdge: .leading) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Add to Dictionary").font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
+                Text("Spelt your way in every dictation from now on.").font(.system(size: 12)).foregroundStyle(Crystal.ink2)
+                HStack(spacing: 8) {
+                    SettingsTextField("Word", text: $word, prompt: "A name or a term", onSubmit: add).frame(width: 180)
+                    Button("Add", action: add).buttonStyle(PrimaryButtonStyle())
+                        .disabled(word.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .padding(14)
+        }
+    }
+
+    private func add() {
+        let clean = word.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        model.addToDictionary(clean)
+        asking = false
     }
 }
 

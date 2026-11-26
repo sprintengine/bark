@@ -27,59 +27,55 @@ struct ConfigurationView: View {
         let restartNeeded = draft.bindAddress != saved.bindAddress || draft.port != saved.port || draft.token != saved.token
             || draft.workerCount != saved.workerCount || draft.queueCapacity != saved.queueCapacity
             || (draft.pairingEnabled && draft.token.trimmingCharacters(in: .whitespaces).isEmpty)
-        VStack(alignment: .leading, spacing: 0) {
-            if case .failed = controller.runState {
-                StartProblemBanner()
-                    .padding(.horizontal, 28)
-                    .padding(.top, 18)
-            }
-            PageHeader(title: "Configuration")
-                .padding(.horizontal, 28)
-                .padding(.top, 18)
-            ScrollViewReader { proxy in
-                Form {
-                    server
-                    workers
-                    limits
-                    thisDevice
-                    // Applies at once, like This device; Save and Revert are for the host's file only.
-                    UpdateSettingsSection(updates: updates, style: .server)
-                    advanced
+        ScrollViewReader { proxy in
+            SettingsPage(title: "Configuration", subtitle: "Saved in host-config.json. Limits and models apply at once; the address, port, token, workers and queue restart the server.") {
+                if case .failed = controller.runState {
+                    StartProblemBanner().padding(.top, 20)
                 }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
-                .frame(maxWidth: 820, alignment: .leading)
-                .padding(.horizontal, 12)
-                .task {
-                    // Screenshot mode: show the Advanced rows.
-                    guard controller.revealAdvanced else { return }
-                    try? await Task.sleep(for: .milliseconds(300))
-                    proxy.scrollTo("advanced-end", anchor: .bottom)
-                }
+                server
+                workers
+                limits
+                thisDevice
+                // Applies at once, like This device; Save and Revert are for the host's file only.
+                ServerUpdateSection(updates: updates)
+                advanced
             }
+            .task {
+                // Screenshot mode: show the Advanced rows.
+                guard controller.revealAdvanced else { return }
+                try? await Task.sleep(for: .milliseconds(300))
+                proxy.scrollTo("advanced-end", anchor: .bottom)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: 12) {
                 if let message {
                     if message.isError {
                         ErrorLabel(text: message.text)
                     } else {
-                        Label(message.text, systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(Crystal.ok)
+                        Label(message.text, systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(Crystal.ink2)
                     }
                 } else if restartNeeded {
                     Label("Saving restarts the server.", systemImage: "arrow.clockwise")
                         .font(.callout).foregroundStyle(Crystal.ink2)
+                } else if draft != saved {
+                    Text("Unsaved changes.").font(.callout).foregroundStyle(Crystal.ink2)
                 }
                 Spacer()
                 Button("Revert") { draft = saved; message = nil }
-                    .buttonStyle(.glass)
+                    .buttonStyle(OutlineButtonStyle())
                     .disabled(draft == saved)
-                Button(saving ? "Saving…" : (restartNeeded ? "Save and restart" : "Save")) { save() }
-                    .buttonStyle(.glassProminent).tint(Crystal.serverAccent)
+                Button(saving ? "Saving…" : (restartNeeded ? "Save and Restart" : "Save")) { save() }
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(draft == saved || saving)
                     .keyboardShortcut("s", modifiers: .command)
             }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 14)
-            .frame(maxWidth: 844)
+            .frame(maxWidth: SettingsMetrics.column - 32)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(Crystal.canvas)
+            .overlay(alignment: .top) { Rectangle().fill(Crystal.hairlineSoft).frame(height: 1) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
@@ -106,17 +102,12 @@ struct ConfigurationView: View {
     // MARK: Sections
 
     private var server: some View {
-        Section("Server") {
-            LabeledContent("Name other devices see") {
-                TextField("Name", text: $draft.displayName, prompt: Text(MachineName.current()))
-                    .labelsHidden().multilineTextAlignment(.trailing).frame(width: 260)
+        SettingsSection("Server") {
+            SettingsRow("Name other devices see", detail: "What a scan for servers shows. This Mac's name when left empty.") {
+                SettingsTextField("Name", text: $draft.displayName, prompt: MachineName.current()).frame(width: 240)
             }
-            LabeledContent("Who can connect") {
-                HStack(spacing: 8) {
-                    Text(accessLabel).foregroundStyle(Crystal.ink2)
-                    Button("Change…") { controller.section = .connect }
-                        .buttonStyle(.borderless).foregroundStyle(Crystal.serverAccent)
-                }
+            SettingsRow("Who can connect", detail: accessLabel) {
+                Button("Change…") { controller.section = .connect }.buttonStyle(OutlineButtonStyle())
             }
         }
     }
@@ -130,55 +121,61 @@ struct ConfigurationView: View {
     }
 
     private var workers: some View {
-        Section {
-            Stepper(value: Binding(get: { draft.workerCount }, set: { n in
-                draft.workerCount = n
-                if draft.workerModels.count < n {
-                    draft.workerModels += Array(repeating: draft.workerModels.last ?? HostConfiguration.defaultModel, count: n - draft.workerModels.count)
-                } else {
-                    draft.workerModels = Array(draft.workerModels.prefix(n))
-                }
-            }), in: HostConfiguration.workerCountRange) {
-                LabeledContent("Workers", value: "\(draft.workerCount)")
+        SettingsSection("Workers", footer: "Each worker transcribes one dictation at a time. Workers on the same model share it in memory.") {
+            SettingsRow("Workers", detail: "How many dictations are transcribed side by side.") {
+                ValueStepper(value: Binding(get: { draft.workerCount }, set: { n in
+                    draft.workerCount = n
+                    if draft.workerModels.count < n {
+                        draft.workerModels += Array(repeating: draft.workerModels.last ?? HostConfiguration.defaultModel, count: n - draft.workerModels.count)
+                    } else {
+                        draft.workerModels = Array(draft.workerModels.prefix(n))
+                    }
+                }), range: HostConfiguration.workerCountRange, label: "Workers") { "\($0)" }
             }
             ForEach(0..<draft.workerModels.count, id: \.self) { i in
-                Picker("Worker \(i + 1)", selection: Binding(get: { draft.workerModels[i] }, set: { draft.workerModels[i] = $0 })) {
-                    ForEach(controller.backend.catalog) { m in
-                        Text(m.name + (controller.backend.isInstalled(m.id) ? "" : " (not installed)")).tag(m.id)
+                let id = draft.workerModels[i]
+                SettingsRow("Worker \(i + 1)") {
+                    SelectMenu(controller.backend.catalog.first { $0.id == id }?.name ?? id, label: "Worker \(i + 1) model", minWidth: 200) {
+                        Picker("Worker \(i + 1)", selection: Binding(get: { draft.workerModels[i] }, set: { draft.workerModels[i] = $0 })) {
+                            ForEach(controller.backend.catalog) { m in
+                                Text(m.name + (controller.backend.isInstalled(m.id) ? "" : " (not installed)")).tag(m.id)
+                            }
+                        }
+                        .pickerStyle(.inline)
                     }
                 }
             }
-        } header: {
-            Text("Workers")
-        } footer: {
-            Text("Each worker transcribes one dictation at a time. Workers on the same model share it in memory.")
-                .font(.caption).foregroundStyle(Crystal.ink2)
         }
     }
 
     private var limits: some View {
-        Section("Limits") {
-            Stepper(value: $draft.maxActiveStreams, in: HostConfiguration.maxActiveStreamsRange) {
-                LabeledContent("Dictations at once", value: "\(draft.maxActiveStreams)")
+        SettingsSection("Limits") {
+            SettingsRow("Dictations at once", detail: "Streams the server takes at the same time.") {
+                ValueStepper(value: $draft.maxActiveStreams, range: HostConfiguration.maxActiveStreamsRange, label: "Dictations at once") { "\($0)" }
             }
-            Stepper(value: $draft.maxRecordingSeconds, in: HostConfiguration.maxRecordingSecondsRange, step: 10) {
-                LabeledContent("Longest recording", value: ServerFormat.duration(Double(draft.maxRecordingSeconds)))
+            SettingsRow("Longest recording", detail: "A dictation longer than this is refused.") {
+                ValueStepper(value: $draft.maxRecordingSeconds, range: HostConfiguration.maxRecordingSecondsRange, step: 10,
+                             label: "Longest recording") { ServerFormat.duration(Double($0)) }
             }
-            Stepper(value: $draft.queueCapacity, in: HostConfiguration.queueCapacityRange) {
-                LabeledContent("Queue", value: "\(draft.queueCapacity) waiting")
+            SettingsRow("Queue", detail: "When every worker is busy and the queue is full, new requests get 429 and clients retry.") {
+                ValueStepper(value: $draft.queueCapacity, range: HostConfiguration.queueCapacityRange, label: "Queue") { "\($0) waiting" }
             }
-            .help("When every worker is busy and the queue is full, new requests get 429 and clients retry.")
         }
     }
 
     private var thisDevice: some View {
-        Section("This device") {
-            Toggle("Start at login", isOn: Binding(get: { controller.loginItemEnabled }, set: { controller.setLoginItem($0) }))
-                .help("Opens the app in the menu bar when you log in. To serve with nobody logged in, see apps/macos/README.md.")
-            Toggle("Keep this device awake while serving", isOn: Binding(get: { controller.configuration.preventSleep }, set: {
-                controller.setPreventSleep($0)
-                draft.preventSleep = $0
-            }))
+        SettingsSection("This Mac") {
+            SettingsRow("Start at login", detail: "Opens the app in the menu bar when you log in. To serve with nobody logged in, see the README.") {
+                Toggle("Start at login", isOn: Binding(get: { controller.loginItemEnabled }, set: { controller.setLoginItem($0) }))
+                    .toggleStyle(.settingsSwitch).labelsHidden()
+            }
+            SettingsRow("Keep this Mac awake while serving", detail: "The display can still sleep.") {
+                Toggle("Keep this Mac awake while serving", isOn: Binding(get: { controller.configuration.preventSleep }, set: {
+                    controller.setPreventSleep($0)
+                    draft.preventSleep = $0
+                }))
+                .toggleStyle(.settingsSwitch).labelsHidden()
+            }
         }
     }
 
@@ -205,59 +202,82 @@ struct ConfigurationView: View {
     private var tailscaleCommand: String { "tailscale serve --bg \(String(draft.port))" }
 
     private var advanced: some View {
-        Section("Advanced", isExpanded: $showAdvanced) {
+        SettingsSection("Advanced") {
+            Button {
+                withAnimation(.smooth(duration: 0.2)) { showAdvanced.toggle() }
+            } label: {
+                HStack {
+                    Text(showAdvanced ? "Hide" : "Show").font(.system(size: 12, weight: .medium))
+                    Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold))
+                        .rotationEffect(.degrees(showAdvanced ? 90 : 0))
+                }
+                .foregroundStyle(Crystal.ink2)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(showAdvanced ? "Hide advanced settings" : "Show advanced settings")
+        } content: {
+            if showAdvanced {
+                advancedRows
+            } else {
+                SettingsRow("Address, port, token and the Neural Engine", detail: "For a custom network set-up. Most servers never need these.")
+            }
+        }
+    }
+
+    @ViewBuilder private var advancedRows: some View {
+        SettingsRow("Listen on", detail: addressChoice.wrappedValue == .custom ? nil : draft.bindAddress) {
+            SelectMenu(addressTitle, label: "Listen on", minWidth: 220) {
                 Picker("Listen on", selection: addressChoice) {
                     Text("This device only (127.0.0.1)").tag(AddressChoice.loopback)
                     if let t = controller.addresses.tailscale { Text("Your Tailscale network (\(t.address))").tag(AddressChoice.tailscale) }
                     Text("Every network (0.0.0.0)").tag(AddressChoice.all)
                     Text("One address…").tag(AddressChoice.custom)
                 }
-                if addressChoice.wrappedValue == .custom {
-                    LabeledContent("Address") {
-                        TextField("Address", text: $draft.bindAddress, prompt: Text("192.168.1.20"))
-                            .labelsHidden().font(.fsData()).multilineTextAlignment(.trailing).frame(width: 200)
-                    }
-                }
-                LabeledContent("Port") {
-                    TextField("Port", value: $draft.port, format: .number.grouping(.never))
-                        .labelsHidden().font(.fsData()).multilineTextAlignment(.trailing).frame(width: 90)
-                }
-                LabeledContent("Token") {
-                    HStack {
-                        if showToken {
-                            TextField("Token", text: $draft.token, prompt: Text("none"))
-                                .labelsHidden().font(.fsData()).frame(minWidth: 280)
-                        } else {
-                            SecureField("Token", text: $draft.token, prompt: Text("none"))
-                                .labelsHidden().frame(minWidth: 280)
-                        }
-                        Button(showToken ? "Hide" : "Show") { showToken.toggle() }
-                        Button("New") { draft.token = HostConfiguration.generateToken(); showToken = true }
-                            .help("Make a new token. Every client then pairs again.")
-                        CopyButton(value: draft.token).disabled(draft.token.isEmpty)
-                    }
-                }
-                if draft.token.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Label("Without a token, anything that can reach the server can use it.", systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(Crystal.warn)
-                }
-                LabeledContent("Publish with Tailscale") {
-                    HStack {
-                        Text(tailscaleCommand).font(.fsData(.callout)).textSelection(.enabled)
-                        CopyButton(value: tailscaleCommand)
-                    }
-                }
-                .help("Keeps the server on 127.0.0.1 and gives it an HTTPS name on your Tailscale network.")
-                Toggle("Use the Neural Engine", isOn: $draft.useGpu)
-                if !draft.useGpu {
-                    Label("The CPU is several times slower. Only for testing.", systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(Crystal.warn)
-                }
-                LabeledContent("Configuration file") {
-                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([controller.configURL]) }
-                }
-                .help(controller.configURL.path)
-                .id("advanced-end")
+                .pickerStyle(.inline)
+            }
+        }
+        if addressChoice.wrappedValue == .custom {
+            SettingsRow("Address") {
+                SettingsTextField("Address", text: $draft.bindAddress, prompt: "192.168.1.20", mono: true).frame(width: 200)
+            }
+        }
+        SettingsRow("Port") {
+            TextField("Port", value: $draft.port, format: .number.grouping(.never))
+                .textFieldStyle(.plain).labelsHidden().font(.mono(12.5)).multilineTextAlignment(.trailing)
+                .padding(.horizontal, 9).frame(width: 90, height: 28)
+                .background(Crystal.well, in: .rect(cornerRadius: Radius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous).strokeBorder(Crystal.input))
+        }
+        SettingsRow("Token", detail: draft.token.trimmingCharacters(in: .whitespaces).isEmpty
+                    ? "Without a token, anything that can reach the server can use it." : "Clients send it with every request.") {
+            SettingsTextField("Token", text: $draft.token, prompt: "none", secure: !showToken, mono: showToken).frame(width: 240)
+            Button(showToken ? "Hide" : "Show") { showToken.toggle() }.buttonStyle(OutlineButtonStyle())
+            Button("New") { draft.token = HostConfiguration.generateToken(); showToken = true }
+                .buttonStyle(OutlineButtonStyle())
+                .help("Make a new token. Every client then pairs again.")
+            CopyButton(value: draft.token).disabled(draft.token.isEmpty)
+        }
+        SettingsRow("Publish with Tailscale", detail: tailscaleCommand, mono: true) {
+            CopyButton(value: tailscaleCommand)
+        }
+        .help("Keeps the server on 127.0.0.1 and gives it an HTTPS name on your Tailscale network.")
+        SettingsRow("Use the Neural Engine", detail: draft.useGpu ? "Transcription runs on the Neural Engine." : "The CPU is several times slower. Only for testing.") {
+            Toggle("Use the Neural Engine", isOn: $draft.useGpu).toggleStyle(.settingsSwitch).labelsHidden()
+        }
+        SettingsRow("Configuration file", detail: controller.configURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"), mono: true) {
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([controller.configURL]) }
+                .buttonStyle(OutlineButtonStyle())
+        }
+        .id("advanced-end")
+    }
+
+    private var addressTitle: String {
+        switch addressChoice.wrappedValue {
+        case .loopback: "This device only"
+        case .tailscale: "Your Tailscale network"
+        case .all: "Every network"
+        case .custom: "One address"
         }
     }
 
@@ -274,6 +294,52 @@ struct ConfigurationView: View {
             case .failed(let m): message = (m, true)
             }
             draft = controller.configuration
+        }
+    }
+}
+
+/// Updates in the settings idiom: the state with its action, the version, the channel and when
+/// it last checked.
+private struct ServerUpdateSection: View {
+    var updates: UpdateController
+
+    var body: some View {
+        let p = updates.presentation
+        SettingsSection("Updates", footer: "Checks every 6 hours and asks before installing. Only updates signed by Bark install.") {
+            HStack(spacing: 12) {
+                UpdateGlyph(presentation: p, style: .server, size: 28)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(p.title).font(.system(size: 14, weight: .medium)).foregroundStyle(Crystal.ink)
+                    Text(p.detail).font(.system(size: 12)).foregroundStyle(Crystal.ink2).lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(p.accessibilityLabel)
+                switch updates.state {
+                case .available(let version):
+                    Button("Install \(version)") { updates.installUpdate() }.buttonStyle(PrimaryButtonStyle())
+                case .ready:
+                    Button("Restart to Update") { updates.relaunchToUpdate() }.buttonStyle(PrimaryButtonStyle())
+                default:
+                    EmptyView()
+                }
+                Button(updates.state == .checking ? "Checking…" : "Check Now") { updates.checkForUpdates() }
+                    .buttonStyle(OutlineButtonStyle())
+                    .disabled(updates.state == .checking || updates.state.primaryAction == .none)
+            }
+            .padding(.horizontal, SettingsMetrics.rowH)
+            .padding(.vertical, SettingsMetrics.rowV)
+            SettingsRow("Current version") {
+                Text("\(updates.currentVersion) (\(updates.build))").font(.mono(12)).foregroundStyle(Crystal.ink2).textSelection(.enabled)
+            }
+            SettingsRow("Channel", detail: updates.channel.explanation + (updates.showsMoveToStableNote ? " You'll move to Stable with the next stable release." : "")) {
+                SegmentedChoice("Update channel", selection: Binding(get: { updates.channel }, set: { updates.setChannel($0) }),
+                                options: UpdateChannel.allCases.map { .init($0, $0.title) })
+            }
+            SettingsRow("Last checked") {
+                Text(updates.lastChecked.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "Never")
+                    .font(.system(size: 13)).foregroundStyle(Crystal.ink2)
+            }
         }
     }
 }
