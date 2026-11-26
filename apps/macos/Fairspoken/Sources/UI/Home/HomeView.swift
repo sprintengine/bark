@@ -1,253 +1,524 @@
-import Charts
-import FairspokenUI
 import FairspokenCore
+import FairspokenUI
 import SwiftUI
 
-/// Home: the dog banner with the greeting, the date, how to dictate and the
-/// status; a dictation card with the big microphone beside the time saved; four stat tiles; the
-/// recent dictations beside the speech engine and the speed test. Before the first dictation it
-/// leads with one thing to do instead: finish setting up, or try the shortcut.
+/// Home: the new-dictation screen. How to dictate, a composer to try it in (type, or dictate into
+/// it, and save it as a note), the keyboard hints, the week in four numbers and the model. Before
+/// setup is finished, what's missing takes the numbers' place; a dictation that hasn't been
+/// transcribed yet comes first.
 struct HomeView: View {
     @Environment(AppModel.self) private var model
-    /// Wide enough for the side column beside the main one.
-    @State private var wide = true
 
     var body: some View {
-        if model.homeShowsAllDictations {
-            AllDictationsView()
-        } else {
-            overview
-        }
-    }
-
-    private var overview: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HomeBanner()
-                // First: a dictation that hasn't been transcribed is the one thing that can be lost.
-                if !model.pending.items.isEmpty { PendingDictationsCard() }
-                if model.history.items.isEmpty {
-                    firstUse
-                } else {
-                    pair { DictationCard() } side: { TimeSavedCard() }
-                    StatsRow(wide: wide)
-                    pair {
-                        RecentDictationsCard()
-                    } side: {
-                        VStack(spacing: 18) {
-                            EngineCard()
-                            SpeedTestCard()
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 0) {
+                if !model.pending.items.isEmpty {
+                    PendingDictationsCard().padding(.bottom, 28)
                 }
+                HomeHeading()
+                HomeComposer().padding(.top, 22)
+                KeyHints().padding(.top, 14).padding(.horizontal, 4)
+                if !SetupGuide.isReady(model.setupChecklist()) {
+                    SetupCard().padding(.top, 32)
+                } else if model.history.usage.totalDictations > 0 {
+                    WeekStats().padding(.top, 32)
+                }
+                ModelSection().padding(.top, 28)
             }
-            .frame(maxWidth: Layout.readable, alignment: .leading)
-            .onGeometryChange(for: Bool.self) { $0.size.width >= 780 } action: { wide = $0 }
-            .padding(.horizontal, Layout.pageH)
-            .padding(.top, 8)
-            .padding(.bottom, Layout.pageH)
+            .frame(maxWidth: 688, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.top, 56)
+            .padding(.bottom, 40)
             .frame(maxWidth: .infinity)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
     }
-
-    /// Before any dictation: finish setup if something required is missing; otherwise the
-    /// dictation card, with the speed test beside it.
-    @ViewBuilder private var firstUse: some View {
-        if SetupGuide.isReady(model.setupChecklist()) {
-            pair { DictationCard() } side: { SpeedTestCard() }
-        } else {
-            SetupCard()
-        }
-        EmptyRecent()
-    }
-
-    /// A main card and a 300 pt side column, or one above the other in a narrow window.
-    @ViewBuilder private func pair<Main: View, Side: View>(@ViewBuilder _ main: () -> Main,
-                                                           @ViewBuilder side: () -> Side) -> some View {
-        if wide {
-            HStack(alignment: .top, spacing: 18) {
-                main().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                side().frame(width: 300)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-        } else {
-            main()
-            side()
-        }
-    }
 }
 
-// MARK: - Banner
+// MARK: - Heading
 
-/// The first thing on Home: the dog on black, with the greeting, the date, how to dictate and
-/// whether dictation is ready. Black in both themes, as the app icon is.
-private struct HomeBanner: View {
+private struct HomeHeading: View {
     @Environment(AppModel.self) private var model
-    @State private var width: CGFloat = 900
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Plain.radius, style: .continuous)
-        ZStack(alignment: .leading) {
-            Color.black
-            GeometryReader { geo in
-                // The photo's face on the right, its black fur fading into the banner's.
-                let side = geo.size.height * 1.32
-                Image("HomeBanner")
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: side, height: side)
-                    .offset(x: geo.size.width - side * 0.9, y: -side * 0.12)
-                    .mask {
-                        LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.32)],
-                                       startPoint: .leading, endPoint: .trailing)
-                            .frame(width: side, height: side)
-                            .offset(x: geo.size.width - side * 0.9, y: -side * 0.12)
-                    }
-                    .opacity(geo.size.width > 560 ? 1 : 0)
-            }
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(Self.greeting())
-                    .font(.barkWordmark(36))
-                    .tracking(-0.7)
-                    .foregroundStyle(.white)
-                    .accessibilityAddTraits(.isHeader)
-                Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.68))
-                    .padding(.top, 2)
-                howTo.padding(.top, 16)
-                HStack(spacing: 8) {
-                    BannerStatus()
-                    MicDeviceChip()
-                }
-                .padding(.top, 16)
-            }
-            // The words stop short of the dog's face.
-            .frame(maxWidth: max(320, width - 250), alignment: .leading)
-            .padding(.horizontal, 30)
-            .padding(.vertical, 26)
-        }
-        .frame(minHeight: 210)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-        .clipShape(shape)
-        .overlay(shape.strokeBorder(.white.opacity(0.08)))
-        .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
-        // Keycaps, chips and menus drawn for a dark surface in both themes.
-        .environment(\.colorScheme, .dark)
-    }
-
-    private var howTo: some View {
-        let push = model.settings.settings.recordingShortcutMode == .pushToTalk
-        return HStack(spacing: 6) {
-            Text(push ? "Hold" : "Press")
-            ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
-            Text(push ? "in any app and talk. Let go, and \(AppInfo.displayName) types it where your cursor is."
-                      : "in any app and talk. Press it again, and \(AppInfo.displayName) types it where your cursor is.")
+        let s = model.settings.settings
+        let push = s.recordingShortcutMode == .pushToTalk
+        let key = s.fnPushToTalk ? "fn" : HotkeyController.currentShortcutSymbols
+        VStack(alignment: .leading, spacing: 6) {
+            Text(s.fnPushToTalk || push ? "Hold \(key) and speak." : "Press \(key) and speak.")
+                .font(TypeScale.title)
+                .tracking(-0.33)
+                .foregroundStyle(Crystal.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text(s.fnPushToTalk || push
+                 ? "Let go and \(AppInfo.displayName) types it wherever your cursor is. If nothing can take it, it goes on the clipboard."
+                 : "Press it again and \(AppInfo.displayName) types it wherever your cursor is. If nothing can take it, it goes on the clipboard.")
+                .font(.system(size: 14))
+                .foregroundStyle(Crystal.ink2)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.system(size: 14))
-        .foregroundStyle(.white.opacity(0.78))
-    }
-
-    static func greeting(at date: Date = .now) -> String {
-        let hour = Calendar.current.component(.hour, from: date)
-        return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
     }
 }
 
-/// "Ready", or what dictation is waiting for, as a pill on the banner.
-private struct BannerStatus: View {
-    @Environment(AppModel.self) private var model
+// MARK: - Composer
 
-    var body: some View {
-        let remote = model.settings.settings.transcriptionLocation == .remoteHost
-        let state = model.models.engineState
-        let host = model.hostStatus
-        let (text, color, busy): (String, Color, Bool) = {
-            if case .listening = model.dictation.phase { return ("Listening", Crystal.live, true) }
-            if remote { return ("Network device · \(host.stateLabel.lowercased())", host.tint, host.state == .checking) }
-            if state.isReady { return ("\(model.models.activeModel.shortName) is ready", Crystal.ok, false) }
-            return ("\(model.models.activeModel.shortName) · \(state.label.lowercased())", state.tint, state.isBusy)
-        }()
-        HStack(spacing: 7) {
-            StatusDot(color: color, pulsing: busy)
-            Text(text).lineLimit(1)
-        }
-        .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(.white.opacity(0.9))
-        .padding(.horizontal, 11)
-        .frame(height: 26)
-        .background(.white.opacity(0.10), in: .capsule)
-        .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Status: \(text)")
+/// "Try it here": type, or dictate into it (the words land here because Bark's own window is in
+/// front), then save it as a note in history.
+private struct HomeComposer: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var savedID: String?
+    @FocusState private var focused: Bool
+
+    /// What's typed, kept on the app model so it survives moving to another screen.
+    private var draft: String {
+        get { model.homeDraft }
+        nonmutating set { model.homeDraft = newValue }
     }
-}
-
-// MARK: - Microphone
-
-/// The microphone dictation listens on, as a pill that switches it (on the banner).
-struct MicDeviceChip: View {
-    @Environment(AppModel.self) private var model
-    @State private var names: [String] = []
 
     var body: some View {
-        let current = model.settings.settings.audioDevice
-        Menu {
-            Picker("Microphone", selection: Binding(get: { current }, set: { v in model.settings.update { $0.audioDevice = v } })) {
-                Text("System default\(Microphones.defaultName().map { " (\($0))" } ?? "")").tag("")
-                ForEach(names, id: \.self) { Text($0).tag($0) }
+        @Bindable var app = model
+        let dictation = model.dictation
+        let listening = dictation.phase.isListening
+        let hasDraft = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                if !hasDraft && !listening && !focused { placeholder.allowsHitTesting(false) }
+                TextEditor(text: $app.homeDraft)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Crystal.ink)
+                    .scrollContentBackground(.hidden)
+                    .scrollIndicators(.never)
+                    .focused($focused)
+                    .frame(minHeight: 48, maxHeight: 220)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .onKeyPress(.return, phases: .down) { press in
+                        guard press.modifiers.contains(.command) else { return .ignored }
+                        save()
+                        return .handled
+                    }
+                    .accessibilityLabel("Try it here")
+                    .accessibilityHint("Type or dictate, then press Command Return to save it as a note")
+                    .opacity(listening ? 0 : 1)
+                if listening { liveWords(dictation) }
             }
-            .pickerStyle(.inline)
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 2)
+            .contentShape(.rect)
+            .onTapGesture { focused = true }
+
+            HStack(spacing: 4) {
+                if listening {
+                    ListeningStatus(dictation: dictation)
+                } else if case .transcribing = dictation.phase {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(dictation.transcribingNote.map { "\($0)…" } ?? "Cleaning up…")
+                    }
+                    .font(.system(size: 13)).foregroundStyle(Crystal.ink2).padding(.leading, 8)
+                } else if let savedID {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold))
+                        Text("Saved to history")
+                        Button("Open") { model.open(dictation: savedID) }.buttonStyle(.plain).foregroundStyle(Crystal.info)
+                    }
+                    .font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink2).padding(.leading, 8)
+                } else {
+                    HStack(spacing: 6) {
+                        TypeGlyph(size: 13, color: Crystal.ink2)
+                        Text("Note")
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Crystal.ink)
+                    .padding(.horizontal, 8)
+                    .frame(height: 28)
+                    .help("What you type or dictate here is kept in history as a note")
+                }
+                Spacer(minLength: 8)
+                EngineChip()
+                if hasDraft && !listening {
+                    IconButton(symbol: "mic", label: "Dictate into the note") { focused = false; dictation.toggleFromUI() }
+                    Button(action: save) {
+                        Image(systemName: "arrow.up").font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Crystal.onAccent)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(Crystal.primary))
+                            .contentShape(.circle)
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .help("Save as a note (⌘⏎)")
+                    .accessibilityLabel("Save as a note")
+                } else {
+                    DictateButton(dictation: dictation, size: 32) { focused = false; dictation.toggleFromUI() }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+        }
+        .background(Crystal.card, in: .rect(cornerRadius: Radius.composer, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.composer, style: .continuous)
+            .strokeBorder(focused ? Crystal.input : Crystal.hairline))
+        .composerShadow()
+        .onChange(of: dictation.lastInAppHistoryID) { _, id in
+            guard let id, let item = model.history.item(id) else { return }
+            draft = draft.isEmpty ? item.text : draft.trimmingCharacters(in: .whitespacesAndNewlines) + " " + item.text
+            model.homeDraftSources.append(id)
+            savedID = nil
+        }
+        .onChange(of: model.homeDraft) {
+            if model.homeDraft.isEmpty { model.homeDraftSources = [] } else { savedID = nil }
+        }
+        .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hasDraft)
+    }
+
+    private var placeholder: some View {
+        let s = model.settings.settings
+        return FlowLayout(spacing: 4, lineSpacing: 2) {
+            Text("Try it here.")
+            if s.fnPushToTalk {
+                Text("Hold")
+                Keycap(label: "fn", outline: true)
+                Text("or press")
+            } else {
+                Text(s.recordingShortcutMode == .pushToTalk ? "Hold" : "Press")
+            }
+            Keycap(label: HotkeyController.currentShortcutSymbols, outline: true)
+            Text("and say:")
+            ForEach(Array("“Can you send the revised quote to Aoife by Thursday?”".split(separator: " ").enumerated()), id: \.offset) { _, word in
+                Text(word).foregroundStyle(Crystal.ink).fontWeight(.medium)
+            }
+            Text("Or type a note.")
+        }
+        .font(.system(size: 15))
+        .foregroundStyle(Crystal.ink2)
+        .frame(minHeight: 24)
+        .padding(.leading, 5)
+        .padding(.top, 0)
+        .accessibilityHidden(true)
+    }
+
+    private func liveWords(_ dictation: DictationController) -> some View {
+        Text(dictation.liveText.isEmpty ? "Listening…" : LiveTranscript.displayTail(dictation.liveText, maxCharacters: 220))
+            .font(.system(size: 15))
+            .foregroundStyle(dictation.liveText.isEmpty ? Crystal.ink2 : Crystal.ink)
+            .lineSpacing(4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 5)
+            .accessibilityLabel("Heard so far: \(dictation.liveText)")
+    }
+
+    private func save() {
+        guard let id = model.saveNote(draft, replacing: model.homeDraftSources) else { return }
+        draft = ""
+        model.homeDraftSources = []
+        savedID = id
+    }
+}
+
+/// While listening: the red dot, the time and the level.
+private struct ListeningStatus: View {
+    var dictation: DictationController
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(Crystal.recording).frame(width: 8, height: 8)
+            if case .listening(let since) = dictation.phase {
+                TimelineView(.periodic(from: since, by: 1)) { ctx in
+                    Text(PillView.clock(ctx.date.timeIntervalSince(since))).monospacedDigit()
+                }
+                .font(.system(size: 12)).foregroundStyle(Crystal.ink2)
+            }
+            LevelBars(meter: dictation.meter, active: true, bars: 24, color: Crystal.ink)
+                .frame(width: 96, height: 16)
+        }
+        .padding(.leading, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Listening")
+    }
+}
+
+/// Where dictation runs: this Mac's model or Bark Server, as a menu to switch.
+private struct EngineChip: View {
+    @Environment(AppModel.self) private var model
+    @State private var hovered = false
+
+    var body: some View {
+        let s = model.settings.settings
+        let remote = s.transcriptionLocation == .remoteHost
+        Menu {
+            Button {
+                model.settings.update { $0.transcriptionLocation = .local }
+            } label: {
+                Label("\(model.models.activeModel.shortName) on this Mac", systemImage: remote ? "" : "checkmark")
+            }
+            if !s.remoteUrl.isEmpty {
+                Button {
+                    model.settings.update { $0.transcriptionLocation = .remoteHost }
+                    model.hostStatus.refresh()
+                } label: {
+                    Label("Bark Server", systemImage: remote ? "checkmark" : "")
+                }
+            }
             Divider()
-            Button("Audio Settings…") { model.settingsTab = .audio; model.section = .settings }
+            Button("Manage Models…") { model.section = .models }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: "mic.fill").foregroundStyle(.white.opacity(0.7))
-                Text(Microphones.displayName(for: current)).lineLimit(1)
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.6))
+                Image(systemName: remote ? "server.rack" : "laptopcomputer").font(.system(size: 12)).foregroundStyle(Crystal.ink2)
+                Text(remote ? "Bark Server" : model.models.activeModel.shortName).foregroundStyle(Crystal.ink)
+                if !remote { Text("This Mac").foregroundStyle(Crystal.ink2).fontWeight(.regular) }
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(Crystal.ink2)
             }
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.white.opacity(0.9))
-            .padding(.horizontal, 11)
-            .frame(height: 26)
-            .background(.white.opacity(0.10), in: .capsule)
-            .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
-            .contentShape(.capsule)
+            .font(.system(size: 13, weight: .medium))
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .background(hovered ? Crystal.rowHover : .clear, in: .rect(cornerRadius: Radius.control, style: .continuous))
+            .contentShape(.rect)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Microphone")
-        .accessibilityLabel("Microphone, \(Microphones.displayName(for: current))")
-        .onAppear { names = Microphones.names() }
+        .onHover { hovered = $0 }
+        .help("Where dictation runs")
+        .accessibilityLabel(remote ? "Transcribing on Bark Server" : "Transcribing with \(model.models.activeModel.shortName) on this Mac")
+    }
+}
+
+/// Keyboard hints under the composer: only shortcuts that exist.
+private struct KeyHints: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let s = model.settings.settings
+        let shortcut = HotkeyController.currentShortcutSymbols
+        let push = s.recordingShortcutMode == .pushToTalk
+        FlowLayout(spacing: 18, lineSpacing: 6) {
+            if s.fnPushToTalk && push {
+                hint(["fn", shortcut], "hold to dictate")
+            } else {
+                if s.fnPushToTalk { hint(["fn"], "hold to dictate") }
+                hint([shortcut], push ? "hold to dictate" : "start or stop")
+            }
+            if let cancel = HotkeyController.cancelShortcutSymbols { hint([cancel == "⎋" ? "esc" : cancel], "cancel") }
+            hint(["⌘⏎"], "save a note")
+            hint(["⌘K"], "search")
+        }
+    }
+
+    private func hint(_ keys: [String], _ text: String) -> some View {
+        HStack(spacing: 6) {
+            HStack(spacing: 3) { ForEach(keys, id: \.self) { Keycap(label: $0) } }
+            Text(text).font(.system(size: 12)).foregroundStyle(Crystal.ink3)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(keys.joined(separator: " or ")): \(text)")
+    }
+}
+
+// MARK: - The week
+
+/// Words this week, time saved, average pace and how much cleanup took out.
+private struct WeekStats: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let usage = model.history.usage
+        let week = (0..<7).map { usage.bucket(daysAgo: $0) }
+        let lastWeek = (7..<14).map { usage.bucket(daysAgo: $0) }
+        let words = week.reduce(0) { $0 + $1.words }
+        let dictations = week.reduce(0) { $0 + $1.dictations }
+        let seconds = week.reduce(0) { $0 + $1.recordingSeconds }
+        let typing = Double(words) / usage.typingWPMInUse * 60
+        let saved = max(0, typing - seconds)
+        let pace = seconds > 30 ? Double(words) / (seconds / 60) : nil
+        let lastSeconds = lastWeek.reduce(0) { $0 + $1.recordingSeconds }
+        let lastPace = lastSeconds > 30 ? Double(lastWeek.reduce(0) { $0 + $1.words }) / (lastSeconds / 60) : nil
+        let cleaned = Self.cleanedShare(model.history.items)
+        HStack(spacing: 0) {
+            tile("Words this week", Format.number(words), unit: nil, note: Text("\(dictations) dictation\(dictations == 1 ? "" : "s")"))
+            SoftDivider(vertical: true)
+            Button { model.speedTest.isPresented = true } label: {
+                tile("Time saved", Self.hoursMinutes(saved), unit: nil,
+                     note: Text("vs typing at \(Int(usage.typingWPMInUse.rounded())) wpm \(Image(systemName: "chevron.right"))"))
+            }
+            .buttonStyle(.plain)
+            .help(usage.measuredTypingWpm == nil ? "A typical typing pace. Take the speed test to use your own."
+                                                 : "Your typing speed from the speed test. Take it again.")
+            .accessibilityHint("Opens the speed test")
+            SoftDivider(vertical: true)
+            tile("Average pace", pace.map { "\(Int($0.rounded()))" } ?? "–", unit: pace == nil ? nil : "wpm",
+                 note: Text(Self.paceNote(pace, lastPace)))
+            SoftDivider(vertical: true)
+            tile("Cleaned up", cleaned.map { "\(Int(($0 * 100).rounded()))%" } ?? "–", unit: nil,
+                 note: Text(cleaned == nil ? "once cleanup has run" : "of words were filler"))
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .background(Crystal.card.opacity(0.4), in: .rect(cornerRadius: Radius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card, style: .continuous).strokeBorder(Crystal.hairlineSoft))
+    }
+
+    private func tile(_ label: String, _ value: String, unit: String?, note: Text) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(label).font(.system(size: 12)).foregroundStyle(Crystal.ink3)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value).font(.mvNumber(20, weight: .semibold)).tracking(-0.2).foregroundStyle(Crystal.ink)
+                if let unit { Text(unit).font(.system(size: 13)).foregroundStyle(Crystal.ink2) }
+            }
+            .padding(.top, 6)
+            note.font(.system(size: 12)).foregroundStyle(Crystal.ink3).lineLimit(1).padding(.top, 3)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+    }
+
+    static func hoursMinutes(_ seconds: Double) -> String {
+        let minutes = Int(seconds / 60)
+        return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
+    }
+
+    static func paceNote(_ pace: Double?, _ last: Double?) -> String {
+        guard let pace else { return "speak a little more" }
+        guard let last else { return "this week" }
+        let change = Int((pace - last).rounded())
+        if abs(change) < 3 { return "steady on last week" }
+        return change > 0 ? "up \(change) on last week" : "down \(-change) on last week"
+    }
+
+    /// The share of words heard in the last 7 days that cleanup took out (fillers, repeats,
+    /// restarts, corrections), from dictations that recorded their edits.
+    static func cleanedShare(_ items: [TranscriptHistoryItem], now: Date = .now) -> Double? {
+        let since = now.addingTimeInterval(-7 * 86_400)
+        var heard = 0, removed = 0
+        for item in items where item.date >= since {
+            guard let edits = item.cleanupEdits, let raw = item.rawText else { continue }
+            heard += WordCounter.count(raw)
+            for edit in edits where [.filler, .repetition, .restart, .selfCorrection].contains(edit.kind) {
+                removed += max(0, WordCounter.count(edit.removed) - WordCounter.count(edit.inserted))
+            }
+        }
+        return heard > 0 ? Double(removed) / Double(heard) : nil
+    }
+}
+
+// MARK: - Model
+
+/// The model in use, and Bark Server when one is set up.
+private struct ModelSection: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let s = model.settings.settings
+        let remote = s.transcriptionLocation == .remoteHost
+        let info = model.models.activeModel
+        let state = model.models.engineState
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Model").font(.system(size: 16, weight: .semibold)).foregroundStyle(Crystal.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button { model.section = .models } label: {
+                    HStack(spacing: 4) {
+                        Text("Manage models")
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                    }
+                }
+                .buttonStyle(GhostButtonStyle())
+            }
+            .padding(.horizontal, 16)
+            GroupCard {
+                row(title: info.name,
+                    badge: Badge(state.isReady ? "Ready" : state.label,
+                                 style: state.isReady ? .neutral : { if case .failed = state { return .error } else { return .neutral } }()),
+                    detail: "Runs on this Mac. \(info.summary)") {
+                    Text(Format.bytes(info.approxBytes)).font(.mono(12)).foregroundStyle(Crystal.ink3)
+                }
+                if case .downloading(let f) = state {
+                    ProgressView(value: f).tint(Crystal.primary).padding(.horizontal, 16).padding(.bottom, 12)
+                }
+                if !s.remoteUrl.isEmpty {
+                    SoftDivider()
+                    row(title: "Bark Server", badge: Badge(serverBadge, style: serverStyle),
+                        detail: "\(model.hostStatus.hostName). \(remote ? "Dictation runs there now." : "Used when you choose it.")") {
+                        Button(remote ? "Use This Mac" : "Use Bark Server") {
+                            model.settings.update { $0.transcriptionLocation = remote ? .local : .remoteHost }
+                            if !remote { model.hostStatus.refresh() }
+                        }
+                        .buttonStyle(OutlineButtonStyle())
+                    }
+                }
+            }
+        }
+    }
+
+    private var serverBadge: String {
+        switch model.hostStatus.state {
+        case .connected: "Reachable"
+        case .checking: "Checking"
+        case .failed: "Not reachable"
+        case .notConfigured: "Not set"
+        }
+    }
+
+    private var serverStyle: Badge.Style {
+        switch model.hostStatus.state {
+        case .connected: .info
+        case .failed: .error
+        default: .neutral
+        }
+    }
+
+    private func row<Control: View>(title: String, badge: Badge, detail: String, @ViewBuilder control: () -> Control) -> some View {
+        HStack(alignment: .center, spacing: 32) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(title).font(.system(size: 14, weight: .medium)).foregroundStyle(Crystal.ink)
+                    badge
+                }
+                Text(detail).font(.system(size: 12)).foregroundStyle(Crystal.ink2).lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 520, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            control()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .contain)
     }
 }
 
 // MARK: - First use
 
-/// Before any dictation, when something required is missing: what, and the way to finish.
+/// Before setup is finished: what's missing, and the way to finish.
 private struct SetupCard: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         let checklist = model.setupChecklist()
-        Card(cornerRadius: 28, padding: 26) {
-            HStack(alignment: .center, spacing: 16) {
-                IconTile("checklist", color: Crystal.clientAccent, size: 44)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Finish setting up").font(.system(size: 20, weight: .semibold)).foregroundStyle(Crystal.ink)
-                    Text(missing(checklist)).font(.system(size: 14)).foregroundStyle(Crystal.ink2)
+        GroupCard {
+            HStack(alignment: .center, spacing: 32) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text("Finish setting up").font(.system(size: 14, weight: .medium)).foregroundStyle(Crystal.ink)
+                        Badge("\(checklist.filter { $0.required && !$0.isDone }.count) left", style: .warn)
+                    }
+                    Text(missing(checklist)).font(.system(size: 12)).foregroundStyle(Crystal.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // No Return shortcut: the composer above takes Return for new lines.
                 Button("Continue Setup") { model.openOnboarding?() }
-                    .buttonStyle(PrimaryButtonStyle(large: true))
-                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(PrimaryButtonStyle())
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
     }
 
@@ -264,591 +535,50 @@ private struct SetupCard: View {
     }
 }
 
-/// Where dictations will appear, before there are any.
-private struct EmptyRecent: View {
-    var body: some View {
-        Card(cornerRadius: 26, padding: 20) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Recent dictations").font(.system(size: 15, weight: .semibold)).foregroundStyle(Crystal.ink)
-                    .accessibilityAddTraits(.isHeader)
-                VStack(spacing: 6) {
-                    Image(systemName: "text.bubble").font(.system(size: 22)).foregroundStyle(Crystal.ink3)
-                    Text("Your dictations appear here, with the app each one went to.")
-                        .font(TypeScale.body).foregroundStyle(Crystal.ink2)
-                    Text("Usage stats start after your first dictation.")
-                        .font(TypeScale.meta).foregroundStyle(Crystal.ink3)
-                }
-                .frame(maxWidth: .infinity, minHeight: 130)
-            }
-        }
+// MARK: - Flow layout
+
+/// Lays its children out in lines, wrapping like words in a sentence.
+struct FlowLayout: SwiftUI.Layout {
+    var spacing: CGFloat = 6
+    var lineSpacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map { $0.width }.max() ?? 0
+        let height = rows.reduce(0) { $0 + $1.height } + lineSpacing * CGFloat(max(0, rows.count - 1))
+        return CGSize(width: min(width, proposal.width ?? width), height: height)
     }
-}
 
-// MARK: - Dictation
-
-/// "Here's what you said": the shortcut, the last dictation made in this window with its
-/// words, time to text and Copy, and the big microphone to try it here.
-private struct DictationCard: View {
-    @Environment(AppModel.self) private var model
-    @State private var copied = false
-
-    var body: some View {
-        let dictation = model.dictation
-        Card(cornerRadius: 28, padding: 26, fillHeight: true) {
-            HStack(alignment: .center, spacing: 20) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Eyebrow(text: "Dictation", symbol: "mic")
-                    Text(title).font(.system(size: 26, weight: .semibold)).tracking(-0.3)
-                        .foregroundStyle(Crystal.ink)
-                        .contentTransition(.opacity)
-                    instructions
-                    resultArea
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                MicButton(dictation: dictation) { dictation.toggleFromUI() }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: .unspecified)
+                x += size.width + spacing
             }
-            .frame(maxHeight: .infinity)
+            y += row.height + lineSpacing
         }
     }
 
-    private var title: String {
-        switch model.dictation.phase {
-        case .listening: "Listening…"
-        case .transcribing: "Transcribing…"
-        case .failed: "Let's try that again"
-        default: model.dictation.lastInAppResult == nil ? "Ready when you are" : "Here's what you said"
-        }
-    }
+    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
 
-    private var instructions: some View {
-        let s = model.settings.settings
-        return HStack(spacing: 6) {
-            Text(s.recordingShortcutMode == .pushToTalk ? "Hold" : "Press")
-            ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
-            if s.fnPushToTalk {
-                Text("or hold")
-                Keycap(label: "fn")
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = [Row()]
+        for (i, view) in subviews.enumerated() {
+            let size = view.sizeThatFits(.unspecified)
+            let needed = rows[rows.count - 1].indices.isEmpty ? size.width : rows[rows.count - 1].width + spacing + size.width
+            if needed > width, !rows[rows.count - 1].indices.isEmpty {
+                rows.append(Row())
             }
-            // Wraps beside the keys rather than truncating.
-            Text("in any app, or click the mic.")
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.leading, 2)
+            var row = rows[rows.count - 1]
+            row.width = row.indices.isEmpty ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+            row.indices.append(i)
+            rows[rows.count - 1] = row
         }
-        .font(.system(size: 14))
-        .foregroundStyle(Crystal.ink2)
-    }
-
-    @ViewBuilder private var resultArea: some View {
-        let dictation = model.dictation
-        switch dictation.phase {
-        case .listening:
-            VStack(alignment: .leading, spacing: 10) {
-                LevelBars(meter: dictation.meter, active: true, bars: 40, color: Crystal.live)
-                    .frame(height: 30)
-                    .frame(maxWidth: 420)
-                if !dictation.liveText.isEmpty {
-                    Text(LiveTranscript.displayTail(dictation.liveText, maxCharacters: 160))
-                        .font(.system(size: 16)).foregroundStyle(Crystal.ink)
-                        .lineLimit(2).truncationMode(.head)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.top, 2)
-        case .transcribing:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text(dictation.transcribingNote.map { "\($0)…" } ?? "Turning your words into text…")
-                    .font(.system(size: 14)).foregroundStyle(Crystal.ink2)
-            }
-        case .failed(let message):
-            Label(message, systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 14)).foregroundStyle(Crystal.warn)
-                .fixedSize(horizontal: false, vertical: true)
-        default:
-            if let result = dictation.lastInAppResult {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(result.text)
-                        .font(.system(size: 17))
-                        .foregroundStyle(Crystal.ink)
-                        .textSelection(.enabled)
-                        .lineLimit(4)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 8) {
-                        Tag(text: "\(result.words) words", symbol: "text.word.spacing", color: Crystal.ink2)
-                        Tag(text: "\(Format.ms(Double(result.latencyMs))) to text", symbol: "bolt.fill", color: Crystal.ink2)
-                        Button(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc") {
-                            TextInserter.copy(result.text)
-                            copied = true
-                            Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
-                        }
-                        .cardButton()
-                        .controlSize(.small)
-                    }
-                }
-            } else {
-                Text("Your words appear at the cursor. Try a sentence here first: the text shows up in this card.")
-                    .font(.system(size: 14)).foregroundStyle(Crystal.ink3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-/// The big microphone: a flat pink disc inside one quiet ring at rest; a stop glyph while
-/// listening, with rings that spread with the voice.
-private struct MicButton: View {
-    var dictation: DictationController
-    var size: CGFloat = 104
-    var action: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let listening = dictation.phase.isListening
-        let busy = dictation.phase == .transcribing
-        // The button's footprint includes its resting rings; the spreading rings while listening
-        // draw past it, behind the card's text.
-        let ring = size + 64
-        let canvas = size + 120
-        ZStack {
-            Button(action: action) {
-                ZStack {
-                    if busy {
-                        ProgressView().controlSize(.large).tint(Crystal.onAccent)
-                    } else {
-                        Image(systemName: listening ? "stop.fill" : "mic.fill")
-                            .font(.system(size: size * 0.3, weight: .semibold))
-                            .contentTransition(.symbolEffect(.replace))
-                    }
-                }
-                .foregroundStyle(Crystal.onAccent)
-                .frame(width: size, height: size)
-                .background {
-                    // A flat pink disc: no gradient, no glow.
-                    Circle().fill(Crystal.live)
-                }
-                .contentShape(.circle)
-            }
-            .buttonStyle(.plain)
-            .disabled(busy)
-            .keyboardShortcut(.space, modifiers: [])
-            .help(listening ? "Stop" : "Dictate here (Space)")
-            .accessibilityLabel(listening ? "Stop dictation" : "Start dictation")
-        }
-        .frame(width: ring, height: ring)
-        .background {
-            TimelineView(.animation(minimumInterval: 1 / 30, paused: !listening || reduceMotion)) { ctx in
-                let level = CGFloat(listening ? dictation.meter.snapshot().level : 0)
-                Canvas { gc, sz in
-                    _ = ctx.date
-                    let t = ctx.date.timeIntervalSinceReferenceDate
-                    let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
-                    func circle(_ r: CGFloat) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)) }
-                    if listening && !reduceMotion {
-                        for i in 0..<3 {
-                            let phase = (t * 0.6 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
-                            let r = size / 2 + CGFloat(phase) * (20 + level * 36)
-                            gc.stroke(circle(r), with: .color(Crystal.live.opacity((1 - phase) * (0.25 + Double(level) * 0.5))), lineWidth: 2)
-                        }
-                    } else {
-                        // One quiet ring at rest.
-                        gc.stroke(circle(size / 2 + 12), with: .color(Crystal.live.opacity(0.22)), lineWidth: 1)
-                    }
-                }
-            }
-            .frame(width: canvas, height: canvas)
-            .allowsHitTesting(false)
-        }
-        .animation(Motion.unlessReduced(Motion.deliberate, reduceMotion), value: listening)
-    }
-}
-
-// MARK: - Time saved
-
-/// The lifetime time saved against typing the same words, at the speed test's typing speed when
-/// there is one; the time spent speaking beside typing's; then the totals.
-private struct TimeSavedCard: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let usage = model.history.usage
-        let wpm = Int(usage.typingWPMInUse.rounded())
-        let saved = usage.timeSavedSeconds
-        let faster = usage.totalRecordingSeconds > 0 ? usage.typingSeconds / usage.totalRecordingSeconds : 0
-        Card(cornerRadius: 28, padding: 24, fillHeight: true) {
-            VStack(alignment: .leading, spacing: 10) {
-                Eyebrow(text: "Time saved", symbol: "hourglass")
-                HoursMinutes(seconds: saved)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Time saved, \(Format.duration(saved))")
-                Text(usage.measuredTypingWpm == nil ? "compared with typing at \(wpm) wpm"
-                                                    : "compared with your typing, \(wpm) wpm")
-                    .font(.system(size: 13)).foregroundStyle(Crystal.ink2)
-                    .help(usage.measuredTypingWpm == nil ? "A typical typing pace; take the speed test to use your own"
-                                                         : "Your typing speed from the speed test")
-                if faster >= 1.05 {
-                    Text("Speaking is \(SpeedTestFormat.multiplier(faster)) faster than typing")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.clientAccent)
-                }
-                if usage.typingSeconds > 0 {
-                    SpeakingVersusTyping(speaking: usage.totalRecordingSeconds, typing: usage.typingSeconds)
-                        .padding(.top, 2)
-                }
-                Divider().overlay(Crystal.hairline).padding(.vertical, 4)
-                row("Words dictated", Format.number(usage.totalWords))
-                row("Dictations", Format.number(usage.totalDictations))
-                row("Apps used", "\(model.history.items.appsUsed)")
-                    .help("Apps counted from recent dictations")
-                if let pace = usage.speakingWPM {
-                    row("Speaking pace", "\(Int(pace.rounded())) wpm")
-                }
-            }
-        }
-    }
-
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(Crystal.ink2)
-            Spacer(minLength: 8)
-            Text(value).foregroundStyle(Crystal.ink).monospacedDigit()
-        }
-        .font(.system(size: 13))
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// "132 h 12 m" in big rounded numerals (minutes alone under an hour).
-private struct HoursMinutes: View {
-    var seconds: Double
-
-    var body: some View {
-        let total = Int(seconds) / 60
-        let h = total / 60, m = total % 60
-        HStack(alignment: .firstTextBaseline, spacing: 2) {
-            if h > 0 {
-                Text("\(h)").font(.mvNumber(52, weight: .bold))
-                Text("h").font(.system(size: 20, weight: .semibold)).foregroundStyle(Crystal.ink2)
-                    .padding(.trailing, 8)
-            }
-            Text("\(m)").font(.mvNumber(52, weight: .bold))
-            Text("m").font(.system(size: 20, weight: .semibold)).foregroundStyle(Crystal.ink2)
-        }
-        .foregroundStyle(Crystal.ink)
-        .lineLimit(1)
-        .minimumScaleFactor(0.6)
-    }
-}
-
-/// The time spent speaking beside the time typing would have taken, on one scale.
-private struct SpeakingVersusTyping: View {
-    var speaking: Double
-    var typing: Double
-
-    var body: some View {
-        let longest = max(speaking, typing, 1)
-        VStack(spacing: 6) {
-            row("Speaking", speaking / longest, Crystal.clientAccent, speaking)
-            row("Typing", typing / longest, Crystal.ink3.opacity(0.7), typing)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Speaking took \(Format.duration(speaking)); typing would take \(Format.duration(typing))")
-    }
-
-    private func row(_ label: String, _ fraction: Double, _ color: Color, _ seconds: Double) -> some View {
-        HStack(spacing: 8) {
-            Text(label).font(.system(size: 11, weight: .medium)).foregroundStyle(Crystal.ink2).frame(width: 54, alignment: .leading)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Crystal.well)
-                    Capsule().fill(color).frame(width: max(4, geo.size.width * min(1, fraction)))
-                }
-            }
-            .frame(height: 6)
-            Text(Format.duration(seconds)).font(.system(size: 11).monospacedDigit()).foregroundStyle(Crystal.ink2)
-                .frame(width: 58, alignment: .trailing)
-        }
-    }
-}
-
-// MARK: - Stat tiles
-
-/// Today, this week (with the days as bars), release → text, and the streak.
-private struct StatsRow: View {
-    var wide: Bool
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let usage = model.history.usage
-        let today = usage.bucket(daysAgo: 0)
-        let week = usage.words(lastDays: 7)
-        let lastWeek = usage.words(lastDays: 14) - week
-        let streak = usage.streak()
-        let todayTile = StatTile(title: "Today", symbol: "sun.max", value: Format.number(today.words), unit: "words",
-                                 footnote: "\(today.dictations) dictation\(today.dictations == 1 ? "" : "s")")
-        let weekTile = WeekTile(usage: usage, words: week, previous: lastWeek)
-        let latencyTile = StatTile(title: "Release → text", symbol: "bolt", value: model.history.typicalLatencyMs.map { "\($0)" } ?? "–",
-                                   unit: "ms", footnote: "median of recent dictations")
-        let streakTile = StatTile(title: "Streak", symbol: "flame", value: "\(streak)", unit: streak == 1 ? "day" : "days",
-                                  footnote: "days in a row with a dictation")
-        if wide {
-            HStack(spacing: 18) { todayTile; weekTile; latencyTile; streakTile }
-                .fixedSize(horizontal: false, vertical: true)
-        } else {
-            Grid(horizontalSpacing: 18, verticalSpacing: 18) {
-                GridRow { todayTile; weekTile }
-                GridRow { latencyTile; streakTile }
-            }
-        }
-    }
-}
-
-private struct StatTile: View {
-    var title: String
-    var symbol: String
-    var value: String
-    var unit: String
-    var footnote: String
-
-    var body: some View {
-        Card(cornerRadius: Plain.radius, padding: 18, fillHeight: true) {
-            VStack(alignment: .leading, spacing: 6) {
-                Eyebrow(text: title, symbol: symbol)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(value).font(.mvNumber(32, weight: .bold)).foregroundStyle(Crystal.ink)
-                        .lineLimit(1).minimumScaleFactor(0.6)
-                    Text(unit).font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink2)
-                }
-                Text(footnote).font(.system(size: 11)).foregroundStyle(Crystal.ink2).lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct WeekTile: View {
-    var usage: UsageStats
-    var words: Int
-    var previous: Int
-
-    var body: some View {
-        let series = usage.series(days: 7)
-        Card(cornerRadius: Plain.radius, padding: 18, fillHeight: true) {
-            VStack(alignment: .leading, spacing: 6) {
-                Eyebrow(text: "This week", symbol: "calendar")
-                HStack(alignment: .bottom, spacing: 8) {
-                    Text(Format.number(words)).font(.mvNumber(32, weight: .bold)).foregroundStyle(Crystal.ink)
-                        .lineLimit(1).minimumScaleFactor(0.6)
-                        .layoutPriority(1)
-                    Spacer(minLength: 0)
-                    Chart(Array(series.enumerated()), id: \.offset) { i, day in
-                        BarMark(x: .value("Day", day.date, unit: .day), y: .value("Words", day.bucket.words), width: 5)
-                            .foregroundStyle(i == series.count - 1 ? Crystal.clientAccent : Crystal.ink3.opacity(0.4))
-                            .clipShape(Capsule())
-                    }
-                    .chartXAxis(.hidden)
-                    .chartYAxis(.hidden)
-                    .frame(width: 54, height: 36)
-                    .accessibilityLabel("Words per day this week")
-                }
-                if previous > 0 {
-                    let change = Double(words - previous) / Double(previous) * 100
-                    Label("\(Int(abs(change).rounded()))% vs last week", systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(change >= 0 ? Crystal.ok : Crystal.ink2)
-                        .lineLimit(1)
-                } else {
-                    Text("words in the last 7 days").font(.system(size: 11)).foregroundStyle(Crystal.ink2)
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - Recent
-
-/// The latest dictations as rows: the app, the words, how long they took to text, when; copy.
-private struct RecentDictationsCard: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        Card(cornerRadius: 26, padding: 20, fillHeight: true) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Recent dictations").font(.system(size: 15, weight: .semibold)).foregroundStyle(Crystal.ink)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer(minLength: 8)
-                    Text("\(model.history.items.count) kept on this Mac").font(.system(size: 11)).foregroundStyle(Crystal.ink3)
-                    Button("See all") { model.homeShowsAllDictations = true }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Crystal.clientAccent)
-                        .padding(.leading, 6)
-                        .accessibilityLabel("See all dictations")
-                }
-                VStack(spacing: 2) {
-                    ForEach(model.history.items.prefix(6)) { item in RecentRow(item: item) }
-                }
-            }
-        }
-    }
-}
-
-private struct RecentRow: View {
-    var item: TranscriptHistoryItem
-    @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var hovered = false
-    @State private var copied = false
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            AppIconView(bundleID: item.appBundleId, size: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.text).font(.system(size: 13)).foregroundStyle(Crystal.ink).lineLimit(1).truncationMode(.tail)
-                Text(meta).font(.system(size: 11)).foregroundStyle(Crystal.ink3).lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            Text(Format.relative(item.date)).font(.system(size: 11)).foregroundStyle(Crystal.ink3).monospacedDigit()
-            Button { copy() } label: {
-                Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(copied ? Crystal.ok : Crystal.ink2)
-                    .frame(width: 26, height: 24)
-                    .background(Crystal.well, in: .rect(cornerRadius: 7, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .opacity(hovered || copied ? 1 : 0.5)
-            .help("Copy")
-            .accessibilityLabel("Copy dictation")
-        }
-        .padding(.vertical, 7)
-        .padding(.horizontal, 8)
-        .background(hovered ? Crystal.rowHover : .clear, in: .rect(cornerRadius: 12, style: .continuous))
-        .onHover { hovered = $0 }
-        .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: hovered)
-        .help(item.text.count > 300 ? String(item.text.prefix(300)) + "…" : item.text)
-        .contextMenu {
-            Button("Copy") { copy() }
-            Button("Delete", role: .destructive) { model.history.delete(item.id) }
-        }
-    }
-
-    private var meta: String {
-        var parts = [item.appName ?? AppInfo.displayName, "\(item.wordCount) words"]
-        if let ms = item.timings?.totalMs, ms > 0 { parts.append("\(ms) ms") }
-        return parts.joined(separator: " · ")
-    }
-
-    private func copy() {
-        TextInserter.copy(item.text)
-        copied = true
-        Task { try? await Task.sleep(for: .seconds(1.4)); copied = false }
-    }
-}
-
-// MARK: - Speech engine
-
-/// The model in use, where it runs, whether it's ready, its memory and load time.
-private struct EngineCard: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let summary = model.engineSummary
-        let state = model.models.engineState
-        Card(cornerRadius: 26, padding: 20) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("Speech engine").font(.system(size: 15, weight: .semibold)).foregroundStyle(Crystal.ink)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Button("Models") { model.section = .models }
-                        .cardButton().controlSize(.small)
-                }
-                HStack(spacing: 12) {
-                    IconTile(summary.placement == .remoteHost ? "server.rack" : "brain", color: Crystal.ink2, size: 44)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(summary.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Crystal.ink).lineLimit(1)
-                        Text(summary.detail).font(.system(size: 11)).foregroundStyle(Crystal.ink2).lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                if summary.placement == .neuralEngine {
-                    HStack(spacing: 8) {
-                        StatusDot(color: state.tint, pulsing: state.isBusy)
-                        Text(state.label).font(.system(size: 13)).foregroundStyle(Crystal.ink)
-                    }
-                    if case .downloading(let f) = state { ProgressView(value: f).tint(Crystal.clientAccent) }
-                    VStack(alignment: .leading, spacing: 6) {
-                        detail("Memory while loaded", "≈ \(Format.bytes(model.models.activeModel.memoryBytes))")
-                        if let load = model.models.lastLoadSeconds {
-                            detail("Loaded in", String(format: "%.1f s", load))
-                        }
-                    }
-                } else {
-                    HStack(spacing: 8) {
-                        StatusDot(color: model.hostStatus.tint, pulsing: model.hostStatus.state == .checking)
-                        Text(model.hostStatus.summary).font(.system(size: 13)).foregroundStyle(Crystal.ink).lineLimit(1)
-                    }
-                    Button("Host Settings") {
-                        model.settingsTab = .transcription
-                        model.section = .settings
-                    }
-                    .cardButton().controlSize(.small)
-                }
-            }
-        }
-    }
-
-    private func detail(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(Crystal.ink2)
-            Spacer(minLength: 8)
-            Text(value).foregroundStyle(Crystal.ink).monospacedDigit()
-        }
-        .font(.system(size: 12))
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// The round dictate button: a flat pink disc, with a stop glyph and a ring that follows the
-/// voice while listening.
-struct DictateButton: View {
-    var dictation: DictationController
-    var size: CGFloat = 34
-    var action: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let listening = dictation.phase.isListening
-        let busy = dictation.phase == .transcribing
-        Button(action: action) {
-            ZStack {
-                if busy {
-                    ProgressView().controlSize(.small).tint(Crystal.onAccent)
-                } else {
-                    Image(systemName: listening ? "stop.fill" : "mic.fill")
-                        .font(.system(size: size * 0.4, weight: .semibold))
-                        .contentTransition(.symbolEffect(.replace))
-                }
-            }
-            .foregroundStyle(Crystal.onAccent)
-            .frame(width: size, height: size)
-            .background(Circle().fill(Crystal.live))
-            .background {
-                if listening && !reduceMotion {
-                    TimelineView(.animation(minimumInterval: 1 / 30)) { _ in
-                        let level = CGFloat(dictation.meter.snapshot().level)
-                        Circle().stroke(Crystal.live.opacity(0.35), lineWidth: 2)
-                            .frame(width: size + 4 + level * 8, height: size + 4 + level * 8)
-                    }
-                }
-            }
-            .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .disabled(busy)
-        .accessibilityLabel(listening ? "Stop dictation" : "Start dictation")
+        return rows
     }
 }
 
@@ -954,128 +684,3 @@ private struct PendingDictationRow: View {
     }
 }
 
-// MARK: - All dictations
-
-/// "See all": every kept dictation by day, searchable.
-private struct AllDictationsView: View {
-    @Environment(AppModel.self) private var model
-    @State private var query = ""
-
-    var body: some View {
-        let items = model.history.items.filter { query.isEmpty || $0.text.localizedCaseInsensitiveContains(query)
-            || ($0.appName ?? "").localizedCaseInsensitiveContains(query) }
-        let days = Dictionary(grouping: items) { Calendar.current.startOfDay(for: $0.date) }
-            .sorted { $0.key > $1.key }
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
-                    Button { model.homeShowsAllDictations = false } label: {
-                        Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
-                            .frame(width: 26, height: 26)
-                            .background(Crystal.card, in: .rect(cornerRadius: 7, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Crystal.hairline))
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(.cancelAction)
-                    .help("Back to Home")
-                    .accessibilityLabel("Back to Home")
-                    PageTitle("Dictations", subtitle: "\(model.history.items.count) kept on this Mac")
-                    ContentSearchField(text: $query, prompt: "Search dictations").frame(width: 220)
-                }
-                if days.isEmpty {
-                    ContentUnavailableView.search(text: query).frame(maxWidth: .infinity, minHeight: 200)
-                }
-                ForEach(days, id: \.key) { day, entries in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(Self.dayTitle(day)).font(.system(size: 12, weight: .semibold)).foregroundStyle(Crystal.ink2)
-                        Card(padding: 4) {
-                            VStack(spacing: 0) {
-                                ForEach(Array(entries.enumerated()), id: \.element.id) { index, item in
-                                    if index > 0 { Rectangle().fill(Crystal.hairline).frame(height: 1).padding(.leading, 44) }
-                                    DictationRow(item: item)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: Layout.readable, alignment: .leading)
-            .padding(.horizontal, Layout.pageH)
-            .padding(.vertical, Layout.pageTop)
-            .frame(maxWidth: .infinity)
-        }
-        .scrollEdgeEffectStyle(.soft, for: .top)
-    }
-
-    static func dayTitle(_ day: Date) -> String {
-        if Calendar.current.isDateInToday(day) { return "Today" }
-        if Calendar.current.isDateInYesterday(day) { return "Yesterday" }
-        return day.formatted(.dateTime.weekday(.wide).day().month(.wide))
-    }
-}
-
-private struct DictationRow: View {
-    var item: TranscriptHistoryItem
-    @Environment(AppModel.self) private var model
-    @State private var hovered = false
-    @State private var copied = false
-    /// Clicking a row shows the whole dictation.
-    @State private var expanded = false
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            AppIconView(bundleID: item.appBundleId, size: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.text).font(TypeScale.body).foregroundStyle(Crystal.ink).lineLimit(expanded ? nil : 2)
-                Text("\(item.appName ?? AppInfo.displayName) · \(item.wordCount) words")
-                    .font(.system(size: 11)).foregroundStyle(Crystal.ink3).lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            Text(item.date.formatted(date: .omitted, time: .shortened))
-                .font(TypeScale.meta).foregroundStyle(Crystal.ink3).monospacedDigit()
-            Button {
-                TextInserter.copy(item.text)
-                copied = true
-                Task { try? await Task.sleep(for: .seconds(1.4)); copied = false }
-            } label: {
-                Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                    .foregroundStyle(copied ? Crystal.ok : Crystal.ink2)
-                    .frame(width: 20, height: 20)
-            }
-            .buttonStyle(.borderless)
-            .opacity(hovered || copied ? 1 : 0)
-            .allowsHitTesting(hovered || copied)
-            .help("Copy")
-            .accessibilityLabel("Copy dictation")
-        }
-        .contentShape(.rect)
-        .onTapGesture { expanded.toggle() }
-        .accessibilityAction(named: expanded ? "Show less" : "Show all") { expanded.toggle() }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(hovered ? Crystal.rowHover : .clear, in: .rect(cornerRadius: 8, style: .continuous))
-        .onHover { hovered = $0 }
-        .contextMenu {
-            Button("Copy") { TextInserter.copy(item.text) }
-            Button("Delete", role: .destructive) { model.history.delete(item.id) }
-        }
-    }
-}
-
-struct AppIconView: View {
-    var bundleID: String?
-    var size: CGFloat = 28
-    var body: some View {
-        Group {
-            if let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable()
-            } else {
-                Image(systemName: "text.bubble.fill").resizable().scaledToFit().padding(size * 0.2)
-                    .foregroundStyle(Crystal.ink2)
-                    .background(Crystal.well, in: .rect(cornerRadius: size * 0.25, style: .continuous))
-            }
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
-    }
-}

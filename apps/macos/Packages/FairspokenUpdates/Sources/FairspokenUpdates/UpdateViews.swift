@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Colours the update UI borrows from the app: its Crystal accent and warning colour.
@@ -161,6 +162,11 @@ public struct UpdateSidebarButton: View {
 /// "Bark 0.3.0 is available" with Update / Later, bottom-trailing over the content.
 /// Shown once per version; "Up to date" only after a check the person asked for.
 public struct UpdateToastView: View {
+    /// The toast's opaque card: #111111 in dark mode, white in light (the shared card token).
+    static let surface = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0x11 / 255, green: 0x11 / 255, blue: 0x11 / 255, alpha: 1) : .white
+    })
     var updates: UpdateController
     var style: UpdateStyle
 
@@ -208,7 +214,10 @@ public struct UpdateToastView: View {
             }
             .padding(14)
             .frame(width: 340)
-            .glassEffect(.regular, in: .rect(cornerRadius: 20))
+            // Opaque, like every surface: a card with a hairline and a soft drop shadow.
+            .background(Self.surface, in: .rect(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.primary.opacity(0.1)))
+            .shadow(color: .black.opacity(0.35), radius: 22, y: 12)
             .accessibilityElement(children: .contain)
             .id(toast.id)
         }

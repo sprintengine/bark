@@ -180,12 +180,16 @@ final class PendingDictations {
             corrections: s.postProcess ? s.transcriptCorrections : [], speechModel: s.speechModelID))
         guard !text.isEmpty else { return false }
         if copy { TextInserter.copy(text) }
-        keepForTraining(item.id, samples: nil, rawText: output.text, finalText: text, model: output.model, appBundleID: item.appBundleId)
-        history.add(TranscriptHistoryItem(
+        let recordingID = keepForTraining(item.id, samples: nil, rawText: output.text, finalText: text, model: output.model,
+                                          appBundleID: item.appBundleId)
+        var entry = TranscriptHistoryItem(
             id: "transcript-\(item.createdAt)", createdAt: item.createdAt, text: text, backend: output.backend,
             location: output.placement == .remoteHost ? "remote-host" : "local", durationSeconds: item.durationSeconds,
             timings: DictationTimings(transcribeMs: output.modelMs, speechModelMs: output.modelMs, totalMs: 0),
-            model: output.model, appName: item.appName, appBundleId: item.appBundleId))
+            model: output.model, appName: item.appName, appBundleId: item.appBundleId)
+        entry.rawText = output.text
+        entry.recordingID = recordingID
+        history.add(entry)
         onRecovered?(WordCounter.count(text), copy, output.placement)
         return true
     }

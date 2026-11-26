@@ -80,6 +80,8 @@ final class DictationController {
     private(set) var liveText = ""
     /// Latest transcript produced while our own window was frontmost ("Try dictation").
     private(set) var lastInAppResult: Result?
+    /// The history entry of the last dictation shown in Bark's own window.
+    private(set) var lastInAppHistoryID: String?
     /// What `.transcribing` is doing when it isn't the first attempt ("Retrying the host (1 of 2)").
     private(set) var transcribingNote: String?
 
@@ -88,6 +90,8 @@ final class DictationController {
     /// Called as any recording starts (shortcut, fn, the menu bar, a button), before it takes the
     /// microphone: the setup guide's test steps aside.
     @ObservationIgnored var onWillStart: (() -> Void)?
+    /// Whether a dictation shown in Bark's own window lands in Home's composer (and so is a note).
+    @ObservationIgnored var shownInAppIsNote: () -> Bool = { false }
     @ObservationIgnored let capture = AudioCapture()
     @ObservationIgnored private var session: (any TranscriptionSession)?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
@@ -441,16 +445,24 @@ final class DictationController {
         let total = Int((ContinuousClock.now - released) / .milliseconds(1))
         let transcribeMs = Int((transcribed - released) / .milliseconds(1))
         let now = Date()
-        let entry = TranscriptHistoryItem(
+        var entry = TranscriptHistoryItem(
             id: "transcript-\(Int64(now.timeIntervalSince1970 * 1000))",
             createdAt: Int64(now.timeIntervalSince1970 * 1000), text: text, backend: output.backend,
             location: output.placement == .remoteHost ? "remote-host" : "local", durationSeconds: durationSeconds,
             timings: DictationTimings(transcribeMs: transcribeMs, speechModelMs: output.modelMs, totalMs: total),
             model: output.model, appName: item.appName, appBundleId: item.appBundleId)
-        history.add(entry)
+        // What the model heard, for the dictation view's bubble and diff.
+        entry.rawText = output.text
+        // Dictated into Home's composer: a note.
+        if delivery == .shownInApp, shownInAppIsNote() { entry.isNote = true }
+        // A paste was tried and nothing could take it (not a copy-only choice in Settings).
+        if case .copied = delivery, s.insertAtCursor { entry.clipboardOnly = true }
         // The recording already on disk moves to the post-training folder; nothing is written twice.
         let captureID = pending.keepForTraining(item.id, samples: samples, rawText: output.text, finalText: text, model: output.model,
                                                 appBundleID: item.appBundleId)
+        entry.recordingID = captureID
+        history.add(entry)
+        if entry.isNote == true { lastInAppHistoryID = entry.id }
         if case .pasted = delivery, let fieldRead, let editWatcher {
             let dictation = EditWatcher.Dictation(inserted: text, raw: output.text, speechModel: s.speechModelID, captureID: captureID)
             // Apart, so a read still running never holds up the result.

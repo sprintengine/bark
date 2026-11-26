@@ -281,21 +281,17 @@ struct CrystalPage<Content: View>: View {
     }
 }
 
-/// A Liquid Glass card (radius 20). What sits inside is flat (`CrystalWell`), never glass.
+/// An opaque card (the shared card surface). What sits inside is flat (`CrystalWell`).
 struct SurfaceCard<Content: View>: View {
     var padding: CGFloat = 20
     var fillHeight = false
     @ViewBuilder var content: Content
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: fillHeight ? .infinity : nil, alignment: .topLeading)
-            .glassEffect(reduceTransparency ? .identity : .regular, in: .rect(cornerRadius: 20))
-            .background {
-                if reduceTransparency { RoundedRectangle(cornerRadius: 20).fill(Crystal.pageSheen) }
-            }
+            .cardSurface()
     }
 }
 

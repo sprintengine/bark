@@ -3,9 +3,9 @@ import FairspokenCore
 import Observation
 import OSLog
 
-/// Recent dictations (`transcript-history.json`, 50 items, Rust schema) and lifetime usage
-/// (`usage-stats.json`). Both import once from the Tauri app. Phase 1 replaces the simple
-/// list with full history/notes behind the same file formats.
+/// Dictations and notes (`transcript-history.json`, up to `TranscriptHistory.maxItems`, the Rust
+/// schema plus optional fields) and lifetime usage (`usage-stats.json`). Both import once from the
+/// Tauri app. History is the main window's thread list.
 @Observable
 final class HistoryStore {
     private(set) var items: [TranscriptHistoryItem] = []
@@ -66,6 +66,61 @@ final class HistoryStore {
         save()
     }
 
+    /// Every dictation and note, gone (usage stats stay).
+    func deleteAll() {
+        items = []
+        save()
+    }
+
+    func item(_ id: String?) -> TranscriptHistoryItem? {
+        guard let id else { return nil }
+        return items.first { $0.id == id }
+    }
+
+    /// A note written (or dictated) in Bark itself: kept in history, never counted as dictated
+    /// words. Returns its id.
+    @discardableResult
+    func addNote(_ text: String, at date: Date = Date()) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        var note = TranscriptHistoryItem(id: "note-\(Int64(date.timeIntervalSince1970 * 1000))",
+                                         createdAt: Int64(date.timeIntervalSince1970 * 1000), text: trimmed,
+                                         backend: "typed", location: "local", durationSeconds: 0,
+                                         appName: AppInfo.displayName, appBundleId: AppInfo.bundleID)
+        note.isNote = true
+        items = TranscriptHistory.adding(note, to: items)
+        save()
+        return note.id
+    }
+
+    /// Changes an item in place (a corrected text, a new transcription). Its place in the list stays.
+    func update(_ id: String, _ change: (inout TranscriptHistoryItem) -> Void) {
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return }
+        change(&items[i])
+        save()
+    }
+
+    /// The thread list: newest first, narrowed by the search text and the filter.
+    func visible(query: String, filter: AppModel.HistoryFilter) -> [TranscriptHistoryItem] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        return items.filter { item in
+            switch filter {
+            case .all: break
+            case .notes: if !item.isBarkNote { return false }
+            case .clipboard: if item.clipboardOnly != true { return false }
+            }
+            guard !q.isEmpty else { return true }
+            return item.text.localizedCaseInsensitiveContains(q) || (item.appName ?? "").localizedCaseInsensitiveContains(q)
+                || (item.destinationHost ?? "").localizedCaseInsensitiveContains(q)
+        }
+    }
+
+    /// Screenshots: a chosen set of dictations. Never saved.
+    func showcase(_ demo: [TranscriptHistoryItem]) {
+        guard !persists else { return }
+        items = demo
+    }
+
     /// Screenshots: shows no dictations (Home's first-use card), or the demo set again. Never saved.
     func showcaseEmpty(_ empty: Bool) {
         guard !persists else { return }
@@ -108,20 +163,7 @@ final class HistoryStore {
 
     private func seedDemo() {
         let now = Date()
-        let samples: [(String, String, String, Double, Int, Int)] = [
-            ("Patient reports intermittent chest tightness on exertion for three weeks, no radiation, settles with rest. ECG today, bloods including troponin and lipids.", "Socrates", "com.socrates.pms", 21.4, 182, 7),
-            ("Referral letter to cardiology outpatients: please assess for stable angina, family history of IHD, ex-smoker, BP well controlled on amlodipine.", "Mail", "com.apple.mail", 17.9, 164, 31),
-            ("Can we move the Thursday practice meeting to 1 pm? The new nurse starts that morning and I'd like her to sit in.", "Slack", "com.tinyspeck.slackmacgap", 7.2, 121, 58),
-            ("Reminder to call the pharmacy about the repeat prescription for Mrs O'Keeffe, the amoxicillin dose needs checking.", "Notes", "com.apple.Notes", 8.6, 133, 96),
-            ("Thanks for the update. I've attached the audit results and we can go through them on Friday.", "Outlook", "com.microsoft.Outlook", 5.4, 117, 180),
-            ("Review in two weeks, sooner if symptoms worsen. Safety-netting advice given and understood.", "Socrates", "com.socrates.pms", 4.8, 109, 260),
-        ]
-        items = samples.enumerated().map { i, s in
-            TranscriptHistoryItem(id: "demo-\(i)", createdAt: Int64((now.timeIntervalSince1970 - Double(s.5 * 60)) * 1000),
-                                  text: s.0, backend: "parakeet", location: "local", durationSeconds: s.3,
-                                  timings: DictationTimings(transcribeMs: s.4 - 20, speechModelMs: s.4 - 60, totalMs: s.4),
-                                  model: "parakeet-tdt-0.6b-v3", appName: s.1, appBundleId: s.2)
-        }
+        items = DemoHistory.items(now: now)
         var u = UsageStats()
         let perDay = [1_420, 2_310, 980, 2_760, 1_890, 260, 0, 1_640, 2_120, 1_310, 2_980, 2_240, 410, 1_186]
         for (ago, words) in perDay.enumerated() where words > 0 {
