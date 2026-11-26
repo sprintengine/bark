@@ -36,7 +36,7 @@ struct PairingTests {
         let h = Harness(pairingPassword: Self.password, displayName: "Studio Mac")
         let events = FrameCollector(h.runtime.observe().frames)
         let ok = await h.request("POST", "/v1/pair", headers: ["X-Forwarded-For": "100.64.0.7"],
-                                 body: pairBody(Self.password, clientName: "  Conal's MacBook \u{7}"), auth: false)
+                                 body: pairBody(Self.password, clientName: "  Dev's MacBook \u{7}"), auth: false)
         #expect(ok.status == 200)
         #expect(ok.body == #"{"token":"secret","name":"Studio Mac"}"#)
         let wrong = await h.request("POST", "/v1/pair", body: pairBody("654321"), auth: false)
@@ -45,7 +45,7 @@ struct PairingTests {
         #expect(await events.wait(for: "pairing", count: 2))
         let first = events.all[0].json
         #expect(first["client"] as? String == "100.64.0.7")
-        #expect(first["clientName"] as? String == "Conal's MacBook")
+        #expect(first["clientName"] as? String == "Dev's MacBook")
         #expect(first["ok"] as? Bool == true)
         #expect((first["at"] as? Int ?? 0) > 1_700_000_000_000)
         #expect(Set(first.keys) == ["at", "client", "clientName", "ok"])
@@ -60,8 +60,8 @@ struct PairingTests {
     }
 
     @Test func pairingFrameMatchesTheRustWireFormat() {
-        #expect(HostWireEvent.pairing(client: "100.64.0.7", clientName: "Conal's MacBook", ok: true).frame(at: 3)
-            == "event: pairing\ndata: {\"at\":3,\"client\":\"100.64.0.7\",\"clientName\":\"Conal's MacBook\",\"ok\":true}\n\n")
+        #expect(HostWireEvent.pairing(client: "100.64.0.7", clientName: "Dev's MacBook", ok: true).frame(at: 3)
+            == "event: pairing\ndata: {\"at\":3,\"client\":\"100.64.0.7\",\"clientName\":\"Dev's MacBook\",\"ok\":true}\n\n")
     }
 
     @Test func malformedPairRequestsAreRejected() async {
@@ -82,7 +82,7 @@ struct PairingTests {
             let body = [UInt8](try JSONSerialization.data(withJSONObject: ["password": "x", "clientName": raw]))
             return try HostRouter.parsePairRequest(body).get().clientName
         }
-        #expect(try name("  Conal's MacBook  ") == "Conal's MacBook")
+        #expect(try name("  Dev's MacBook  ") == "Dev's MacBook")
         #expect(try name(" \n ") == nil)
         #expect(try name(String(repeating: "é", count: 80))?.unicodeScalars.count == 64)
         #expect(try name("a\u{0}b\u{1b}c") == "abc")

@@ -71,7 +71,15 @@ nonisolated final class RemoteStreamSession: TranscriptionSession, @unchecked Se
         let timeout = timeoutSeconds
         let (data, response) = try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group in
             group.addTask { [responseTask] in
-                do { return try await responseTask.value } catch let error as URLError {
+                // Awaiting an unstructured task's value ignores cancellation, so the timeout
+                // below could never end the group: cancelling this child cancels the request.
+                do {
+                    return try await withTaskCancellationHandler {
+                        try await responseTask.value
+                    } onCancel: {
+                        responseTask.cancel()
+                    }
+                } catch let error as URLError {
                     throw RemoteError.unreachable(error.localizedDescription)
                 }
             }

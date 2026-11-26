@@ -35,6 +35,7 @@ extension AppModel {
                                               expectedApp: app.processIdentifier, requireExpectedApp: true) {
             case .pasted: notify("Pasted into \(name)")
             case .copied(let reason): notify(reason)
+            case .withdrawn: break
             }
         }
     }
@@ -61,9 +62,11 @@ extension AppModel {
         Task { @MainActor in
             let outcome = await TextInserter.deliver(item.text, paste: true, restoreClipboard: s.restoreClipboard,
                                                      expectedApp: front.processIdentifier, requireExpectedApp: true)
-            let delivery: DictationController.Delivery = switch outcome {
-            case .pasted: .pasted(app: name)
-            case .copied(let reason): .copied(reason)
+            let delivery: DictationController.Delivery
+            switch outcome {
+            case .pasted: delivery = .pasted(app: name)
+            case .copied(let reason): delivery = .copied(reason)
+            case .withdrawn: return
             }
             dictation.announce(.init(text: item.text, words: item.wordCount, delivery: delivery, latencyMs: 0,
                                      placement: .neuralEngine))

@@ -34,17 +34,16 @@ struct PillView: View {
     private var reduceMotion: Bool { systemReduceMotion || showcaseReduceMotion }
 
     /// Width of the pill while it shows live text, and of the text in it.
-    static let liveWidth: CGFloat = 404
+    static let liveWidth: CGFloat = 432
     static let liveTextWidth: CGFloat = liveWidth - 28
     static let liveTextFont = Font.system(size: 14)
     /// One line of `liveTextFont`, with its leading.
     static let liveTextLineHeight: CGFloat = 20
     static let defaultMaxLines = 4
     static let height: CGFloat = 36
-    /// Whether the cancel button stays while transcribing: only once the controller can drop a
-    /// transcript that is still on its way (otherwise it would land after the pill said
-    /// cancelled). The "esc" hint follows it.
-    static let cancelsWhileTranscribing = false
+    /// The cancel button and its hint stay while transcribing: the controller drops a transcript
+    /// still on its way (until the moment it is pasted) and keeps the recording to retry.
+    static let cancelsWhileTranscribing = true
 
     private var showsLiveText: Bool {
         switch dictation.phase {
@@ -143,7 +142,7 @@ struct PillView: View {
                     .padding(.leading, 2)
             }
             VoiceWaveform(meter: dictation.meter, reduceMotion: reduceMotion)
-                .frame(minWidth: 94, maxWidth: showsLiveText ? .infinity : 94, alignment: .trailing)
+                .frame(minWidth: showsLiveText ? 72 : 94, maxWidth: showsLiveText ? .infinity : 94, alignment: .trailing)
                 .padding(.horizontal, 2)
             PillFinishButton { dictation.stop() }
         }
@@ -248,10 +247,11 @@ struct PillView: View {
         .accessibilityLabel("Ready, \(shortcut) to dictate")
     }
 
-    /// A quiet reminder that the cancel key (Escape unless changed) ends the dictation.
+    /// A quiet reminder that the cancel key (Escape unless changed) ends the dictation, while
+    /// listening and while transcribing.
     @ViewBuilder private var cancelHint: some View {
         if let key = Self.cancelKey {
-            Text(key)
+            Text("\(key) to cancel")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Crystal.ink3)
                 .lineLimit(1)

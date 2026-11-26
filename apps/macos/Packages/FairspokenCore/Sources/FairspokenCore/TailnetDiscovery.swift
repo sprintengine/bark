@@ -15,7 +15,7 @@ public struct TailscaleStatus: Decodable, Sendable, Equatable {
     public var peers: [Node]
 
     public struct Node: Decodable, Sendable, Equatable {
-        /// The OS's own name for the machine; on macOS the computer name ("Conal’s Mac mini").
+        /// The OS's own name for the machine; on macOS the computer name ("Dev’s Mac mini").
         public var hostName: String
         /// MagicDNS name, fully qualified with a trailing dot (`studio.tail1234.ts.net.`).
         public var dnsName: String

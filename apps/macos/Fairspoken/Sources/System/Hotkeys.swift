@@ -49,6 +49,46 @@ final class HotkeyController {
 
     var fnActive: Bool { fnMonitor.isRunning }
 
+    private var shortcutHoldWatch: Task<Void, Never>?
+
+    /// While a hold-to-talk recording started by the shortcut runs: every 250 ms, whether the
+    /// shortcut's modifiers are still held. Once they have been seen held and then are not, the
+    /// key-up was lost (sleep, secure input, a busy main thread), and `onReleased` stands in for
+    /// it. Reads only the modifier state, which needs no permission. A shortcut without
+    /// modifiers can't be watched this way.
+    func watchShortcutHold(onReleased: @escaping () -> Void) {
+        stopWatchingShortcutHold()
+        guard let modifiers = KeyboardShortcuts.getShortcut(for: .dictation)?.modifiers else { return }
+        var wanted: CGEventFlags = []
+        if modifiers.contains(.command) { wanted.insert(.maskCommand) }
+        if modifiers.contains(.shift) { wanted.insert(.maskShift) }
+        if modifiers.contains(.option) { wanted.insert(.maskAlternate) }
+        if modifiers.contains(.control) { wanted.insert(.maskControl) }
+        guard !wanted.isEmpty else { return }
+        shortcutHoldWatch = Task { [weak self] in
+            var seenHeld = false
+            while !Task.isCancelled {
+                let held = CGEventSource.flagsState(.combinedSessionState).isSuperset(of: wanted)
+                if held {
+                    seenHeld = true
+                } else if seenHeld {
+                    Self.log.notice("The shortcut's release was missed; ending the hold")
+                    self?.shortcutHoldWatch = nil
+                    onReleased()
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+    }
+
+    func stopWatchingShortcutHold() {
+        shortcutHoldWatch?.cancel()
+        shortcutHoldWatch = nil
+    }
+
+    private static let log = Logger(subsystem: AppInfo.bundleID, category: "hotkeys")
+
     /// Seeds the KeyboardShortcuts binding from an imported Tauri accelerator string once.
     static func adoptAccelerator(_ accelerator: String) {
         guard let parsed = AcceleratorString(parsing: accelerator), let key = key(for: parsed.code) else { return }
@@ -112,12 +152,22 @@ final class HotkeyController {
 /// Listen-only `CGEventTap` on `flagsChanged`, watching keycode 63 (Fn/Globe), exactly as
 /// `macos_input.rs` does. Needs Input Monitoring (not Accessibility). Re-enables itself
 /// when macOS disables the tap for timeout or user input.
+///
+/// A release can be lost (the tap disabled while Fn went up, sleep, the screen locking, secure
+/// input), which would leave a hold-to-talk recording running. So when the tap is re-enabled,
+/// and every 250 ms while Fn is held, the key's state is read from the session's modifier
+/// flags (no permission beyond the tap's own), and a release is reported if it is up. That
+/// check acts only once the flags have shown Fn down during this hold, so a keyboard whose Fn
+/// never appears there is not cut short.
 @MainActor
 final class FnKeyMonitor {
     var onChange: ((Bool) -> Void)?
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private var fnDown = false
+    /// The session's flags have shown Fn held during this hold.
+    private var flagsShowFn = false
+    private var holdPoll: Task<Void, Never>?
     private static let log = Logger(subsystem: AppInfo.bundleID, category: "hotkeys")
 
     var isRunning: Bool { tap != nil }
@@ -145,19 +195,53 @@ final class FnKeyMonitor {
         if let tap { CFMachPortInvalidate(tap) }
         tap = nil
         source = nil
-        if fnDown { fnDown = false; onChange?(false) }
+        if fnDown { setFn(false) }
     }
 
     fileprivate func handle(type: CGEventType, keyCode: Int64, flags: CGEventFlags) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            Self.log.notice("The Fn tap was disabled (\(type == .tapDisabledByTimeout ? "timeout" : "user input", privacy: .public)); re-enabling it")
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            // Fn may have gone up while the tap was off.
+            checkStillHeld(reason: "after the tap was re-enabled")
             return
         }
         guard type == .flagsChanged, keyCode == 63 else { return }
         let down = flags.contains(.maskSecondaryFn)
         guard down != fnDown else { return }
+        setFn(down)
+    }
+
+    private func setFn(_ down: Bool) {
         fnDown = down
+        holdPoll?.cancel()
+        holdPoll = nil
+        if down {
+            flagsShowFn = Self.fnHeldNow()
+            holdPoll = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled else { return }
+                    self?.checkStillHeld(reason: "while it was held")
+                }
+            }
+        }
         onChange?(down)
+    }
+
+    /// Reports the release macOS didn't deliver, if Fn is up now.
+    private func checkStillHeld(reason: String) {
+        guard fnDown else { return }
+        if Self.fnHeldNow() {
+            flagsShowFn = true
+        } else if flagsShowFn {
+            Self.log.notice("Fn's release was missed (\(reason, privacy: .public)); ending the hold")
+            setFn(false)
+        }
+    }
+
+    private static func fnHeldNow() -> Bool {
+        CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn)
     }
 }
 

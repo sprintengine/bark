@@ -110,6 +110,8 @@ public struct DictationRecovery: Sendable {
         var hostRefused = false
         /// No speech was heard, but the audio couldn't go to the Trash, so it is kept.
         var silentButKept = false
+        /// The run was cancelled: whatever comes back is not delivered, and the audio is kept.
+        var withdrawn = false
 
         /// No speech from the first attempt deletes the audio, as for a silent recording. Once an
         /// attempt has failed (or for a kept dictation) an empty answer is no proof the recording
@@ -129,12 +131,23 @@ public struct DictationRecovery: Sendable {
         }
 
         func finish(_ output: TranscriptionOutput) async -> DictationOutcome? {
+            // Cancelled (Escape while transcribing, or it took too long): a transcript that
+            // lands now is dropped, and the recording is kept to retry.
+            if Task.isCancelled {
+                withdrawn = true
+                return nil
+            }
             guard !output.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 if let outcome = noSpeech() { return outcome }
                 silentButKept = true
                 return nil
             }
             guard await deliver(output) else {
+                // Refused because the run was cancelled meanwhile: not "no speech".
+                if Task.isCancelled {
+                    withdrawn = true
+                    return nil
+                }
                 if let outcome = noSpeech() { return outcome }
                 silentButKept = true
                 return nil
@@ -145,6 +158,10 @@ public struct DictationRecovery: Sendable {
 
         /// Nil to keep going, an outcome when there is nothing more to try.
         func failed(_ error: Error, onThisMac: Bool = false) -> DictationOutcome? {
+            if Task.isCancelled {
+                withdrawn = true
+                return nil
+            }
             if case .noSpeech? = error as? RemoteTranscriptionError {
                 if let outcome = noSpeech() { return outcome }
                 silentButKept = true
@@ -169,7 +186,7 @@ public struct DictationRecovery: Sendable {
             }
         }
 
-        if let remote = routes.remote, !hostRefused, !silentButKept, !Task.isCancelled {
+        if let remote = routes.remote, !hostRefused, !silentButKept, !withdrawn, !Task.isCancelled {
             do {
                 let wav = try store.wav(id)
                 let deadline = ContinuousClock.now + policy.budget
@@ -183,7 +200,7 @@ public struct DictationRecovery: Sendable {
                     } catch {
                         if let outcome = failed(error) { return outcome }
                     }
-                    if hostRefused || silentButKept { break }
+                    if hostRefused || silentButKept || withdrawn { break }
                 }
             } catch is CancellationError {
                 // Fall through: the recording is kept below.
@@ -192,7 +209,7 @@ public struct DictationRecovery: Sendable {
             }
         }
 
-        if let local = routes.local, !silentButKept, !Task.isCancelled {
+        if let local = routes.local, !silentButKept, !withdrawn, !Task.isCancelled {
             progress(.transcribingOnThisMac)
             do {
                 if let outcome = await finish(try await local(try store.samples(id))) { return outcome }
@@ -203,7 +220,8 @@ public struct DictationRecovery: Sendable {
 
         // Nothing worked: keep it, saying what the host and this Mac answered.
         let silent = silentButKept ? "No speech was heard, and the recording couldn't be moved to the Trash" : nil
-        let message = [silent, hostFailure, localFailure.map { "On this Mac: \($0)" }].compactMap(\.self).joined(separator: " · ")
+        let stopped = withdrawn || Task.isCancelled ? "Stopped before it was transcribed" : nil
+        let message = [stopped, silent, hostFailure, localFailure.map { "On this Mac: \($0)" }].compactMap(\.self).joined(separator: " · ")
         store.update(id) {
             $0.state = .failed
             $0.attempts += max(1, failures)

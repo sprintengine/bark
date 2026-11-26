@@ -15,15 +15,15 @@ let tailscaleStatusFixture = #"""
   "BackendState": "Running",
   "HaveNodeKey": true,
   "AuthURL": "",
-  "TailscaleIPs": ["100.91.70.66", "fd7a:115c:a1e0::f03b:4643"],
+  "TailscaleIPs": ["100.64.0.10", "fd7a:115c:a1e0::10"],
   "Self": {
     "ID": "nSelf1CNTRL",
     "PublicKey": "nodekey:1111111111111111111111111111111111111111111111111111111111111111",
-    "HostName": "Conal’s Mac mini",
-    "DNSName": "conals-mac-mini.tail1b4c5c.ts.net.",
+    "HostName": "Dev’s Mac mini",
+    "DNSName": "mac-mini.tail1234.ts.net.",
     "OS": "macOS",
     "UserID": 1234567890,
-    "TailscaleIPs": ["100.91.70.66", "fd7a:115c:a1e0::f03b:4643"],
+    "TailscaleIPs": ["100.64.0.10", "fd7a:115c:a1e0::10"],
     "Addrs": ["192.168.1.20:41641"],
     "Online": true,
     "ExitNode": false,
@@ -31,14 +31,14 @@ let tailscaleStatusFixture = #"""
     "Capabilities": ["https", "funnel"]
   },
   "Health": [],
-  "MagicDNSSuffix": "tail1b4c5c.ts.net",
-  "CurrentTailnet": {"Name": "conal@example.com", "MagicDNSSuffix": "tail1b4c5c.ts.net", "MagicDNSEnabled": true},
-  "CertDomains": ["conals-mac-mini.tail1b4c5c.ts.net"],
+  "MagicDNSSuffix": "tail1234.ts.net",
+  "CurrentTailnet": {"Name": "dev@example.com", "MagicDNSSuffix": "tail1234.ts.net", "MagicDNSEnabled": true},
+  "CertDomains": ["mac-mini.tail1234.ts.net"],
   "Peer": {
     "nodekey:2222222222222222222222222222222222222222222222222222222222222222": {
       "ID": "nPeer2CNTRL",
       "HostName": "studio",
-      "DNSName": "studio.tail1b4c5c.ts.net.",
+      "DNSName": "studio.tail1234.ts.net.",
       "OS": "linux",
       "TailscaleIPs": ["100.101.102.103", "fd7a:115c:a1e0::6565:6667"],
       "Online": true,
@@ -47,31 +47,31 @@ let tailscaleStatusFixture = #"""
     },
     "nodekey:3333333333333333333333333333333333333333333333333333333333333333": {
       "ID": "nPeer3CNTRL",
-      "HostName": "DESKTOP-FUFM1L7",
-      "DNSName": "desktop-fufm1l7.tail1b4c5c.ts.net.",
+      "HostName": "DESKTOP-PC",
+      "DNSName": "desktop-pc.tail1234.ts.net.",
       "OS": "windows",
-      "TailscaleIPs": ["100.86.29.60", "fd7a:115c:a1e0::a03b:1d3d"],
+      "TailscaleIPs": ["100.64.0.11", "fd7a:115c:a1e0::11"],
       "Online": false,
       "LastSeen": "2026-09-30T08:12:44Z"
     },
     "nodekey:4444444444444444444444444444444444444444444444444444444444444444": {
       "ID": "nPeer4CNTRL",
       "HostName": "Reception iMac",
-      "DNSName": "reception-imac.tail1b4c5c.ts.net.",
+      "DNSName": "reception-imac.tail1234.ts.net.",
       "OS": "macOS",
-      "TailscaleIPs": ["fd7a:115c:a1e0::453b:7702"],
+      "TailscaleIPs": ["fd7a:115c:a1e0::13"],
       "Online": true
     },
     "nodekey:5555555555555555555555555555555555555555555555555555555555555555": {
       "ID": "nPeer5CNTRL",
-      "HostName": "OnePlus 8",
-      "DNSName": "oneplus-8.tail1b4c5c.ts.net.",
+      "HostName": "Android phone",
+      "DNSName": "android-phone.tail1234.ts.net.",
       "OS": "android",
-      "TailscaleIPs": ["100.66.34.126", "fd7a:115c:a1e0::103b:227f"],
+      "TailscaleIPs": ["100.64.0.12", "fd7a:115c:a1e0::12"],
       "Online": true
     }
   },
-  "User": {"1234567890": {"ID": 1234567890, "LoginName": "conal@example.com", "DisplayName": "Conal"}},
+  "User": {"1234567890": {"ID": 1234567890, "LoginName": "dev@example.com", "DisplayName": "Dev"}},
   "ClientVersion": null
 }
 """#
@@ -146,14 +146,14 @@ struct TailscaleStatusTests {
     @Test func decodesSelfAndPeers() throws {
         let status = try JSONDecoder().decode(TailscaleStatus.self, from: Data(tailscaleStatusFixture.utf8))
         #expect(status.backendState == "Running")
-        #expect(status.selfNode?.hostName == "Conal’s Mac mini")
-        #expect(status.selfNode?.machineName == "conals-mac-mini")
-        #expect(status.selfNode?.fqdn == "conals-mac-mini.tail1b4c5c.ts.net")
-        #expect(status.peers.map(\.machineName) == ["desktop-fufm1l7", "oneplus-8", "reception-imac", "studio"])
+        #expect(status.selfNode?.hostName == "Dev’s Mac mini")
+        #expect(status.selfNode?.machineName == "mac-mini")
+        #expect(status.selfNode?.fqdn == "mac-mini.tail1234.ts.net")
+        #expect(status.peers.map(\.machineName) == ["android-phone", "desktop-pc", "reception-imac", "studio"])
         let reception = try #require(status.peers.first { $0.machineName == "reception-imac" })
         #expect(reception.firstIPv4 == nil)
-        #expect(status.fqdn(forMachine: "studio") == "studio.tail1b4c5c.ts.net")
-        #expect(status.fqdn(forMachine: "Reception iMac") == "reception-imac.tail1b4c5c.ts.net")
+        #expect(status.fqdn(forMachine: "studio") == "studio.tail1234.ts.net")
+        #expect(status.fqdn(forMachine: "Reception iMac") == "reception-imac.tail1234.ts.net")
     }
 
     @Test func toleratesNullPeerAndMissingFields() throws {
@@ -168,11 +168,11 @@ struct TailscaleStatusTests {
     @Test func candidatesSkipOfflinePeersAndPhonesAndPreferHTTPS() throws {
         let status = try JSONDecoder().decode(TailscaleStatus.self, from: Data(tailscaleStatusFixture.utf8))
         let candidates = TailnetDiscovery.candidates(from: status)
-        #expect(candidates.map(\.machine) == ["conals-mac-mini", "reception-imac", "studio"])
+        #expect(candidates.map(\.machine) == ["mac-mini", "reception-imac", "studio"])
         #expect(candidates[0].isThisMac)
-        #expect(candidates[0].urls.map(\.absoluteString) == ["https://conals-mac-mini.tail1b4c5c.ts.net", "http://conals-mac-mini.tail1b4c5c.ts.net", "http://100.91.70.66:48173"])
-        #expect(candidates[1].urls.map(\.absoluteString) == ["https://reception-imac.tail1b4c5c.ts.net", "http://reception-imac.tail1b4c5c.ts.net"])  // no IPv4
-        #expect(candidates[2].urls.map(\.absoluteString) == ["https://studio.tail1b4c5c.ts.net", "http://studio.tail1b4c5c.ts.net", "http://100.101.102.103:48173"])
+        #expect(candidates[0].urls.map(\.absoluteString) == ["https://mac-mini.tail1234.ts.net", "http://mac-mini.tail1234.ts.net", "http://100.64.0.10:48173"])
+        #expect(candidates[1].urls.map(\.absoluteString) == ["https://reception-imac.tail1234.ts.net", "http://reception-imac.tail1234.ts.net"])  // no IPv4
+        #expect(candidates[2].urls.map(\.absoluteString) == ["https://studio.tail1234.ts.net", "http://studio.tail1234.ts.net", "http://100.101.102.103:48173"])
         // Every candidate URL is one the app's URL policy accepts.
         for url in candidates.flatMap(\.urls) { #expect(throws: Never.self) { try RemoteURLPolicy.validateBaseURL(url.absoluteString) } }
     }
@@ -220,41 +220,41 @@ struct TailnetDiscoveryTests {
     @Test func listsEachHostOncePreferringHTTPS() async throws {
         let t = FakeTransport([
             // This Mac answers on both: HTTPS wins.
-            "https://conals-mac-mini.tail1b4c5c.ts.net/v1/hello": helloJSON("Conal’s Mac mini", auth: "none"),
-            "http://100.91.70.66:48173/v1/hello": helloJSON("Conal’s Mac mini", auth: "none"),
+            "https://mac-mini.tail1234.ts.net/v1/hello": helloJSON("Dev’s Mac mini", auth: "none"),
+            "http://100.64.0.10:48173/v1/hello": helloJSON("Dev’s Mac mini", auth: "none"),
             // studio: HTTPS refused, HTTP answers.
-            "https://studio.tail1b4c5c.ts.net/v1/hello": .refuse,
+            "https://studio.tail1234.ts.net/v1/hello": .refuse,
             "http://100.101.102.103:48173/v1/hello": helloJSON("Studio", auth: "password"),
             // reception: something else on 443.
-            "https://reception-imac.tail1b4c5c.ts.net/v1/hello": helloJSON("Printer", service: "not-fairspoken"),
+            "https://reception-imac.tail1234.ts.net/v1/hello": helloJSON("Printer", service: "not-fairspoken"),
         ])
         let start = ContinuousClock.now
         let hosts = try await discovery(t).discover()
         #expect(ContinuousClock.now - start < .seconds(2))  // the silent probes time out
         #expect(hosts == [
-            DiscoveredHost(name: "Conal’s Mac mini", machine: "conals-mac-mini", url: URL(string: "https://conals-mac-mini.tail1b4c5c.ts.net")!,
+            DiscoveredHost(name: "Dev’s Mac mini", machine: "mac-mini", url: URL(string: "https://mac-mini.tail1234.ts.net")!,
                            auth: .open, serverVersion: "0.4.0", isThisMac: true),
             DiscoveredHost(name: "Studio", machine: "studio", url: URL(string: "http://100.101.102.103:48173")!,
                            auth: .password, serverVersion: "0.4.0"),
         ])
         // Offline and Android peers are never probed.
         let probed = Set(t.requests.compactMap { $0.url?.host() })
-        #expect(!probed.contains("100.86.29.60") && !probed.contains("100.66.34.126"))
+        #expect(!probed.contains("100.64.0.11") && !probed.contains("100.64.0.12"))
     }
 
     /// A server on this Mac turns up on loopback (on its own port too), ahead of the tailnet,
     /// and replaces this Mac's tailnet-IP entry when it is the same host.
     @Test func findsHostsOnThisMacOverLoopback() async throws {
         let t = FakeTransport([
-            "http://127.0.0.1:48173/v1/hello": helloJSON("Conal’s Mac mini", auth: "password"),
-            "http://100.91.70.66:48173/v1/hello": helloJSON("Conal’s Mac mini", auth: "password"),
+            "http://127.0.0.1:48173/v1/hello": helloJSON("Dev’s Mac mini", auth: "password"),
+            "http://100.64.0.10:48173/v1/hello": helloJSON("Dev’s Mac mini", auth: "password"),
             "http://127.0.0.1:48174/v1/hello": helloJSON("Bark Server", auth: "password"),
             "http://100.101.102.103:48173/v1/hello": helloJSON("Studio", auth: "password"),
         ])
         let hosts = try await discovery(t, localPorts: [48174, 48173]).discover()
         #expect(hosts.map(\.url.absoluteString) == ["http://127.0.0.1:48174", "http://127.0.0.1:48173", "http://100.101.102.103:48173"])
         #expect(hosts.map(\.isThisMac) == [true, true, false])
-        #expect(hosts[0].machine == "conals-mac-mini")
+        #expect(hosts[0].machine == "mac-mini")
     }
 
     @Test func listsThisMacsHostWhenTailscaleIsDown() async throws {
@@ -276,7 +276,7 @@ struct TailnetDiscoveryTests {
 
     @Test func ignoresNon200AndUndecodableHellos() async throws {
         let t = FakeTransport([
-            "https://studio.tail1b4c5c.ts.net/v1/hello": .json(404, #"{"error":"not found"}"#),
+            "https://studio.tail1234.ts.net/v1/hello": .json(404, #"{"error":"not found"}"#),
             "http://100.101.102.103:48173/v1/hello": .json(200, "<html>dashboard</html>"),
         ])
         #expect(try await discovery(t).discover().isEmpty)
@@ -284,12 +284,12 @@ struct TailnetDiscoveryTests {
 
     @Test func keepsAtMost32ProbesInFlight() async {
         let nodes = (1...40).map { i in
-            TailnetDiscovery.Candidate(machine: "m\(i)", urls: [URL(string: "https://m\(i).tail1b4c5c.ts.net")!,
+            TailnetDiscovery.Candidate(machine: "m\(i)", urls: [URL(string: "https://m\(i).tail1234.ts.net")!,
                                                                 URL(string: "http://100.100.0.\(i):48173")!], isThisMac: false)
         }
         var answers: [String: FakeTransport.Answer] = [:]
         for i in 1...40 { answers["http://100.100.0.\(i):48173/v1/hello"] = helloJSON("Host \(i)") }
-        for i in 1...40 { answers["https://m\(i).tail1b4c5c.ts.net/v1/hello"] = .refuse }
+        for i in 1...40 { answers["https://m\(i).tail1234.ts.net/v1/hello"] = .refuse }
         let t = FakeTransport(answers, delay: .milliseconds(20))
         let hosts = await discovery(t).probe(nodes)
         #expect(hosts.count == 40)
@@ -299,9 +299,9 @@ struct TailnetDiscoveryTests {
     }
 
     @Test func probesATypedNameExpandedThroughMagicDNS() async throws {
-        let t = FakeTransport(["https://studio.tail1b4c5c.ts.net/v1/hello": helloJSON("Studio", auth: "token")])
+        let t = FakeTransport(["https://studio.tail1234.ts.net/v1/hello": helloJSON("Studio", auth: "token")])
         let host = try await discovery(t).probe(entry: " studio ")
-        #expect(host.url.absoluteString == "https://studio.tail1b4c5c.ts.net")
+        #expect(host.url.absoluteString == "https://studio.tail1234.ts.net")
         #expect(host.machine == "studio")
         #expect(host.auth == .token)
     }
@@ -320,8 +320,8 @@ struct TailnetDiscoveryTests {
             try TailnetDiscovery.manualURLs(s, expand: expand).map(\.absoluteString)
         }
         #expect(try urls("studio") == ["https://studio", "http://studio:48173"])
-        #expect(try urls("studio", { $0 == "studio" ? "studio.tail1b4c5c.ts.net" : nil })
-                == ["https://studio.tail1b4c5c.ts.net", "http://studio.tail1b4c5c.ts.net:48173"])
+        #expect(try urls("studio", { $0 == "studio" ? "studio.tail1234.ts.net" : nil })
+                == ["https://studio.tail1234.ts.net", "http://studio.tail1234.ts.net:48173"])
         #expect(try urls("studio:8443") == ["https://studio:8443", "http://studio:8443"])
         #expect(try urls("100.101.102.103") == ["https://100.101.102.103", "http://100.101.102.103:48173"])
         #expect(try urls("[fd7a:115c:a1e0::1]:48200") == ["https://[fd7a:115c:a1e0::1]:48200", "http://[fd7a:115c:a1e0::1]:48200"])
@@ -332,7 +332,7 @@ struct TailnetDiscoveryTests {
         #expect(throws: TailnetDiscoveryError.invalidEntry("studio:99999")) { try TailnetDiscovery.manualURLs("studio:99999") }
         #expect(throws: TailnetDiscoveryError.invalidEntry("stu dio")) { try TailnetDiscovery.manualURLs("stu dio") }
         #expect(throws: TailnetDiscoveryError.invalidEntry("http://example.com")) { try TailnetDiscovery.manualURLs("http://example.com") }
-        #expect(TailnetDiscovery.manualMachineName("studio.tail1b4c5c.ts.net:443") == "studio")
+        #expect(TailnetDiscovery.manualMachineName("studio.tail1234.ts.net:443") == "studio")
         #expect(TailnetDiscovery.manualMachineName("100.101.102.103") == "100.101.102.103")
     }
 }
