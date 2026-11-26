@@ -23,6 +23,9 @@ final class PillInteraction {
     private(set) var openedByHover = false
     /// The chip is under the pointer (drawn raised).
     var chipHovered = false
+    /// A click on the chip closed the menu: resting there doesn't open it again until the
+    /// pointer has left the chip.
+    @ObservationIgnored var hoverSuppressed = false
     @ObservationIgnored var onMenuChange: ((Bool) -> Void)?
 
     func openMenu(byHover: Bool) {
@@ -45,7 +48,12 @@ final class PillInteraction {
 
     /// A click on the chip: opens the menu, or closes one it had pinned open.
     func chipClicked() {
-        if menuOpen, !openedByHover { closeMenu() } else { openMenu(byHover: false) }
+        if menuOpen, !openedByHover {
+            closeMenu()
+            hoverSuppressed = true
+        } else {
+            openMenu(byHover: false)
+        }
     }
 }
 
@@ -254,6 +262,7 @@ struct StyleMenuView: View {
     var onAlwaysUse: (DictationStyle.ID) -> Void
     /// Screenshots: the row drawn as if under the pointer.
     var showcaseHighlight: String?
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -283,8 +292,15 @@ struct StyleMenuView: View {
             }
         }
         .padding(4)
-        .frame(width: 236, alignment: .leading)
-        .background(Crystal.card, in: .rect(cornerRadius: Radius.control, style: .continuous))
+        // As wide as its longest row ("Always use Document for docs.google.com"), within reason.
+        .frame(minWidth: 236, maxWidth: 340, alignment: .leading)
+        .fixedSize()
+        .background {
+            // The shadow is the card's alone, so a highlighted row doesn't cast one.
+            RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                .fill(Crystal.card)
+                .shadow(color: .black.opacity(scheme == .dark ? 0.55 : 0.16), radius: 14, y: 10)
+        }
         .overlay {
             RoundedRectangle(cornerRadius: Radius.control, style: .continuous).strokeBorder(Crystal.hairline)
         }
@@ -311,6 +327,8 @@ private struct StyleMenuRow: View {
                         Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Crystal.ink)
                     } else if let symbol {
                         Image(systemName: symbol).font(.system(size: 11, weight: .medium)).foregroundStyle(Crystal.ink2)
+                    } else {
+                        Color.clear
                     }
                 }
                 .frame(width: 16)

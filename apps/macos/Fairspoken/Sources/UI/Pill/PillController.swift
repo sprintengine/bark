@@ -67,7 +67,6 @@ private struct StyleMenuRoot: View {
                 interaction.closeMenu()
             }
             .padding(PillController.menuShadowRoom)
-            .shadow(color: .black.opacity(0.35), radius: 12, y: 8)
             .fixedSize()
         }
     }
@@ -228,8 +227,16 @@ final class PillController {
         NSRect(x: panel.frame.minX + frame.minX, y: panel.frame.maxY - frame.maxY, width: frame.width, height: frame.height)
     }
 
+    /// Where the pointer is (a stand-in in the demo, which can't move the real one).
+    private var pointer: NSPoint {
+        #if DEBUG
+        if let debugPointer { return debugPointer }
+        #endif
+        return NSEvent.mouseLocation
+    }
+
     private func updateMouse() {
-        let mouse = NSEvent.mouseLocation
+        let mouse = pointer
         let tracking = !mouseMonitors.isEmpty && panel.isVisible
         let capsule = onScreen(interaction.capsuleFrame)
         let wantsMouse = interaction.capsuleTakesMouse || interaction.scrollable
@@ -240,7 +247,8 @@ final class PillController {
         let chip = interaction.chipFrame.map(onScreen)
         let onChip = tracking && dictation.phase.isListening && (chip?.contains(mouse) ?? false)
         if interaction.chipHovered != onChip { interaction.chipHovered = onChip }
-        if onChip {
+        if !onChip { interaction.hoverSuppressed = false }
+        if onChip, !interaction.hoverSuppressed {
             hoverSince = hoverSince ?? Date()
             if !interaction.menuOpen, let since = hoverSince, Date().timeIntervalSince(since) >= Self.hoverDelay {
                 interaction.openMenu(byHover: true)
@@ -279,8 +287,10 @@ final class PillController {
             return
         }
         guard let chipFrame = interaction.chipFrame else { interaction.closeMenu(); return }
-        menuHost.rootView = StyleMenuRoot(dictation: dictation, interaction: interaction)
-        let size = menuHost.fittingSize
+        let root = StyleMenuRoot(dictation: dictation, interaction: interaction)
+        menuHost.rootView = root
+        // The hosting view doesn't size itself (`sizingOptions` is empty), so measure the content.
+        let size = NSHostingController(rootView: root).sizeThatFits(in: NSSize(width: 600, height: 2000))
         guard size.width > 0, size.height > 0 else { interaction.closeMenu(); return }
         let chip = onScreen(chipFrame)
         let capsule = onScreen(interaction.capsuleFrame)
@@ -305,6 +315,10 @@ final class PillController {
     }
 
     #if DEBUG
+    /// `--pill-demo-paste` without Accessibility: the pointer as the demo moves it.
+    var debugPointer: NSPoint? {
+        didSet { updateMouse() }
+    }
     var debugPanel: NSPanel { panel }
     var debugMenuPanel: NSPanel { menuPanel }
 

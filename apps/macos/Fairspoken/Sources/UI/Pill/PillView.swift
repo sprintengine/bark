@@ -135,6 +135,7 @@ struct PillView: View {
                 Text(Self.clock(ctx.date.timeIntervalSince(since)))
                     .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(Crystal.ink2)
+                    .fixedSize()
                     .accessibilityLabel("Listening, \(Self.spokenClock(ctx.date.timeIntervalSince(since)))")
             }
             if let chip = chipState {
