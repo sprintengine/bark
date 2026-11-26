@@ -34,14 +34,14 @@ interface TranscriptPreviewEvent {
 
 // We read only the fields we need from the full settings payload.
 interface VoiceSettings {
-  transcriptionLocation: "local" | "remote-host";
+  transcriptionLocation: "local" | "remote-host" | "cloud";
   model: string;
 }
 
 interface BackendInfo {
   engine: string;
   model: string;
-  location: "local" | "remote-host";
+  location: "local" | "remote-host" | "cloud";
   previewMode: PreviewMode;
 }
 
@@ -204,10 +204,10 @@ export function createVoiceAccuracyTest(opts: {
     if (backend) {
       body.push(
         h("div", { class: "vt-source" }, [
-          h("span", { class: "k", text: "Backend" }),
+          h("span", { class: "k", text: "Model" }),
           ` ${modelDisplay(backend.model)}`,
           h("span", { class: "sep", text: "·" }),
-          backend.location === "remote-host" ? "remote host" : "local",
+          backend.location === "remote-host" ? "my host" : backend.location === "cloud" ? "Bark Cloud" : "this device",
         ]),
       );
     }

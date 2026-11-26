@@ -14,7 +14,7 @@ struct ConnectView: View {
 
     var body: some View {
         CrystalPage {
-            PageHeader(title: "Connect", subtitle: "On your other devices, choose Find hosts and type the pairing password.")
+            PageHeader(title: "Connect", subtitle: "On your other devices, look for this server in Bark’s settings and type the pairing password.")
             accessCard
             HStack(alignment: .top, spacing: 16) {
                 SurfaceCard(fillHeight: true) {
@@ -64,7 +64,7 @@ struct ConnectView: View {
                             .buttonStyle(OutlineButtonStyle(compact: true))
                     }
                 } else if access == .tailnet && port != HostConfiguration.defaultPort {
-                    Label("Find hosts only looks on port \(String(HostConfiguration.defaultPort)). On your other devices, enter \(controller.shareableEndpoint?.url ?? "this address") under Enter address manually.",
+                    Label("Other devices only look for servers on port \(String(HostConfiguration.defaultPort)). On them, type \(controller.shareableEndpoint?.url ?? "this address") as the server’s address.",
                           systemImage: "info.circle")
                         .font(.callout).foregroundStyle(Crystal.ink2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -160,7 +160,7 @@ private struct PortRow: View {
                 } else if saved != HostConfiguration.defaultPort {
                     Button("Use \(String(HostConfiguration.defaultPort))") { draft = HostConfiguration.defaultPort; apply() }
                         .buttonStyle(OutlineButtonStyle(compact: true))
-                        .help("The port Find hosts looks on")
+                        .help("The port other devices look for servers on")
                 }
                 Spacer(minLength: 0)
             }

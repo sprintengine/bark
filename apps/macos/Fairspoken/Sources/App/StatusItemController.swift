@@ -50,7 +50,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         toggleItem.target = self
-        toggleItem.image = Self.symbol("mic")
+        toggleItem.image = Self.symbol("waveform")
         toggleItem.setShortcut(for: .dictation)
         menu.addItem(toggleItem)
         pasteLastItem.target = self
@@ -62,7 +62,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(pendingItem)
         menu.addItem(.separator())
 
-        microphoneItem.image = Self.symbol("speaker.wave.2")
+        microphoneItem.image = Self.symbol("mic")
         microphoneItem.submenu = NSMenu(title: "Microphone")
         menu.addItem(microphoneItem)
         locationItem.image = Self.symbol("laptopcomputer")
@@ -70,17 +70,20 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(locationItem)
         menu.addItem(.separator())
 
-        menu.addItem(entry("Open \(AppInfo.displayName)", #selector(openHome), "o"))
-        menu.addItem(entry("Settings…", #selector(openSettings), ","))
+        // Every row carries a symbol, so the titles line up down the whole menu.
+        menu.addItem(entry("Open \(AppInfo.displayName)", #selector(openHome), "o", symbol: "macwindow"))
+        menu.addItem(entry("Settings…", #selector(openSettings), ",", symbol: "gearshape"))
         updateItem.target = self
+        updateItem.image = Self.symbol("arrow.triangle.2.circlepath")
         menu.addItem(updateItem)
         menu.addItem(.separator())
-        menu.addItem(entry("Quit \(AppInfo.displayName)", #selector(quit), "q"))
+        menu.addItem(entry("Quit \(AppInfo.displayName)", #selector(quit), "q", symbol: "power"))
     }
 
-    private func entry(_ title: String, _ action: Selector, _ key: String) -> NSMenuItem {
+    private func entry(_ title: String, _ action: Selector, _ key: String, symbol: String? = nil) -> NSMenuItem {
         let i = NSMenuItem(title: title, action: action, keyEquivalent: key)
         i.target = self
+        if let symbol { i.image = Self.symbol(symbol) }
         return i
     }
 
@@ -107,14 +110,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     func update(for phase: DictationController.Phase) {
-        let symbol: String
+        let symbol: String?
         switch phase {
         case .listening: symbol = "mic.fill"
         case .transcribing: symbol = "ellipsis.circle"
         case .failed: symbol = "exclamationmark.triangle"
-        default: symbol = "waveform"
+        default: symbol = nil
         }
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: AppInfo.displayName)
+        // At rest, the sheepdog: the app icon's markings knocked out of a tile, one colour so
+        // the menu bar can tint it.
+        let image = symbol.map { NSImage(systemSymbolName: $0, accessibilityDescription: AppInfo.displayName) }
+            ?? NSImage(named: "MenuBarMark")
+        image?.accessibilityDescription = AppInfo.displayName
         image?.isTemplate = true
         item.button?.image = image
         item.button?.contentTintColor = phase.isListening ? NSColor(Crystal.live) : nil
@@ -137,7 +144,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func refresh() {
         let listening = model.dictation.phase.isListening
         toggleItem.title = listening ? "Stop Dictation" : "Start Dictation"
-        toggleItem.image = Self.symbol(listening ? "stop.circle" : "mic")
+        toggleItem.image = Self.symbol(listening ? "stop.circle" : "waveform")
         pasteLastItem.isEnabled = model.lastDictation != nil
         lastItem.isHidden = model.lastDictation == nil
         // The views' heights follow their content (the last dictation's text wraps to two lines).
@@ -259,11 +266,7 @@ private struct StatusMenuHeader: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "waveform")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Crystal.canvas)
-                .frame(width: 20, height: 20)
-                .background(Crystal.ink, in: .rect(cornerRadius: 6, style: .continuous))
+            BrandMark(size: 22)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     if model.dictation.phase.isListening {

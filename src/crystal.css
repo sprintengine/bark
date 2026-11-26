@@ -156,8 +156,11 @@ body {
 .sidebar-status-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .sidebar-status-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-status-state { color: var(--crystal-ink-2); font-size: var(--sem-font-size-micro); }
-.sidebar-status-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: var(--crystal-ink-2); font-size: var(--sem-font-size-micro); }
-.sidebar-status .ds-kbd-chord-key { height: 18px; min-width: 20px; font-size: 11px; border-radius: 5px; background: var(--row-raised); }
+.sidebar-status-shortcut { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; color: var(--crystal-ink-2); font-size: var(--sem-font-size-micro); }
+/* A long chord ("Ctrl Alt Shift F12") wraps inside the card instead of
+   running past its edge. */
+.sidebar-status .ds-kbd-chord { flex-wrap: wrap; justify-content: flex-end; row-gap: 3px; min-width: 0; }
+.sidebar-status .ds-kbd-chord-key { height: 18px; min-width: 20px; padding: 0 5px; font-size: 11px; border-radius: 5px; background: var(--row-raised); }
 .status-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--crystal-ink-3); }
 .sidebar-status[data-state="ok"] .status-dot { background: var(--crystal-ok); box-shadow: 0 0 0 3px var(--crystal-tint); }
 .sidebar-status[data-state="busy"] .status-dot { background: var(--crystal-warn); animation: status-pulse 1.2s ease-in-out infinite alternate; }
@@ -533,7 +536,7 @@ body {
 .monthly-usage-total { color: var(--crystal-ink-2); padding-bottom: var(--sem-space-sm); }
 .monthly-usage-note { border-top-color: var(--crystal-hairline); color: var(--crystal-ink-3); }
 
-.empty { margin: 0 0 22px; max-width: 480px; min-height: 0; padding: 36px 32px; }
+.empty { margin: 0 0 22px; min-height: 0; padding: 36px 32px; }
 .empty .e-title { color: var(--crystal-ink); font-size: var(--sem-font-size-title); font-weight: 600; }
 .empty .e-sub { color: var(--crystal-ink-2); }
 .empty .e-actions { display: flex; gap: var(--sem-space-sm); margin-top: 8px; }
@@ -576,7 +579,9 @@ body {
 
 /* ── Speed and accuracy tests ────────────────────────────────────────── */
 .st-step { color: var(--crystal-ink-3); }
-.st-h, .res-h { font-size: var(--sem-font-size-display); letter-spacing: -0.022em; }
+.res-h { font-size: var(--sem-font-size-display); letter-spacing: -0.022em; }
+/* Under the page title, so a step down from it rather than a second title. */
+.st-h { font-size: 20px; letter-spacing: -0.012em; }
 .st-sub { color: var(--crystal-ink-2); }
 .passage { color: var(--crystal-ink-3); }
 .passage.live .ch.bad { color: var(--crystal-error); text-decoration-color: var(--crystal-error); }

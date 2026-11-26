@@ -333,7 +333,7 @@ async function loadDevices(select: HTMLSelectElement): Promise<void> {
   const current = select.value || settings?.audioDevice || "";
   const devices = await navigator.mediaDevices?.enumerateDevices().catch(() => []) ?? [];
   const inputs = devices.filter((device) => device.kind === "audioinput" && device.deviceId !== "default");
-  select.replaceChildren(new Option("System default", ""), ...inputs.map((device, i) => new Option(device.label || `Microphone ${i + 1}`, device.deviceId)));
+  select.replaceChildren(new Option("Default microphone", ""), ...inputs.map((device, i) => new Option(device.label || `Microphone ${i + 1}`, device.deviceId)));
   select.value = [...select.options].some((option) => option.value === current) ? current : "";
 }
 

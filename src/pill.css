@@ -196,6 +196,8 @@ body[data-pill="transcribing"] .status-dot { background: var(--text-secondary); 
   letter-spacing: -0.005em;
 }
 
+body[data-long-hint][data-pill="hover"] .brand { display: none; }
+
 .pill-label {
   color: var(--text-primary);
   font-weight: 600;

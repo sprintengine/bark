@@ -239,7 +239,7 @@ struct ModelRow: View {
             ScoreBar(value: info.accuracy, label: "Accuracy").frame(width: Column.bar, alignment: .leading)
                 .help(info.wer.map { String(format: "%.1f%% word error rate", $0) } ?? "")
             if columns.size {
-                Text(Format.bytes(library.diskBytes[info.id] ?? info.approxBytes))
+                Text(Format.bytes(library.shownBytes(info)))
                     .font(.contentBody).monospacedDigit().foregroundStyle(Crystal.ink2)
                     .frame(width: Column.size, alignment: .trailing)
             }
@@ -392,8 +392,15 @@ struct ModelDetailSheet: View {
                 if let url = info.sourceURL {
                     HStack(spacing: 12) {
                         label("Source").frame(width: 92, alignment: .leading)
-                        Link(info.variant.map { "\(info.repository)/\($0)" } ?? info.repository, destination: url)
-                            .font(.contentBody).foregroundStyle(Crystal.info).lineLimit(1).truncationMode(.middle)
+                        // The label as its own Text: a Link's title wrapped onto a second, centred line
+                        // and ignored the line limit.
+                        Link(destination: url) {
+                            Text(info.variant.map { "\(info.repository)/\($0)" } ?? info.repository)
+                                .lineLimit(1).truncationMode(.middle)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .font(.contentBody).foregroundStyle(Crystal.info)
+                        .help(info.variant.map { "\(info.repository)/\($0)" } ?? info.repository)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 14).frame(minHeight: 36)

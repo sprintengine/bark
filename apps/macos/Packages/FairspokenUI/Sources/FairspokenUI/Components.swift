@@ -445,10 +445,14 @@ public enum Format {
 
     public static func number(_ n: Int) -> String { n.formatted(.number) }
 
+    /// "45s", "1m 30s", "10m", "2h 36m", "3h": a zero remainder is left off ("10m", not "10m 0s").
     public static func duration(_ seconds: Double) -> String {
         let s = Int(seconds)
-        if s >= 3600 { return "\(s / 3600)h \(s % 3600 / 60)m" }
-        if s >= 60 { return "\(s / 60)m \(s % 60)s" }
+        func pair(_ big: Int, _ bigUnit: String, _ small: Int, _ smallUnit: String) -> String {
+            small == 0 ? "\(big)\(bigUnit)" : "\(big)\(bigUnit) \(small)\(smallUnit)"
+        }
+        if s >= 3600 { return pair(s / 3600, "h", s % 3600 / 60, "m") }
+        if s >= 60 { return pair(s / 60, "m", s % 60, "s") }
         return "\(s)s"
     }
 

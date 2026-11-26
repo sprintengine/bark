@@ -89,7 +89,7 @@ struct StyleChipTests {
         let chosen = rules.resolve(mail, override: .casual)
         let chip = try #require(StyleChipState(resolution: chosen, rulesResolution: rules.resolve(mail),
                                                target: rules.alwaysUseTarget(for: mail)))
-        #expect(chip.label == "Casual · You chose this")
+        #expect(chip.label == "Casual · Your pick")
         #expect(chip.entries.contains(.style(.casual, checked: true)))
         #expect(chip.entries.contains(.useRules(title: "Back to Email (Mail rule)")))
         #expect(chip.entries.last == .alwaysUse(title: "Always use Casual for Mail", style: .casual))

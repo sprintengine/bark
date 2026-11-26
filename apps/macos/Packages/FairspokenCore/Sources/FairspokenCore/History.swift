@@ -49,6 +49,10 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
     public var isNote: Bool?
     /// Time post-processing took.
     public var cleanupMs: Int?
+    /// After the transcript, the wait to learn which app and field it is going to (for the style).
+    public var destinationMs: Int?
+    /// From the cleaned text to the paste: waiting for the keys to come up, checking the field, ⌘V.
+    public var pasteMs: Int?
     /// True when nothing could take the paste and the text went to the clipboard instead.
     public var clipboardOnly: Bool?
     /// The post-training recording kept for it (`TrainingEntry.id`), so it can be transcribed again.
@@ -58,7 +62,7 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
                 timings: DictationTimings? = nil, model: String? = nil, appName: String? = nil, appBundleId: String? = nil,
                 rawText: String? = nil, cleanupEdits: [CleanupEdit]? = nil, style: String? = nil, styleReason: String? = nil,
                 destinationHost: String? = nil, isNote: Bool? = nil, cleanupMs: Int? = nil, clipboardOnly: Bool? = nil,
-                recordingID: String? = nil) {
+                recordingID: String? = nil, destinationMs: Int? = nil, pasteMs: Int? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.text = text
@@ -76,6 +80,8 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
         self.destinationHost = destinationHost
         self.isNote = isNote
         self.cleanupMs = cleanupMs
+        self.destinationMs = destinationMs
+        self.pasteMs = pasteMs
         self.clipboardOnly = clipboardOnly
         self.recordingID = recordingID
     }
@@ -112,6 +118,8 @@ public struct TranscriptHistoryItem: Codable, Equatable, Identifiable, Sendable 
         destinationHost = c.lenient(String.self, .destinationHost)
         isNote = c.lenient(Bool.self, .isNote)
         cleanupMs = c.lenientInt(.cleanupMs)
+        destinationMs = c.lenientInt(.destinationMs)
+        pasteMs = c.lenientInt(.pasteMs)
         clipboardOnly = c.lenient(Bool.self, .clipboardOnly)
         recordingID = c.lenient(String.self, .recordingID)
     }

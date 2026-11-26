@@ -214,6 +214,7 @@ function shortErrorMessage(message: string): string {
   if (lower.includes("cloud sign-in expired")) return "Cloud sign-in expired — see Settings";
   if (lower.includes("took too long")) return "Took too long, try again";
   if (lower.includes("speech model is still busy")) return "Still finishing the last one";
+  if (lower.includes("no speech")) return "No speech heard — check the mic";
   if (!normalized) return "Error";
   return normalized.length <= 40 ? normalized : `${normalized.slice(0, 39)}…`;
 }

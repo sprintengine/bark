@@ -62,11 +62,12 @@ private struct ServerSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Crystal.canvas)
-                    .frame(width: 20, height: 20)
-                    .background(Crystal.ink, in: .rect(cornerRadius: 6, style: .continuous))
+                // Bark Server's own icon, its sheepdog.
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 24, height: 24)
+                    .accessibilityHidden(true)
                 Text("\(Text("Bark").fontWeight(.semibold).foregroundStyle(Crystal.ink)) \(Text("Server").foregroundStyle(Crystal.ink2))")
                     .font(.system(size: 15))
                 Spacer(minLength: 0)
@@ -447,12 +448,14 @@ enum ServerFormat {
         return value >= 1000 ? String(format: "%.1f s", value / 1000) : "\(Int(value.rounded())) ms"
     }
 
+    /// Bark's spelling ("45s", "10m", "2h 36m", "3d 4h"), a zero remainder left off.
     static func duration(_ seconds: Double) -> String {
         let s = Int(seconds)
-        if s >= 86_400 { return "\(s / 86_400) d \(s % 86_400 / 3600) h" }
-        if s >= 3600 { return "\(s / 3600) h \(s % 3600 / 60) m" }
-        if s >= 60 { return "\(s / 60) m \(s % 60) s" }
-        return "\(s) s"
+        if s >= 86_400 {
+            let h = s % 86_400 / 3600
+            return h == 0 ? "\(s / 86_400)d" : "\(s / 86_400)d \(h)h"
+        }
+        return Format.duration(seconds)
     }
 
     static func ago(_ epochMs: Double, now: Date = Date()) -> String {

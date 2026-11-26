@@ -113,7 +113,7 @@ public struct StyleChipState: Equatable, Sendable {
     }
 
     public var style: DictationStyle.ID
-    /// "Mail rule", "Your Slack rule", "You chose this", "Terminal".
+    /// "Mail rule", "Your Slack rule", "Your pick", "Terminal".
     public var reason: String
     public var isLocked: Bool
     public var entries: [Entry]
@@ -150,8 +150,11 @@ public struct StyleChipState: Equatable, Sendable {
 
     /// Short enough for the chip: "Your rule for Slack" → "Your Slack rule"; with a long name
     /// ("Your rule for Microsoft Outlook") just "Your rule", the app being in front of the person.
+    /// A style picked for this one dictation reads "Your pick": "You chose this" cut the chip's
+    /// reason short ("Casual · You chose t…").
     public static func shortReason(_ reason: String) -> String {
         let r = reason.trimmingCharacters(in: .whitespaces)
+        if r == "You chose this" { return "Your pick" }
         if r.hasPrefix("Your rule for ") {
             let name = String(r.dropFirst("Your rule for ".count))
             return name.count <= 12 ? "Your \(name) rule" : "Your rule"

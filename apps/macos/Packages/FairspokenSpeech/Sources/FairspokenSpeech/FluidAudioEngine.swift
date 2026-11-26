@@ -148,6 +148,21 @@ public enum ParakeetModels {
         var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
         _ = try? await manager.transcribe(probe, decoderState: &state)
     }
+
+    /// Model time per second of audio above which a freshly loaded model counts as degraded. A
+    /// healthy Parakeet on the Neural Engine takes 5–20 ms per second of audio on an M-series
+    /// Mac; a degraded one 40 ms and up.
+    static let slowMsPerAudioSecond = 30.0
+
+    /// Times one 4 s inference (after `warmUp`): milliseconds of model time per second of audio.
+    static func msPerAudioSecond(_ manager: AsrManager) async -> Double {
+        let seconds = 4
+        let probe = (0..<(16_000 * seconds)).map { i in Float(sin(Double(i) * 0.05)) * 0.0008 }
+        var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+        let started = ContinuousClock.now
+        _ = try? await manager.transcribe(probe, decoderState: &state)
+        return Double((ContinuousClock.now - started) / .microseconds(1)) / 1000 / Double(seconds)
+    }
 }
 
 public enum SpeechEngineError: LocalizedError, Sendable {
@@ -195,15 +210,34 @@ public actor FluidAudioEngine: LocalSpeechEngine {
         }
         progress(.loading)
         let started = Date()
-        let models = try await AsrModels.load(from: dir, version: v)
-        let next = AsrManager(config: ParakeetModels.managerConfig(v))
-        try await next.loadModels(models)
+        // A load can come up healthy-looking but many times slower than it should (seen after
+        // the disk filled up at launch: 40–160 ms of model time per second of audio instead of
+        // 5–20), which turned every release into seconds of "Transcribing". So the warm-up is
+        // timed, and a slow load is thrown away and loaded once more before it is used.
+        var next: AsrManager?
+        for attempt in 1...2 {
+            let models = try await AsrModels.load(from: dir, version: v)
+            let candidate = AsrManager(config: ParakeetModels.managerConfig(v))
+            try await candidate.loadModels(models)
+            progress(.warming)
+            await ParakeetModels.warmUp(candidate)
+            let rate = await ParakeetModels.msPerAudioSecond(candidate)
+            if rate <= ParakeetModels.slowMsPerAudioSecond || attempt == 2 {
+                if rate > ParakeetModels.slowMsPerAudioSecond {
+                    speechLog.error("\(id, privacy: .public) is still slow after a reload: \(rate, format: .fixed(precision: 0)) ms per second of audio")
+                }
+                next = candidate
+                break
+            }
+            speechLog.error("\(id, privacy: .public) loaded slow (\(rate, format: .fixed(precision: 0)) ms per second of audio); loading it again")
+            await candidate.cleanup()
+            progress(.loading)
+        }
+        guard let next else { throw SpeechEngineError.notLoaded }
         if let old = manager { await old.cleanup() }
         manager = next
         loadedModelID = id
         speechLog.info("Loaded \(id, privacy: .public) in \(Date().timeIntervalSince(started), format: .fixed(precision: 2)) s")
-        progress(.warming)
-        await ParakeetModels.warmUp(next)
     }
 
     public func unload() async {

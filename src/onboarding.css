@@ -110,7 +110,7 @@ body {
 .ob-point + .ob-point { border-top: 1px solid var(--crystal-hairline); }
 .ob-point div { display: flex; flex-direction: column; gap: 1px; }
 .ob-point strong { font-weight: 600; }
-.ob-point span { color: var(--crystal-ink-2); }
+.ob-point div span { color: var(--crystal-ink-2); }
 .ob-points--compact { margin-top: 4px; }
 
 /* Buttons */

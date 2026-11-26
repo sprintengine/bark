@@ -56,6 +56,8 @@ final class AppModel {
     var homeDraftSources: [String] = []
     /// Screenshots: the thread row drawn as if under the pointer.
     var showcaseHoveredRow: String?
+    /// Screenshots only: the timeline step shown as hovered (`DictationTimeline.Kind` raw value).
+    var showcaseTimelineStep: String?
     /// Bumped to start editing the open dictation's text (⏎ in the thread list).
     var editRequest = 0
     /// Dictations being transcribed again from their kept recording.

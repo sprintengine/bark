@@ -101,22 +101,37 @@ enum TextInserter {
             write(text, to: pasteboard, transient: false)
             return .copied(reason: switchedDuringCheckReason)
         }
-        let saved = restoreClipboard && !switchedApps ? snapshot(pasteboard) : nil
+        // A restore still waiting from the last dictation holds the person's own clipboard while
+        // the pasteboard still holds that dictation, which must not be what this one puts back.
+        let saved = restoreClipboard && !switchedApps ? (pendingRestore.flatMap { $0.change == pasteboard.changeCount ? $0.items : nil } ?? snapshot(pasteboard)) : nil
         // The layout was made for the app the recording started in: elsewhere, words only.
         Self.write(text, html: switchedApps ? nil : html, to: pasteboard, transient: saved != nil)
         let ourChange = pasteboard.changeCount
         postCommandV()
 
         if let saved {
-            // Give the target app time to read the pasteboard before restoring it. If another
-            // app came to the front meanwhile, the paste may have missed: leave the dictation.
-            try? await Task.sleep(for: .milliseconds(450))
-            if pasteboard.changeCount == ourChange, NSWorkspace.shared.frontmostApplication?.processIdentifier == front {
-                restore(saved, to: pasteboard)
+            // Give the target app time to read the pasteboard before restoring it, in the
+            // background: the dictation is done once ⌘V is sent, and waiting here held the pill
+            // and the next step for 450 ms every time. If another app came to the front meanwhile
+            // the paste may have missed, and if anything wrote the pasteboard since (a copy, the
+            // next dictation), it is theirs: either way the dictation is left.
+            restoreToken &+= 1
+            let token = restoreToken
+            pendingRestore = (token, ourChange, saved)
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(450))
+                if pasteboard.changeCount == ourChange, NSWorkspace.shared.frontmostApplication?.processIdentifier == front {
+                    restore(saved, to: pasteboard)
+                }
+                if pendingRestore?.token == token { pendingRestore = nil }
             }
         }
         return .pasted
     }
+
+    /// The clipboard a pasted dictation will put back in a moment, with the paste that owns it.
+    private static var pendingRestore: (token: Int, change: Int, items: [[NSPasteboard.PasteboardType: Data]])?
+    private static var restoreToken = 0
 
     static func copy(_ text: String, html: String? = nil) {
         write(text, html: html, to: .general, transient: false)

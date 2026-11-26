@@ -17,11 +17,8 @@ struct AppMonogram: View {
         let shape = RoundedRectangle(cornerRadius: size >= 20 ? 5 : 4, style: .continuous)
         Group {
             if isNote {
-                Image(systemName: "waveform")
-                    .font(.system(size: size * 0.55, weight: .bold))
-                    .foregroundStyle(Crystal.canvas)
-                    .frame(width: size, height: size)
-                    .background(Crystal.ink, in: shape)
+                // Written in Bark: Bark's own sheepdog.
+                BrandMark(size: size)
             } else {
                 Text(AppMonogram.letters(appName ?? AppInfo.displayName))
                     .font(.system(size: size >= 20 ? 9 : 7.5, weight: .bold, design: .monospaced))

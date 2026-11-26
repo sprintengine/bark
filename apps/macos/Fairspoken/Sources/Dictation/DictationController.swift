@@ -668,6 +668,7 @@ final class DictationController {
         let destination = await style.destination(fallback: DictationDestination(bundleID: item.appBundleId, appName: item.appName))
         let resolution = style.resolve(destination, rules: s.styleRules)
         let cleanupStarted = ContinuousClock.now
+        let destinationMs = Int((cleanupStarted - transcribed) / .milliseconds(1))
         let processed = DictationPipeline.process(output.text, context: PostProcessContext(settings: s, appBundleID: item.appBundleId,
                                                                                             resolution: resolution))
         let cleanupMs = Int((ContinuousClock.now - cleanupStarted) / .milliseconds(1))
@@ -691,8 +692,10 @@ final class DictationController {
             Self.log.notice("Dictation \(id) was cancelled before it was pasted; nothing was pasted")
             return false
         }
-        let total = Int((ContinuousClock.now - released) / .milliseconds(1))
+        let delivered = ContinuousClock.now
+        let total = Int((delivered - released) / .milliseconds(1))
         let transcribeMs = Int((transcribed - released) / .milliseconds(1))
+        let pasteMs = Int((delivered - pasteStarted) / .milliseconds(1))
         let now = Date()
         var entry = TranscriptHistoryItem(
             id: "transcript-\(Int64(now.timeIntervalSince1970 * 1000))",
@@ -701,7 +704,7 @@ final class DictationController {
             timings: DictationTimings(transcribeMs: transcribeMs, speechModelMs: output.modelMs, totalMs: total),
             model: output.model, appName: item.appName, appBundleId: item.appBundleId, rawText: output.text,
             cleanupEdits: processed.edits, style: resolution.style.rawValue, styleReason: resolution.reason,
-            destinationHost: destination.host, cleanupMs: cleanupMs)
+            destinationHost: destination.host, cleanupMs: cleanupMs, destinationMs: destinationMs, pasteMs: pasteMs)
         // Dictated into Home's composer: a note.
         if delivery == .shownInApp, shownInAppIsNote() { entry.isNote = true }
         // A paste was tried and nothing could take it (not a copy-only choice in Settings).

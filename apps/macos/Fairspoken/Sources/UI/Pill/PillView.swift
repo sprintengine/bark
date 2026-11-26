@@ -234,7 +234,7 @@ struct PillView: View {
     /// Before a recording (screenshots and the demo only: the floating pill hides when idle).
     private var readyRow: some View {
         HStack(spacing: 6) {
-            Image(systemName: "waveform").font(.system(size: 13)).foregroundStyle(Crystal.ink2).frame(width: 28, height: 28)
+            BrandMark(size: 20).frame(width: 28, height: 28)
             VoiceWaveform(meter: dictation.meter, reduceMotion: true, bars: 14, resting: true).frame(width: 54)
             Keycap(label: shortcut).padding(.leading, 4)
         }
