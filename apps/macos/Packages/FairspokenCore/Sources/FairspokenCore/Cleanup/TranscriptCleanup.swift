@@ -102,7 +102,7 @@ struct CleanupWork {
         if p >= 0 {
             if last.endsSentence && !t[p].endsSentence {
                 t[p].trail = Self.strippingPause(t[p].trail) + Self.terminal(of: last.trail)
-            } else if fillerCommas, t[p].endsWithComma, last.endsWithComma, n < t.count, !keepsCommaBefore(n) {
+            } else if fillerCommas, t[p].endsWithComma, last.endsWithComma, n < t.count, !keepsCommaBefore(n), !commaIsStructural(after: p) {
                 t[p].trail = Self.strippingPause(t[p].trail)
             }
         }
@@ -132,6 +132,23 @@ struct CleanupWork {
         let next = tags.lexical[n + 1]
         return next != .adjective && next != .adverb
     }
+
+    /// A comma the sentence needs whatever was removed after it: after a name ("Hi Aoife,"),
+    /// after the sentence's first word ("Yes,", "Thanks,"), or closing a subordinate clause
+    /// ("If you can,").
+    func commaIsStructural(after p: Int) -> Bool {
+        if t[p].isCapitalised && !isSentenceStart(p) && !Self.isIForm(t[p].lower) { return true }
+        if isSentenceStart(p) { return Self.interjections.contains(t[p].lower) }
+        let start = sentenceStart(of: p)
+        var i = p - 1
+        while i >= start, !t[i].hasPause { i -= 1 }
+        return L.subordinators.contains(t[i + 1].lower)
+    }
+
+    static let interjections: Set<String> = [
+        "yes", "yeah", "yep", "no", "nope", "thanks", "ok", "okay", "well", "right", "sure", "hi", "hello", "hey",
+        "sorry", "look", "listen", "honestly", "anyway", "grand", "great", "cheers", "morning", "afternoon",
+    ]
 
     /// The trail without a trailing comma, semicolon, colon or dash.
     static func strippingPause(_ trail: String) -> String {

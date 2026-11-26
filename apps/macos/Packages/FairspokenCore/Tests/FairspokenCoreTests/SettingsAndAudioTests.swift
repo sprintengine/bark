@@ -93,16 +93,17 @@ struct SettingsTests {
 struct HistoryTests {
     @Test func historyDedupesAndCaps() {
         var items: [TranscriptHistoryItem] = []
-        for i in 0..<60 {
+        let cap = TranscriptHistory.maxItems
+        for i in 0..<(cap + 10) {
             items = TranscriptHistory.adding(TranscriptHistoryItem(id: "\(i)", createdAt: Int64(i), text: "note \(i)", backend: "parakeet",
                                                                    location: "local", durationSeconds: 1), to: items)
         }
-        #expect(items.count == 50)
-        items = TranscriptHistory.adding(TranscriptHistoryItem(id: "x", createdAt: 99, text: "NOTE   59", backend: "parakeet",
+        #expect(items.count == cap)
+        items = TranscriptHistory.adding(TranscriptHistoryItem(id: "x", createdAt: 99, text: "NOTE   \(cap + 9)", backend: "parakeet",
                                                                location: "local", durationSeconds: 1), to: items)
-        #expect(items.count == 50)
+        #expect(items.count == cap)
         #expect(items.first?.id == "x")
-        #expect(!items.contains { $0.id == "59" })
+        #expect(!items.contains { $0.id == "\(cap + 9)" })
     }
 
     @Test func decodesRustHistoryItems() throws {
