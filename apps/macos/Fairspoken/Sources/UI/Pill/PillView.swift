@@ -100,6 +100,7 @@ struct PillView: View {
                             .padding(.leading, 2)
                     }
                     if showsLiveText { Spacer(minLength: 0) }
+                    cancelHint
                 }
                 .accessibilityLabel("Listening")
             }
@@ -110,6 +111,8 @@ struct PillView: View {
                     ProgressView().controlSize(.small)
                     // "Retrying the host (1 of 2)" once the first attempt has failed.
                     Text(dictation.transcribingNote ?? "Transcribing").font(.system(size: 13, weight: .semibold)).foregroundStyle(Crystal.ink)
+                    if showsLiveText { Spacer(minLength: 0) }
+                    cancelHint
                 }
                 .accessibilityLabel(dictation.transcribingNote ?? "Transcribing")
             }
@@ -136,6 +139,20 @@ struct PillView: View {
                 Text("Ready").font(.system(size: 13, weight: .medium)).foregroundStyle(Crystal.ink)
                 ShortcutCaps(description: HotkeyController.currentShortcutSymbols)
             }
+        }
+    }
+
+    /// A quiet reminder that the cancel key (Escape unless changed) ends the dictation, while
+    /// listening and while transcribing.
+    @ViewBuilder private var cancelHint: some View {
+        if let key = HotkeyController.cancelShortcutSymbols {
+            Text(key == "⎋" ? "esc to cancel" : "\(key) to cancel")
+                .font(.system(size: 11))
+                .foregroundStyle(Crystal.ink3)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.leading, 2)
+                .accessibilityHidden(true)
         }
     }
 
