@@ -230,7 +230,9 @@ struct TailnetDiscoveryTests {
         ])
         let start = ContinuousClock.now
         let hosts = try await discovery(t).discover()
-        #expect(ContinuousClock.now - start < .seconds(2))  // the silent probes time out
+        // The silent probes time out (300 ms here) rather than wait out the fake's 60 s. The bound
+        // is loose on purpose: a busy CI runner has taken 2.6 s.
+        #expect(ContinuousClock.now - start < .seconds(10))
         #expect(hosts == [
             DiscoveredHost(name: "Dev’s Mac mini", machine: "mac-mini", url: URL(string: "https://mac-mini.tail1234.ts.net")!,
                            auth: .open, serverVersion: "0.4.0", isThisMac: true),
