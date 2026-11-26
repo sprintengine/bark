@@ -21,7 +21,7 @@ scripts/setup-signing.sh              # once per machine: a stable signing ident
 scripts/build.sh                      # Debug, both apps → build/Build/Products/Debug/{Bark,Bark Server}.app
 scripts/build.sh release              # Release, both apps
 scripts/build.sh --app server         # one app: client | server | all
-scripts/test.sh                       # unit tests: FairspokenCore (255), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
+scripts/test.sh                       # unit tests: FairspokenCore (304), FairspokenHost (80), FairspokenUpdates (19), FairspokenSpeech (11)
 scripts/install.sh                    # Release Bark → ~/Applications, then launches it
 scripts/install.sh --app server       # the same for Bark Server (--app all for both)
 scripts/release.sh                    # Developer ID + notarized → build/release/Bark-<version>-macos-arm64.{zip,dmg}
@@ -195,7 +195,9 @@ Increase Contrast variant, and every text colour holds 4.5:1 on the surfaces it 
   why, and a word diff (blue added, orange removed; worked out from the words as heard when no edits
   were recorded). Beside it an actions card: open the app, copy (⇧⌘C), paste again, edit, the style,
   transcribe again from a kept post-training recording, delete. A composer docked at the bottom
-  corrects the text: click in, change it, ⏎ saves it to history.
+  corrects the text: click in, change it, ⏎ saves it to history. Typed over the text, a command
+  ("change Tuesday to Friday", "delete really", "add see you then at the end") is applied instead,
+  when what it names appears exactly once (`NoteEditCommand`).
 
 Settings › Transcription › **Network device** holds the host URL, token (Keychain) and timeout, a Test
 connection button and a status line such as "Using host: practice-mini.local:48173 · connected"
@@ -254,6 +256,62 @@ field. Press ⌘V to paste." for about 4 s. Anything unclear (apps that report l
 Accessibility, such as terminals and web-view apps) is pasted as before. If a different app is in
 front than when recording started, the text is pasted but the old clipboard is not restored, so the
 dictation can still be pasted again.
+
+## Cleanup and styles
+
+Every dictation goes through `DictationPipeline` (FairspokenCore) before it is pasted: the user's
+vocabulary casing, then cleanup, then the user's corrections, then the style's layout. It is
+deterministic, uses no models and no network, and takes well under 2 ms for a typical dictation.
+
+**Cleanup** (`TranscriptCleanup`) is a precision-first rule set. A wrongly deleted word is worse
+than a missed fix, so every rule needs clear evidence and anything ambiguous is left as heard:
+
+- fillers: "um", "uh", "er", "erm", "hmm"; "you know", "I mean" and "like" only when commas set
+  them off as fillers ("I was, like, so tired"), never "I like it" or "like ten minutes";
+- stutters and repeats: "the the", "I I I", "I think I think we"; not "very very", "bye bye",
+  "had had", "what it is is", "I know, I know";
+- restarts: a clause abandoned and started again ("where you could, where you can"), only when the
+  abandoned part ends on an unfinished word or a cut-off mark;
+- cue corrections: "no wait", "sorry", "I mean", "or rather", "actually", "correction", "make that",
+  when the repair after the cue is the same kind of thing as the words before it (a day, a month, a
+  number or amount with its unit, a name, a "the …" noun phrase) and stands on its own: "on Tuesday,
+  sorry, Wednesday" → "on Wednesday", but "Sorry, Wednesday works better" is left alone. "Scratch
+  that" and "let me rephrase" take back the clause or sentence before them;
+- spoken commands: "new line", "new paragraph", "full stop" / "period", "comma", "question mark",
+  "exclamation mark", "semicolon", except where the words are ordinary nouns ("the Oxford comma",
+  "a trial period");
+- a punctuation tidy: a full stop a pause put after "the" or "and", a capital after a comma, doubled
+  punctuation, the first word of each sentence.
+
+Quoted speech is never changed. Settings › Transcription has three switches (`cleanupFillers`,
+`cleanupSelfCorrections`, `cleanupSpokenCommands`, all on). The golden fixtures in
+`Packages/FairspokenCore/Tests/FairspokenCoreTests/Fixtures/cleanup-fixtures.jsonl` (345 cases, 179
+of them must-not-change) report exact matches per category and a harm count of content words
+wrongly removed or added, which must stay at 0.
+
+**Styles** (`DictationStyle`): Verbatim (vocabulary and corrections only), Casual (light cleanup, the
+speaker's casing, no full stop on a short single message), Clean (the default), Email (a spoken
+greeting and sign-off on their own lines, paragraphs at "new paragraph" or, in long bodies, before
+"Also," and the like), Document and Notes (spoken headings, "bullet point" lists, "number one…" and
+"first… second…" numbered lists) and Code (no punctuation polishing). Formatters only reshape words
+that were spoken: nothing is ever added. Email, Document and Notes are pasted as one pasteboard item
+with plain text and minimal HTML (`<div>`, `<h2>`, `<ul>`/`<ol>`, no fonts or colours).
+
+**Which style** (`StyleRules`, in `styleRules` in settings.json): the user's rule for the app (by
+bundle id) beats the user's rule for the website (host, optional path prefix), which beats Bark's
+defaults (Mail, Outlook and webmail → Email; Notes, Obsidian, Bear → Notes; Pages, Word, Google Docs,
+Notion → Document; Slack, Messages, WhatsApp, Discord, Teams → Casual; Xcode, VS Code, Cursor,
+github.com → Code), which beats the user's default (Clean). The destination is read when recording
+starts, off the main thread within 300 ms (`DestinationReader`): the app, the window title, whether
+the field is single-line, and in a browser the page's `AXURL` (or the window's `AXDocument`), cut to
+scheme, host and path (Chromium browsers are asked once per process to build their full accessibility
+tree, which is where the address comes from). A single-line field gets no multi-line layout; terminals and secure fields are
+always Verbatim and plain, whatever was chosen. While recording, the pill can change the dictation's
+style (`setStyleOverride`) and make it the rule for the site, or for the app when the user already has
+a rule for that browser (`alwaysUseStyle`, `alwaysUseTarget`). Each history item records the raw text, the edits,
+the style and why, the website's host and the time cleanup took.
+
+`Contents/MacOS/Fairspoken --pipeline-demo` (Debug builds) prints sample dictations through every style.
 
 ## Learning from your corrections
 
@@ -506,8 +564,9 @@ Fairspoken/                      Bark
   Sources/Audio/                 AVAudioEngine capture → 16 kHz mono Float32, device selection, level meter
   Sources/Engine/                ModelLibrary, local/remote sessions, HostStatus (network device reachability)
   Sources/Dictation/             DictationController state machine, PendingDictations (kept audio, retries)
-  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, copy-only with no text field), EditWatcher +
-                                 FieldReader (learning from corrections), hotkeys + Fn tap, sounds
+  Sources/System/                Permissions, TextInserter (⌘V + clipboard restore, rich paste, copy-only with no text field),
+                                 DestinationReader (app, field and website for the style), EditWatcher + FieldReader
+                                 (learning from corrections), hotkeys + Fn tap, sounds
   Sources/Storage/               settings.json / transcript-history.json / usage-stats.json / learned.json (Rust schemas), Keychain
   Sources/UI/                    Shell (window, sidebar, thread list), Home, Dictation (one opened), Models, Settings,
                                  Onboarding, Pill
@@ -519,7 +578,7 @@ FairspokenServer/                Bark Server
 Packages/
   FairspokenCore/                platform-neutral core + tests: frame codec, URL policy, protocol types, SSE parser,
                                  host events/stats/live-state reducer, polling differ, simulator, settings/history models,
-                                 edit diff and learned dictionary
+                                 edit diff and learned dictionary, transcript cleanup, styles and the post-processing pipeline
   FairspokenSpeech/              FairspokenSpeech: the only FluidAudio code (pinned 0.17.5): model registry, the client's engine,
                                  the server's worker pool (shared weights, one decoder per worker);
                                  FairspokenWhisper (client only): the only WhisperKit code (pinned 1.1.1), the

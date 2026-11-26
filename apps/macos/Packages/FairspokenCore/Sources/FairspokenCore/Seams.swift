@@ -56,16 +56,42 @@ public struct PostProcessContext: Sendable {
     public var corrections: [TranscriptCorrection]
     /// `AppSettings.speechModelID` of the model that heard it, for scoped corrections.
     public var speechModel: String
-    public init(appBundleID: String?, vocabulary: [String], corrections: [TranscriptCorrection] = [], speechModel: String = "") {
+    /// The style chosen for this dictation (`StyleRules.resolve`), and why.
+    public var style: DictationStyle.ID
+    public var styleReason: String?
+    /// The user's cleanup switches.
+    public var cleanup: CleanupSettings
+    /// The destination takes more than one line (not a single-line field or a terminal).
+    public var allowsMultiline: Bool
+    /// The destination may be given rich text alongside plain.
+    public var allowsRichText: Bool
+
+    public init(appBundleID: String?, vocabulary: [String], corrections: [TranscriptCorrection] = [], speechModel: String = "",
+                style: DictationStyle.ID = .clean, styleReason: String? = nil, cleanup: CleanupSettings = .all,
+                allowsMultiline: Bool = true, allowsRichText: Bool = true) {
         self.appBundleID = appBundleID
         self.vocabulary = vocabulary
         self.corrections = corrections
         self.speechModel = speechModel
+        self.style = style
+        self.styleReason = styleReason
+        self.cleanup = cleanup
+        self.allowsMultiline = allowsMultiline
+        self.allowsRichText = allowsRichText
+    }
+
+    /// The context for a dictation going where `resolution` says, with the user's settings.
+    public init(settings s: AppSettings, appBundleID: String?, resolution: StyleResolution) {
+        self.init(appBundleID: appBundleID, vocabulary: s.vocabularyHints,
+                  corrections: s.postProcess ? s.transcriptCorrections : [], speechModel: s.speechModelID,
+                  style: resolution.style, styleReason: resolution.reason, cleanup: s.cleanupSettings,
+                  allowsMultiline: resolution.allowsMultiline, allowsRichText: resolution.allowsRichText)
     }
 }
 
 /// Trim, restore the user's casing for vocabulary terms, then apply the user's corrections
-/// (`TranscriptCorrections`). Tidy, snippets and polish are still to come.
+/// (`TranscriptCorrections`). Dictations go through `DictationPipeline`, which adds cleanup and
+/// styles; this is the plain path the self-test uses.
 public struct BasicPostProcessor: TranscriptPostProcessor {
     public init() {}
     public func process(_ text: String, context: PostProcessContext) async -> String {

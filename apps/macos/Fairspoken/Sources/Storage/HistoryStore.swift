@@ -4,8 +4,9 @@ import Observation
 import OSLog
 
 /// Dictations and notes (`transcript-history.json`, up to `TranscriptHistory.maxItems`, the Rust
-/// schema plus optional fields) and lifetime usage (`usage-stats.json`). Both import once from the
-/// Tauri app. History is the main window's thread list.
+/// schema plus optional Mac-only fields) and lifetime usage (`usage-stats.json`). Both import
+/// once from the Tauri app. History is the main window's thread list; files are written off the
+/// main thread, newest snapshot last.
 @Observable
 final class HistoryStore {
     private(set) var items: [TranscriptHistoryItem] = []
@@ -14,7 +15,10 @@ final class HistoryStore {
     @ObservationIgnored private var usageRaw: [String: JSONValue] = [:]
     @ObservationIgnored private let directory: URL
     @ObservationIgnored private let persists: Bool
-    private static let log = Logger(subsystem: AppInfo.bundleID, category: "history")
+    /// Writes in order, off the main thread: a 1,000-item history is too big to write on every
+    /// dictation while the UI waits.
+    @ObservationIgnored private let writer = DispatchQueue(label: "history-writer", qos: .utility)
+    nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ie.fairspoken.mac", category: "history")
 
     init(directory: URL = AppInfo.supportDirectory, persists: Bool = !AppInfo.isDemo) {
         self.directory = directory
@@ -83,11 +87,7 @@ final class HistoryStore {
     func addNote(_ text: String, at date: Date = Date()) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        var note = TranscriptHistoryItem(id: "note-\(Int64(date.timeIntervalSince1970 * 1000))",
-                                         createdAt: Int64(date.timeIntervalSince1970 * 1000), text: trimmed,
-                                         backend: "typed", location: "local", durationSeconds: 0,
-                                         appName: AppInfo.displayName, appBundleId: AppInfo.bundleID)
-        note.isNote = true
+        let note = TranscriptHistoryItem.note(trimmed, at: date, appName: AppInfo.displayName, appBundleId: AppInfo.bundleID)
         items = TranscriptHistory.adding(note, to: items)
         save()
         return note.id
@@ -134,15 +134,22 @@ final class HistoryStore {
         return values[values.count / 2]
     }
 
+    /// Waits for queued writes (at quit).
+    func flush() { writer.sync {} }
+
     private func save() {
         guard persists else { return }
-        do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
-            try encoder.encode(items).write(to: historyURL, options: .atomic)
-            try JSONMerge.encode(usage, over: usageRaw).write(to: usageURL, options: .atomic)
-        } catch {
-            Self.log.error("Saving history failed: \(error.localizedDescription, privacy: .public)")
+        let items = items, usage = usage, usageRaw = usageRaw
+        let historyURL = historyURL, usageURL = usageURL
+        writer.async {
+            do {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
+                try encoder.encode(items).write(to: historyURL, options: .atomic)
+                try JSONMerge.encode(usage, over: usageRaw).write(to: usageURL, options: .atomic)
+            } catch {
+                Self.log.error("Saving history failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 

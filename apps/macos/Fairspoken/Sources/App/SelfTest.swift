@@ -18,10 +18,21 @@ import FairspokenCore
 ///
 /// Scans the tailnet the way Settings › Find my host does (or probes one typed entry) and
 /// prints what answered; with `--password`, pairs with the typed host (nothing is saved).
+///
+///   Contents/MacOS/Fairspoken --pipeline-demo        (Debug builds only)
+///
+/// Runs sample transcripts through post-processing (cleanup, corrections, each style's layout)
+/// as a dictation into Mail, Slack, Notes and so on would, and prints plain text, HTML and edits.
 @MainActor
 enum SelfTest {
     static func runIfRequested() -> Bool {
         let args = AppInfo.arguments
+        #if DEBUG
+        if args.contains("--pipeline-demo") {
+            pipelineDemo()
+            exit(0)
+        }
+        #endif
         if let i = args.firstIndex(of: "--discover") {
             let entry = i + 1 < args.count && !args[i + 1].hasPrefix("-") ? args[i + 1] : nil
             let password = args.firstIndex(of: "--password").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
@@ -53,6 +64,48 @@ enum SelfTest {
     }
 
     private static func say(_ s: String) { FileHandle.standardOutput.write(Data((s + "\n").utf8)) }
+
+    #if DEBUG
+    /// Sample dictations through the real pipeline, for each style, with the rules a fresh
+    /// install has. Nothing is pasted, saved or sent anywhere.
+    private static func pipelineDemo() {
+        let rules = StyleRules()
+        let samples: [(DictationDestination, String)] = [
+            (.init(bundleID: "com.apple.mail", appName: "Mail", windowTitle: "Re: Thursday's clinic"),
+             "Hi Aoife, um, thanks for sending these on. I've looked at the audit results and we can go through them on Thursday, no wait, Friday at 2 pm. Kind regards, Pádraig."),
+            (.init(bundleID: "com.google.Chrome", appName: "Chrome", url: "https://mail.google.com/mail/u/0/?compose=new#inbox"),
+             "Dear Mr Byrne, thank you for your letter. New paragraph. Your appointment is confirmed for the 4th at 3 pm, sorry, 4 pm. Many thanks."),
+            (.init(bundleID: "com.tinyspeck.slackmacgap", appName: "Slack"),
+             "So I was thinking we could, we could move standup to, uh, 10 tomorrow."),
+            (.init(bundleID: "com.apple.Notes", appName: "Notes"),
+             "Heading: shopping list. Bullet point milk bullet point eggs, bullet point the, the brown bread and"),
+            (.init(bundleID: "com.microsoft.Word", appName: "Word"),
+             "First, we need to update the consent form. Second, the audit is due on the 12th. Third, the new nurse starts Monday."),
+            (.init(bundleID: "com.example.unknown", appName: "Another app"),
+             "We need a feature where you can fix a sentence if the user says, where you can fix a sentence if the user says the wrong thing."),
+            (.init(bundleID: "com.apple.dt.Xcode", appName: "Xcode"),
+             "um the getUserName function should, should return nil when the cache is empty"),
+            (.init(bundleID: "com.apple.Terminal", appName: "Terminal"),
+             "um git commit dash m fix the build new line"),
+            (.init(bundleID: "com.apple.Safari", appName: "Safari", url: "https://example.com/search", isSingleLineField: true),
+             "Clinics in Cork, um, open on Saturday new line"),
+        ]
+        var settings = AppSettings()
+        settings.vocabularyHints = ["getUserName"]
+        for (destination, raw) in samples {
+            let resolution = rules.resolve(destination)
+            let start = ContinuousClock.now
+            let r = DictationPipeline.process(raw, context: PostProcessContext(settings: settings, appBundleID: destination.bundleID, resolution: resolution))
+            let us = (ContinuousClock.now - start) / .microseconds(1)
+            say("== \(destination.appName ?? "?")\(destination.host.map { " (\($0))" } ?? ""): \(resolution.style.rawValue), \(resolution.reason), \(Int(us)) µs")
+            say("heard: \(raw)")
+            say("plain:\n\(r.plainText)")
+            if let html = r.html { say("html:  \(html)") }
+            say("edits: " + r.edits.map { "\($0.kind.rawValue) \"\($0.removed)\" → \"\($0.inserted.replacingOccurrences(of: "\n", with: "⏎"))\"" }.joined(separator: "; "))
+            say("")
+        }
+    }
+    #endif
 
     private static func discover(entry: String?, password: String?) async {
         let discovery = TailnetDiscovery()

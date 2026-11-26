@@ -58,6 +58,17 @@ extension AppModel {
     func correct(_ item: TranscriptHistoryItem, to text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != item.text else { return }
+        // Typed over the text as a command ("change Tuesday to Friday", "delete really",
+        // "add see you then at the end"): applied to the text, and the change listed with its edits.
+        if let result = NoteEditCommand.command(trimmed, for: item.text) {
+            history.update(item.id) { entry in
+                entry.recordingID = entry.recordingID ?? keptRecordingID(for: item)
+                entry.text = result.text
+                entry.cleanupEdits = (entry.cleanupEdits ?? []) + result.edits
+            }
+            notify("Changed")
+            return
+        }
         history.update(item.id) { entry in
             // Before a correction loses the words that found it, keep its recording's id.
             entry.recordingID = entry.recordingID ?? keptRecordingID(for: item)
@@ -118,9 +129,15 @@ extension AppModel {
                 let options = TranscriptionRequestOptions(
                     language: s.language, vocabularyHints: VocabularyPacks.hints(userTerms: s.vocabularyHints, enabledPacks: s.enabledPacks))
                 let output = try await models.transcribeOnThisMac(samples, model: s.model, options: options)
-                let text = await BasicPostProcessor().process(output.text, context: PostProcessContext(
-                    appBundleID: item.appBundleId, vocabulary: s.vocabularyHints,
-                    corrections: s.postProcess ? s.transcriptCorrections : [], speechModel: s.speechModelID))
+                // The style it had, or what the rules give its app now; nothing is pasted, so only the
+                // text changes (a note keeps the notes style).
+                let resolution = item.styleID.map { StyleResolution(style: $0, reason: item.styleReason ?? "As before", source: .dictation) }
+                    ?? s.styleRules.resolve(DictationDestination(bundleID: item.appBundleId, appName: item.appName))
+                let started = ContinuousClock.now
+                let processed = DictationPipeline.process(output.text, context: PostProcessContext(settings: s, appBundleID: item.appBundleId,
+                                                                                                    resolution: resolution))
+                let cleanupMs = Int((ContinuousClock.now - started) / .milliseconds(1))
+                let text = processed.plainText
                 guard !text.isEmpty else { notify("No words this time"); return }
                 history.update(item.id) { entry in
                     entry.recordingID = recordingID
@@ -130,11 +147,10 @@ extension AppModel {
                     entry.backend = output.backend
                     entry.location = "local"
                     entry.timings = DictationTimings(transcribeMs: output.modelMs, speechModelMs: output.modelMs, totalMs: 0)
-                    // Tidied again with the basic pass only: the earlier cleanup and style no longer describe it.
-                    entry.cleanupEdits = nil
-                    entry.cleanupMs = nil
-                    entry.style = nil
-                    entry.styleReason = nil
+                    entry.cleanupEdits = processed.edits
+                    entry.cleanupMs = cleanupMs
+                    entry.style = resolution.style.rawValue
+                    entry.styleReason = resolution.reason
                 }
                 notify("Transcribed again with \(models.activeModel.shortName)")
             } catch {

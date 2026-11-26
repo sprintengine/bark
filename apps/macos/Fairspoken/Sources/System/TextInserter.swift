@@ -28,9 +28,15 @@ enum TextInserter {
     /// front now, the text is still pasted but the old clipboard is not put back, so the
     /// dictation stays recoverable if it landed somewhere unexpected. With `requireExpectedApp`
     /// (pasting a dictation again into its app) it is copied instead.
-    static func deliver(_ text: String, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?,
+    ///
+    /// With `html`, the pasteboard gets one item carrying both the HTML and the plain text, so
+    /// apps that take rich text paste the layout and the rest paste the words.
+    static func deliver(_ text: String, html: String? = nil, paste: Bool, restoreClipboard: Bool, expectedApp: pid_t?,
                         requireExpectedApp: Bool = false) async -> Outcome {
         let pasteboard = NSPasteboard.general
+        func write(_ text: String, to pasteboard: NSPasteboard, transient: Bool) {
+            Self.write(text, html: html, to: pasteboard, transient: transient)
+        }
         guard paste else {
             write(text, to: pasteboard, transient: false)
             return .copied(reason: "Copied to clipboard")
@@ -43,7 +49,8 @@ enum TextInserter {
         // the shortcut, and ⌘V goes to whatever is in front once it is up.
         await waitForModifierRelease(timeout: .milliseconds(800))
         if IsSecureEventInputEnabled() || focusedElementIsSecure() {
-            write(text, to: pasteboard, transient: false)
+            // Never rich text into a secure field.
+            Self.write(text, html: nil, to: pasteboard, transient: false)
             return .copied(reason: "Copied — secure field")
         }
 
@@ -66,7 +73,8 @@ enum TextInserter {
             return .copied(reason: switchedDuringCheckReason)
         }
         let saved = restoreClipboard && !switchedApps ? snapshot(pasteboard) : nil
-        write(text, to: pasteboard, transient: saved != nil)
+        // The layout was made for the app the recording started in: elsewhere, words only.
+        Self.write(text, html: switchedApps ? nil : html, to: pasteboard, transient: saved != nil)
         let ourChange = pasteboard.changeCount
         postCommandV()
 
@@ -81,14 +89,23 @@ enum TextInserter {
         return .pasted
     }
 
-    static func copy(_ text: String) {
-        write(text, to: .general, transient: false)
+    static func copy(_ text: String, html: String? = nil) {
+        write(text, html: html, to: .general, transient: false)
     }
 
-    private static func write(_ text: String, to pasteboard: NSPasteboard, transient: Bool) {
+    private static func write(_ text: String, html: String?, to pasteboard: NSPasteboard, transient: Bool) {
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        if transient { pasteboard.setData(Data(), forType: transientType) }
+        guard let html else {
+            pasteboard.setString(text, forType: .string)
+            if transient { pasteboard.setData(Data(), forType: transientType) }
+            return
+        }
+        let item = NSPasteboardItem()
+        // The charset declaration keeps non-ASCII text (fadas, curly quotes) intact in every reader.
+        item.setString("<meta charset=\"utf-8\">" + html, forType: .html)
+        item.setString(text, forType: .string)
+        if transient { item.setData(Data(), forType: transientType) }
+        pasteboard.writeObjects([item])
     }
 
     private static func snapshot(_ pasteboard: NSPasteboard) -> [[NSPasteboard.PasteboardType: Data]] {

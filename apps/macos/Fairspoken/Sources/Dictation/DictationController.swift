@@ -32,6 +32,8 @@ final class DictationController {
         var delivery: Delivery
         var latencyMs: Int
         var placement: ComputePlacement
+        /// The style the dictation was given, and why.
+        var style: StyleResolution? = nil
     }
 
     enum Phase: Equatable {
@@ -85,6 +87,19 @@ final class DictationController {
     /// What `.transcribing` is doing when it isn't the first attempt ("Retrying the host (1 of 2)").
     private(set) var transcribingNote: String?
 
+    // MARK: Style of the current dictation (the pill's menu)
+
+    /// Where the current recording is going: the app at once, then the field and website once
+    /// Accessibility has answered (`DestinationReader`). Nil for a recording in Bark's own window.
+    private(set) var destination: DictationDestination?
+    /// The style chosen for this dictation only, from the pill's menu; cleared when a recording starts.
+    private(set) var styleOverride: DictationStyle.ID?
+    /// The style the current recording will get, and why. Updates as the destination is read
+    /// and when the user picks another style.
+    private(set) var currentStyle: StyleResolution?
+    /// The latest destination read for the current recording, shared with its completion.
+    @ObservationIgnored private var destinationProbe = DestinationProbe()
+
     @ObservationIgnored var onPhaseChange: ((Phase) -> Void)?
     @ObservationIgnored var onNeedsOnboarding: (() -> Void)?
     /// Called as any recording starts (shortcut, fn, the menu bar, a button), before it takes the
@@ -117,7 +132,6 @@ final class DictationController {
     @ObservationIgnored private var liveGeneration = 0
     /// The recording being captured, and the writer putting it on disk.
     @ObservationIgnored private var kept: (item: PendingDictation, writer: PendingAudioWriter?)?
-    @ObservationIgnored private let postProcessor: any TranscriptPostProcessor = BasicPostProcessor()
 
     private let settings: SettingsStore
     private let models: ModelLibrary
@@ -208,6 +222,7 @@ final class DictationController {
             return
         }
         editWatcher?.prime(targetApp)
+        beginDestination(for: targetApp)
         let now = Date()
         let item = PendingDictation(id: "dictation-\(Int64(now.timeIntervalSince1970 * 1000))", createdAt: now,
                                     appName: targetApp?.localizedName, appBundleId: targetApp?.bundleIdentifier)
@@ -295,6 +310,10 @@ final class DictationController {
         let item = kept.item
         let target = targetApp
         let placement = self.placement
+        // The style as it stands at release: the destination read at the start, and any choice
+        // made in the pill while recording.
+        let style = StyleChoice(probe: destinationProbe, override: styleOverride,
+                                isNote: target == nil && startedInWindow == Self.dashboardWindow)
         // The field the dictation goes into, read while the speech is transcribed.
         let fieldRead = editWatcher?.prepare(for: target)
         // After the live attempt: the whole recording to the host again, then this Mac.
@@ -308,7 +327,7 @@ final class DictationController {
         }
         let deliver: @Sendable (TranscriptionOutput) async -> Bool = { [weak self] output in
             // A retry lands many seconds later, when the field read at release may be out of date.
-            await self?.complete(output, item: item, target: target, samples: samples, settings: s,
+            await self?.complete(output, item: item, target: target, style: style, samples: samples, settings: s,
                                  durationSeconds: stats.durationSeconds, released: released,
                                  retried: retried.isSet, fieldRead: retried.isSet ? nil : fieldRead) ?? false
         }
@@ -430,18 +449,21 @@ final class DictationController {
 
     /// The transcript is in: post-process, deliver, record in history (and for post-training),
     /// show the result. False when post-processing left no words, so nothing was delivered.
-    private func complete(_ output: TranscriptionOutput, item: PendingDictation, target: NSRunningApplication?, samples: [Float],
-                          settings s: AppSettings, durationSeconds: Double, released: ContinuousClock.Instant, retried: Bool,
-                          fieldRead: Task<EditWatcher.FieldRead?, Never>?) async -> Bool {
+    private func complete(_ output: TranscriptionOutput, item: PendingDictation, target: NSRunningApplication?, style: StyleChoice,
+                          samples: [Float], settings s: AppSettings, durationSeconds: Double, released: ContinuousClock.Instant,
+                          retried: Bool, fieldRead: Task<EditWatcher.FieldRead?, Never>?) async -> Bool {
         let transcribed = ContinuousClock.now
         transcribingNote = nil
-        let text = await postProcessor.process(
-            output.text, context: PostProcessContext(appBundleID: item.appBundleId, vocabulary: s.vocabularyHints,
-                                                     corrections: s.postProcess ? s.transcriptCorrections : [],
-                                                     speechModel: s.speechModelID))
+        let destination = await style.destination(fallback: DictationDestination(bundleID: item.appBundleId, appName: item.appName))
+        let resolution = style.resolve(destination, rules: s.styleRules)
+        let cleanupStarted = ContinuousClock.now
+        let processed = DictationPipeline.process(output.text, context: PostProcessContext(settings: s, appBundleID: item.appBundleId,
+                                                                                            resolution: resolution))
+        let cleanupMs = Int((ContinuousClock.now - cleanupStarted) / .milliseconds(1))
+        let text = processed.plainText
         guard !text.isEmpty else { return false }
         let pasteStarted = ContinuousClock.now
-        let delivery = await deliver(text, settings: s, target: target, retried: retried)
+        let delivery = await deliver(text, html: processed.html, settings: s, target: target, retried: retried)
         let total = Int((ContinuousClock.now - released) / .milliseconds(1))
         let transcribeMs = Int((transcribed - released) / .milliseconds(1))
         let now = Date()
@@ -450,9 +472,9 @@ final class DictationController {
             createdAt: Int64(now.timeIntervalSince1970 * 1000), text: text, backend: output.backend,
             location: output.placement == .remoteHost ? "remote-host" : "local", durationSeconds: durationSeconds,
             timings: DictationTimings(transcribeMs: transcribeMs, speechModelMs: output.modelMs, totalMs: total),
-            model: output.model, appName: item.appName, appBundleId: item.appBundleId)
-        // What the model heard, for the dictation view's bubble and diff.
-        entry.rawText = output.text
+            model: output.model, appName: item.appName, appBundleId: item.appBundleId, rawText: output.text,
+            cleanupEdits: processed.edits, style: resolution.style.rawValue, styleReason: resolution.reason,
+            destinationHost: destination.host, cleanupMs: cleanupMs)
         // Dictated into Home's composer: a note.
         if delivery == .shownInApp, shownInAppIsNote() { entry.isNote = true }
         // A paste was tried and nothing could take it (not a copy-only choice in Settings).
@@ -468,7 +490,8 @@ final class DictationController {
             // Apart, so a read still running never holds up the result.
             Task { editWatcher.arm(await fieldRead.value, insertedAfter: pasteStarted, dictation: dictation) }
         }
-        let result = Result(text: text, words: WordCounter.count(text), delivery: delivery, latencyMs: total, placement: output.placement)
+        let result = Result(text: text, words: WordCounter.count(text), delivery: delivery, latencyMs: total, placement: output.placement,
+                            style: resolution)
         if delivery == .shownInApp { lastInAppResult = result }
         phase = .done(result)
         Self.log.info("Dictation \(durationSeconds, format: .fixed(precision: 1)) s → \(total) ms (model \(output.modelMs) ms)")
@@ -509,23 +532,105 @@ final class DictationController {
         }
     }
 
-    private func deliver(_ text: String, settings s: AppSettings, target: NSRunningApplication?, retried: Bool) async -> Delivery {
+    private func deliver(_ text: String, html: String?, settings s: AppSettings, target: NSRunningApplication?, retried: Bool) async -> Delivery {
         // Our own window is frontmost (dashboard "Try dictation", onboarding): show it there.
         if target == nil || (NSApp.isActive && NSApp.keyWindow != nil) {
-            TextInserter.copy(text)
+            TextInserter.copy(text, html: html)
             return .shownInApp
         }
         // A retry can take many seconds: if the user has moved on to another app by then, never
         // type into it. (A first attempt is pasted, keeping the text on the clipboard, as before.)
         if retried, NSWorkspace.shared.frontmostApplication?.processIdentifier != target?.processIdentifier {
-            TextInserter.copy(text)
+            TextInserter.copy(text, html: html)
             return .copied("Copied — you'd switched apps")
         }
-        switch await TextInserter.deliver(text, paste: s.insertAtCursor, restoreClipboard: s.restoreClipboard,
+        switch await TextInserter.deliver(text, html: html, paste: s.insertAtCursor, restoreClipboard: s.restoreClipboard,
                                           expectedApp: target?.processIdentifier) {
         case .pasted: return .pasted(app: target?.localizedName)
         case .copied(let reason): return .copied(reason)
         }
+    }
+
+    // MARK: Style
+
+    static let dashboardWindow = NSUserInterfaceItemIdentifier("dashboard")
+
+    /// Starts reading where the new recording is going. The app is known at once; the field,
+    /// window title and website arrive off the main thread within `DestinationReader.deadline`
+    /// (a Chromium browser builds its tree lazily, so an address it didn't give is asked again).
+    private func beginDestination(for app: NSRunningApplication?) {
+        styleOverride = nil
+        let probe = DestinationProbe()
+        destinationProbe = probe
+        guard let app else {
+            destination = nil
+            currentStyle = startedInWindow == Self.dashboardWindow ? StyleChoice.noteResolution : nil
+            probe.finish(nil)
+            return
+        }
+        let pid = app.processIdentifier
+        let bundleID = app.bundleIdentifier
+        let name = app.localizedName
+        let basic = DictationDestination(bundleID: bundleID, appName: name)
+        destination = basic
+        currentStyle = settings.settings.styleRules.resolve(basic)
+        Task { [weak self] in
+            var read = await DestinationReader.read(pid: pid, bundleID: bundleID, appName: name)
+            probe.update(read)
+            self?.destinationArrived(read, from: probe)
+            if read.host == nil, DestinationReader.isBrowser(bundleID) {
+                try? await Task.sleep(for: .milliseconds(700))
+                read = await DestinationReader.read(pid: pid, bundleID: bundleID, appName: name)
+                if read.host != nil {
+                    probe.update(read)
+                    self?.destinationArrived(read, from: probe)
+                }
+            }
+            probe.finish(read)
+        }
+    }
+
+    private func destinationArrived(_ read: DictationDestination, from probe: DestinationProbe) {
+        guard probe === destinationProbe else { return }
+        destination = read
+        currentStyle = settings.settings.styleRules.resolve(read, override: styleOverride)
+    }
+
+    /// The pill's menu: this dictation only. Nil goes back to the rules. Only while listening:
+    /// the style is fixed when the recording ends, so a later choice would show without applying.
+    @discardableResult
+    func setStyleOverride(_ style: DictationStyle.ID?) -> Bool {
+        guard phase.isListening, !isMeasuring else { return false }
+        styleOverride = style
+        if let destination {
+            currentStyle = settings.settings.styleRules.resolve(destination, override: style)
+        } else if let style {
+            currentStyle = StyleResolution(style: style, reason: "You chose this", source: .dictation)
+        } else {
+            currentStyle = startedInWindow == Self.dashboardWindow ? StyleChoice.noteResolution : nil
+        }
+        return true
+    }
+
+    /// What "Always use for …" would attach a rule to ("Mail", "mail.google.com"); nil for a
+    /// terminal or a secure field, and for a recording in Bark's own window.
+    var alwaysUseTarget: StyleRules.RuleTarget? {
+        destination.flatMap { settings.settings.styleRules.alwaysUseTarget(for: $0) }
+    }
+
+    /// "Always use <style> for <app or site>": writes the rule, and while listening uses it for
+    /// this dictation too.
+    @discardableResult
+    func alwaysUseStyle(_ style: DictationStyle.ID) -> Bool {
+        guard let destination else { return false }
+        var wrote = false
+        settings.update { wrote = $0.styleRules.alwaysUse(style, for: destination) }
+        guard wrote else { return false }
+        if phase.isListening {
+            styleOverride = nil
+            currentStyle = settings.settings.styleRules.resolve(destination)
+        }
+        return true
     }
 
     private func waitForEngine() async throws {
@@ -565,6 +670,42 @@ final class DictationController {
         self.phase = phase
         self.liveText = liveText
         if let inAppResult { lastInAppResult = inAppResult }
+    }
+}
+
+/// The destination reads for one recording: the latest answer, and whether reading is over.
+nonisolated final class DestinationProbe: Sendable {
+    private let state = Mutex<(latest: DictationDestination?, done: Bool)>((nil, false))
+    func update(_ d: DictationDestination) { state.withLock { $0.latest = d } }
+    func finish(_ d: DictationDestination?) { state.withLock { if let d { $0.latest = d }; $0.done = true } }
+    var latest: DictationDestination? { state.withLock { $0.latest } }
+    var isDone: Bool { state.withLock { $0.done } }
+}
+
+/// The style decision for one recording, captured at release so a later retry or a new
+/// recording can't change it.
+nonisolated struct StyleChoice: Sendable {
+    let probe: DestinationProbe
+    let override: DictationStyle.ID?
+    /// Dictated into Bark's own window: kept in history as a note.
+    let isNote: Bool
+
+    static let noteResolution = StyleResolution(style: .notes, reason: "Note in Bark", source: .builtInApp)
+
+    /// The destination as read, waiting a moment for a first answer if a short dictation beat it.
+    func destination(fallback: DictationDestination) async -> DictationDestination {
+        let deadline = ContinuousClock.now + .milliseconds(200)
+        while probe.latest == nil, !probe.isDone, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return probe.latest ?? fallback
+    }
+
+    func resolve(_ destination: DictationDestination, rules: StyleRules) -> StyleResolution {
+        if isNote {
+            return override.map { StyleResolution(style: $0, reason: "You chose this", source: .dictation) } ?? Self.noteResolution
+        }
+        return rules.resolve(destination, override: override)
     }
 }
 
