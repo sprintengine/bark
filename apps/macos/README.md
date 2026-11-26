@@ -88,8 +88,10 @@ path and macOS build); later launches load in under a second.
 1. **App** (default): a menu-bar item (status, server address, copy token, start/stop, start at
    login) and a window: Activity (counters and the live constellation of clients → queue → workers →
    models), Clients, Models (download, delete, per-worker model), Connect (address, token, QR code)
-   and Configuration. The toolbar's Live/Demo switch shows a simulated practice server instead of
-   this one (the real server keeps serving). The window reads the host in-process: the same snapshot
+   and Configuration, in the same look as Bark: a solid sidebar of sections and a top bar with the
+   serving status, Live or Demo and Start or Stop; Configuration is grouped cards of divided rows.
+   The top bar's Live/Demo switch shows a simulated practice server instead of this one (the real
+   server keeps serving). The window reads the host in-process: the same snapshot
    and event frames as `/v1/events`, decoded by the `HostEvent`/`HostLiveState` code in FairspokenCore.
 2. **Start at login**: Configuration › This Mac › Start at login (`SMAppService.mainApp`). The app
    opens in the menu bar when you log in; System Settings › General › Login Items lists it.
@@ -194,13 +196,31 @@ Increase Contrast variant, and every text colour holds 4.5:1 on the surfaces it 
   was pasted as the reply, then "Cleaned up in N ms", which opens a table of the changes, the style and
   why, and a word diff (blue added, orange removed; worked out from the words as heard when no edits
   were recorded). Beside it an actions card: open the app, copy (⇧⌘C), paste again, edit, the style,
-  transcribe again from a kept post-training recording, delete. A composer docked at the bottom
+  restyle (the style is a menu: another style runs the formatter again on what was heard and saves
+  the result; Always Use makes it the rule for the app or site), transcribe again from a kept
+  post-training recording, add a name-like word to the Dictionary, delete. A composer docked at the bottom
   corrects the text: click in, change it, ⏎ saves it to history. Typed over the text, a command
   ("change Tuesday to Friday", "delete really", "add see you then at the end") is applied instead,
   when what it names appears exactly once (`NoteEditCommand`).
 
-Settings › Transcription › **Network device** holds the host URL, token (Keychain) and timeout, a Test
-connection button and a status line such as "Using host: practice-mini.local:48173 · connected"
+- **Settings** has its own sidebar in place of the thread list: search (⌘F; it matches rows on every
+  page and shows them live, each page listed with how many rows match), the pages, and Back to Bark
+  (esc). Pages are grouped cards of divided rows (title, a one-line description, the control on the
+  right; the switches are the only blue), built from `SettingsKit` in FairspokenUI, which Bark
+  Server uses too. **General**: the shortcut and its mode, hold fn, the microphone with a level test,
+  the longest recording, paste and clipboard, text while speaking, sounds, launch at login
+  (`SMAppService`), permissions, the setup guide, and post-training recordings. **History**: how many
+  dictations to keep (100 to 1,000, a Mac-only preference in the app's defaults) and Delete all.
+  **Transcription**: this Mac or Bark Server, the model (the one in use, the others on this Mac and
+  the recommended ones), and the three cleanup switches, each with a worked example. **App styles**: a
+  style per kind of app (Email, Chat, Notes, Documents, Code; `StyleRules.categories`) and for
+  everything else, then every app and site with its own rule or seen in history, with the app's
+  icon, why it gets its style, a picker, and a before-and-after preview of a sample dictation made by
+  the real formatter; Add App or Site. Terminals show Always Verbatim. **Dictionary**: suggestions,
+  your words, corrections, learning and packs. **Bark Server**, **Updates** and **About**.
+
+Settings › **Bark Server** holds the host URL, token (Keychain) and timeout, servers found on your
+Tailscale network, a Test button and the server's state ("Reachable", "Not reachable")
 (one `GET /v1/health` when Settings or Home opens, or on Test; no background polling). Monitoring a
 host is Bark Server's job (or the web dashboard at the host's `/`); the client has no Server view.
 
@@ -301,7 +321,8 @@ with plain text and minimal HTML (`<div>`, `<h2>`, `<ul>`/`<ol>`, no fonts or co
 bundle id) beats the user's rule for the website (host, optional path prefix), which beats Bark's
 defaults (Mail, Outlook and webmail → Email; Notes, Obsidian, Bear → Notes; Pages, Word, Google Docs,
 Notion → Document; Slack, Messages, WhatsApp, Discord, Teams → Casual; Xcode, VS Code, Cursor,
-github.com → Code), which beats the user's default (Clean). The destination is read when recording
+github.com → Code; each kind can be given another style in Settings › App styles), which beats the
+user's default (Clean). The destination is read when recording
 starts, off the main thread within 300 ms (`DestinationReader`): the app, the window title, whether
 the field is single-line, and in a browser the page's `AXURL` (or the window's `AXDocument`), cut to
 scheme, host and path (Chromium browsers are asked once per process to build their full accessibility
@@ -315,7 +336,7 @@ the style and why, the website's host and the time cleanup took.
 
 ## Learning from your corrections
 
-**Settings › Vocabulary › Learn from your corrections** (`learnFromEdits`, on by default) is the
+**Settings › Dictionary › Learn from your corrections** (`learnFromEdits`, on by default) is the
 Tauri app's edit watcher, ported. As a recording ends, while it is transcribed, the app reads the
 focused field it will paste into (its text and selection, for the text either side of the
 dictation). It reads that field again when the next dictation starts, when another app or field
