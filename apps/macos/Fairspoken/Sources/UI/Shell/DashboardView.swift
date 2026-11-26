@@ -41,13 +41,24 @@ struct DashboardView: View {
         .animation(Motion.unlessReduced(Motion.normal, reduceMotion), value: model.sidebarVisible)
         .screenshotActive()
         .frame(minWidth: 960, minHeight: 640)
+        .overlay {
+            if model.paletteOpen {
+                CommandPalette().transition(.opacity)
+            }
+        }
+        .animation(Motion.unlessReduced(Motion.fast, reduceMotion), value: model.paletteOpen)
         .background {
-            // ⌘K: the search field for now; the search-and-commands palette takes it later.
-            Button("Search") {
+            // ⌘K: the search-and-commands palette.
+            Button("Search and Commands") { model.paletteOpen.toggle() }
+                .keyboardShortcut("k", modifiers: .command)
+                .hidden()
+                .accessibilityHidden(true)
+            // ⌘F: the thread list's own search field.
+            Button("Find") {
                 if !model.sidebarVisible { model.sidebarVisible = true }
                 model.searchFocusPending = true
             }
-            .keyboardShortcut("k", modifiers: .command)
+            .keyboardShortcut("f", modifiers: .command)
             .hidden()
             .accessibilityHidden(true)
         }

@@ -41,6 +41,10 @@ final class AppModel {
     /// Set by ⌘K; the sidebar's search field takes the focus and clears it (also when the sidebar
     /// was hidden and the field appears only now).
     var searchFocusPending = false
+    /// The ⌘K palette is open over the main window.
+    var paletteOpen = false
+    /// Screenshots: the palette opened with this query typed.
+    var showcasePaletteQuery: String?
     /// Home's composer: what's typed there and the dictations made into it, kept while you look
     /// at other screens.
     var homeDraft = ""

@@ -86,7 +86,11 @@ private struct SearchField: View {
             }
             FilterMenu()
             if !focused && model.historyQuery.isEmpty {
-                Keycap(label: "⌘K").accessibilityHidden(true)
+                // Opens the palette: search across dictations, actions and settings.
+                Button { model.paletteOpen = true } label: { Keycap(label: "⌘K") }
+                    .buttonStyle(.plain)
+                    .help("Search and commands (⌘K)")
+                    .accessibilityLabel("Search and commands")
             }
         }
         .padding(.leading, 10)
