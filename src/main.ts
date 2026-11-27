@@ -605,6 +605,12 @@ void listen<ShortcutSettings>("settings-updated", (event) => {
   void registerGlobalShortcuts(event.payload);
 }).catch((error) => addEvent("warning", errorMessage(error)));
 
+// The main window's Ctrl+K palette ("New dictation"): start one, as the
+// record button does, unless a dictation is already under way.
+void listen("pill-start-recording", () => {
+  void startRecording();
+}).catch((error) => addEvent("warning", errorMessage(error)));
+
 // Emitted by the Rust CGEventTap when hold-Fn push-to-talk is enabled.
 void listen<{ pressed: boolean }>("fn-push-to-talk", (event) => {
   void pushToTalk(event.payload.pressed);
