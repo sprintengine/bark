@@ -194,7 +194,6 @@
 .model-facts dd { margin: 0; color: var(--crystal-ink); font-variant-numeric: tabular-nums; }
 .model-detail .models-actions { margin-top: 2px; }
 .model-empty { padding: 28px 12px; text-align: center; color: var(--crystal-ink-2); }
-.model-footnote { margin: 8px 4px 0; color: var(--crystal-ink-3); font-size: var(--sem-font-size-micro); }
 .model-search-status { padding: 0 4px 6px; color: var(--crystal-ink-2); font-size: var(--sem-font-size-meta); }
 .model-search-status:empty { display: none; }
 #modelSearchResults { padding: 4px; }

@@ -196,8 +196,8 @@ function details(row: Row): HTMLElement {
   fact("Publisher", row.publisher);
   if (row.languages) fact("Languages", row.languages);
   if (row.bytes) fact(row.kind === "speech" ? "Download, about" : "Download", formatBytes(row.bytes));
-  if (row.wer !== undefined) fact("Word error rate (reference)", `${row.wer.toFixed(1)}%`);
-  if (row.rtfx !== undefined) fact("Speed (reference, M4 Mac)", `${row.rtfx >= 10 ? Math.round(row.rtfx) : row.rtfx.toFixed(1)}× real time`);
+  if (row.wer !== undefined) fact("Word error rate", `${row.wer.toFixed(1)}%`);
+  if (row.rtfx !== undefined) fact("Speed", `${row.rtfx >= 10 ? Math.round(row.rtfx) : row.rtfx.toFixed(1)}× real time`);
   if (row.kind === "speech" && row.inUse && measured) fact("Speed on this computer", `${measured.toFixed(0)}× real time`);
   if (row.polish?.downloads != null) fact("Hugging Face downloads", row.polish.downloads.toLocaleString());
   body.append(facts);
@@ -252,12 +252,11 @@ function rowElement(row: Row): HTMLElement[] {
   kind.append(glyph, row.kind === "speech" ? "Speech" : "Polish");
   kind.title = row.kind === "speech" ? "Speech to text" : "Cleans up the text";
 
-  const bench = "(reference: 20 English clips, M4 Mac)";
   const speedTitle = [
-    row.rtfx !== undefined ? `${row.rtfx}× real time ${bench}` : "Estimated",
+    row.rtfx !== undefined ? `${row.rtfx}× real time` : "Estimated",
     row.kind === "speech" && row.inUse && measured ? `${measured.toFixed(0)}× real time on this computer` : "",
   ].filter(Boolean).join(" · ");
-  const accuracyTitle = row.wer !== undefined ? `${row.wer}% word error rate ${bench}` : "Estimated";
+  const accuracyTitle = row.wer !== undefined ? `${row.wer}% word error rate` : "Estimated";
   const where = row.location === "local" ? "This device" : row.location === "host" ? "Your host" : "Cloud";
   node.append(
     cell(star),

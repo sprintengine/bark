@@ -487,9 +487,6 @@ h1, h2, h3, p { margin: 0; }
 .composer[data-state="listening"] #composerDictate { box-shadow: 0 0 0 3px var(--bark-canvas), 0 0 0 5px color-mix(in srgb, var(--bark-recording) 55%, transparent); }
 .round-btn.is-busy { opacity: .7; }
 
-.key-hints { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 14px; padding: 0 4px; }
-.key-hint { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--bark-ink-3); }
-.key-hint-keys { display: inline-flex; gap: 3px; }
 
 /* A grouped card: 12px corners, a soft edge, the card colour at 40%. */
 .group-card, .settings-card, .card {
@@ -769,7 +766,6 @@ h1, h2, h3, p { margin: 0; }
 .model-summary { display: none; }
 .model-feedback:empty, .model-search-status:empty { display: none; }
 .card.model-table { overflow: hidden; background: color-mix(in srgb, var(--bark-card) 40%, transparent); }
-.model-footnote { margin-top: 10px; padding: 0 4px; font-size: 12px; line-height: 1.45; color: var(--bark-ink-3); }
 
 /* ── Speed and accuracy tests ────────────────────────────────────────── */
 #screen-speedtest .st, #screen-voicetest .st { max-width: 768px; margin: 0 auto; padding: 18px 40px 40px; }

@@ -315,7 +315,7 @@ export function createSpeedTest(opts: {
         ]),
         wrap,
         pasteNote,
-        h("div", { class: "st-hint" }, ["Start typing to begin the clock. ", h("kbd", { text: "Esc" }), " to cancel."]),
+        h("div", { class: "st-hint" }, ["Start typing to begin the clock."]),
       ]),
     );
 
@@ -445,7 +445,7 @@ export function createSpeedTest(opts: {
         buildPreviewBlock(),
         h("div", { class: "st-actions" }, [
           h("button", { class: "btn btn-primary", text: "Stop", onClick: stopSpeaking }),
-          h("span", { class: "st-hint st-hint-inline" }, ["Read it at your natural pace · ", h("kbd", { text: "Esc" }), " to cancel"]),
+          h("span", { class: "st-hint st-hint-inline" }, ["Read it at your natural pace"]),
         ]),
       ]),
     );

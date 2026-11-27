@@ -126,7 +126,6 @@
           <div class="page page--home">
             <div class="home-heading">
               <h1 class="home-title" id="homeTitle">Press your shortcut and speak.</h1>
-              <p class="home-sub" id="homeSub">Press it again and Bark types it wherever your cursor is. If nothing can take it, it goes on the clipboard.</p>
             </div>
 
             <div class="composer" id="composer">
@@ -152,7 +151,6 @@
                 </button>
               </div>
             </div>
-            <div class="key-hints" id="keyHints"></div>
 
             <!-- Before the first dictation: how to start. -->
             <div class="group-card setup-card" id="homeEmpty" hidden>
@@ -192,7 +190,7 @@
         <!-- ════ MODELS (a library table, modelDashboard.ts) ════ -->
         <section class="screen" id="screen-models" aria-label="Models">
           <div class="page page--wide">
-            <div class="page-title"><h1>Models</h1><p>Speech recognition and polish, on this computer</p></div>
+            <div class="page-title"><h1>Models</h1></div>
             <div class="model-toolbar">
               <span class="ds-field-box" id="modelSearchBox">
                 <svg class="model-search-hint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
@@ -225,20 +223,19 @@
               <span id="polishProvider"></span>
               <span class="model-summary-actions" id="polishProviderActions"></span>
             </div>
-            <div class="card model-table" id="modelTable" role="table" aria-label="Models" aria-describedby="modelFootnote">
+            <div class="card model-table" id="modelTable" role="table" aria-label="Models">
               <div class="model-table-head" role="row" id="modelSort">
                 <span role="columnheader"><span class="sr-only">Favourite</span></span>
                 <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="name">Name</button></span>
                 <span role="columnheader">Kind</span>
-                <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="speed" aria-describedby="modelFootnote">Speed</button></span>
-                <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="accuracy" aria-describedby="modelFootnote">Accuracy</button></span>
+                <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="speed">Speed</button></span>
+                <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="accuracy">Accuracy</button></span>
                 <span role="columnheader" class="col-size"><button type="button" class="model-sort-btn" data-sort="size">Size</button></span>
                 <span role="columnheader">Runs on</span>
                 <span role="columnheader"><span class="sr-only">Action</span></span>
               </div>
               <div id="modelRows" role="rowgroup"></div>
             </div>
-            <p class="model-footnote" id="modelFootnote">Speech ratings come from reference measurements: word error rate and speed on 20 English clips, through the Mac app's engines on an M4 Mac. This app runs some models differently, so read them as a comparison. est. marks an estimate. A model's details show its speed on this computer once it has transcribed here.</p>
             <section class="home-section" aria-labelledby="hubTitle" id="hubSection" hidden>
               <div class="section-head"><h2 id="hubTitle">From Hugging Face</h2></div>
               <div class="card" id="modelSearchResults" aria-busy="false"></div>
@@ -249,21 +246,19 @@
         <!-- ════ POST-TRAINING (trainingData.ts) ════ -->
         <section class="screen" id="screen-training" aria-label="Post-training">
           <div class="page settings-page-col">
-            <div class="page-title"><h1>Post-training</h1><p>Collect recordings of your voice now; training on them arrives in a later update.</p></div>
+            <div class="page-title"><h1>Post-training</h1></div>
             <section class="settings-section">
               <h2>Recording</h2>
               <div class="settings-card">
                 <div class="row">
                   <div class="row-text">
                     <label class="row-label" for="trainingCapture">Save recordings to improve models</label>
-                    <div class="row-help">Keeps the audio of each dictation and what the model heard, so it can learn your voice later. Nothing is uploaded.</div>
                   </div>
                   <div class="row-control"><input id="trainingCapture" class="switch" type="checkbox" role="switch" form="settingsForm" /></div>
                 </div>
                 <div class="row">
                   <div class="row-text">
                     <label class="row-label" for="trainingRetentionDays">Keep recordings</label>
-                    <div class="row-help">Older recordings are deleted on their own.</div>
                   </div>
                   <div class="row-control">
                     <select id="trainingRetentionDays" class="setting-select w-sm" form="settingsForm">
@@ -274,7 +269,6 @@
                   </div>
                 </div>
               </div>
-              <p class="section-footer">Recordings can include anything you dictate, so keep them on a drive you control. They stay on this computer.</p>
             </section>
             <section class="settings-section">
               <h2>Your recordings</h2>
@@ -290,15 +284,6 @@
                   </div>
                 </div>
               </div>
-            </section>
-            <section class="settings-section">
-              <h2>Post-train</h2>
-              <ol class="settings-card steps">
-                <li><span class="step-num">1</span>Save your dictations as you work.</li>
-                <li><span class="step-num">2</span>Transcribe them again with a larger, slower model, and find where Parakeet went wrong.</li>
-                <li><span class="step-num">3</span>Fine-tune Parakeet on your voice and accent.</li>
-                <li><span class="step-num">4</span>Test it on recordings it never trained on, and switch only if it's better.</li>
-              </ol>
             </section>
           </div>
         </section>

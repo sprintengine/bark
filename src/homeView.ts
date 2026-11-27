@@ -9,8 +9,8 @@ import { icon } from "./icons";
 import { notice } from "./confirmDialog";
 
 // Home, as on the Mac: the new-dictation screen. How to dictate, a box to try
-// it in (type, or dictate into it, and keep it as a note), the keyboard hints,
-// the week in four numbers (homeStats.ts) and the model.
+// it in (type, or dictate into it, and keep it as a note), the week in four
+// numbers (homeStats.ts) and the model.
 
 interface HomeSettings {
   recordingShortcut: string;
@@ -23,7 +23,6 @@ interface HomeSettings {
 
 const mac = isMacOS();
 const homeTitle = document.getElementById("homeTitle")!;
-const homeSub = document.getElementById("homeSub")!;
 const composer = document.getElementById("composer")!;
 const input = document.getElementById("composerInput") as HTMLTextAreaElement;
 const placeholder = document.getElementById("composerPlaceholder")!;
@@ -34,7 +33,6 @@ const saveButton = document.getElementById("composerSave") as HTMLButtonElement;
 const dictateButton = document.getElementById("composerDictate") as HTMLButtonElement;
 const engineName = document.getElementById("engineName")!;
 const engineWhere = document.getElementById("engineWhere")!;
-const keyHints = document.getElementById("keyHints")!;
 const modelCard = document.getElementById("homeModelCard")!;
 const micSelect = document.getElementById("micPickerSelect") as HTMLSelectElement;
 const deviceSelect = document.getElementById("audioDeviceSelect") as HTMLSelectElement | null;
@@ -67,7 +65,6 @@ function keycap(text: string, outline = false): HTMLElement {
 function renderHeading(): void {
   const key = shortcutText() || "your shortcut";
   homeTitle.textContent = `${hold() ? "Hold" : "Press"} ${key} and speak.`;
-  homeSub.textContent = `${hold() ? "Let go" : "Press it again"} and Bark types it wherever your cursor is. If nothing can take it, it goes on the clipboard.`;
 
   const parts: (string | HTMLElement)[] = ["Try it here.", hold() ? "Hold" : "Press", keycap(shortcutText() || "shortcut", true), "and say:"];
   const words = "“Can you send the revised quote to Aoife by Thursday?”".split(" ");
@@ -77,25 +74,6 @@ function renderHeading(): void {
   }
   for (const word of words) placeholder.append(Object.assign(document.createElement("strong"), { textContent: word }));
   placeholder.append(Object.assign(document.createElement("span"), { textContent: "Or type a note." }));
-}
-
-function hint(keys: string[], text: string): HTMLElement {
-  const el = document.createElement("span");
-  el.className = "key-hint";
-  const caps = document.createElement("span");
-  caps.className = "key-hint-keys";
-  for (const k of keys) caps.append(keycap(k));
-  el.append(caps, Object.assign(document.createElement("span"), { textContent: text }));
-  return el;
-}
-
-function renderHints(): void {
-  keyHints.replaceChildren(
-    hint([shortcutText() || "shortcut"], hold() ? "hold to dictate" : "start or stop"),
-    hint(["esc"], "cancel"),
-    hint([mac ? "⌘↵" : "Ctrl+Enter"], "save a note"),
-    hint([mac ? "⌘K" : "Ctrl+K"], "search"),
-  );
 }
 
 // ── The box ──
@@ -325,7 +303,6 @@ function apply(next: Partial<HomeSettings> | null | undefined): void {
     audioDevice: next?.audioDevice ?? "",
   };
   renderHeading();
-  renderHints();
   renderModel();
   renderComposer();
   syncMicOptions();

@@ -258,11 +258,7 @@ export function createVoiceAccuracyTest(opts: {
         buildPreviewBlock(),
         h("div", { class: "st-actions" }, [
           h("button", { class: "btn btn-primary", text: "Stop", onClick: stopRecording }),
-          h("span", { class: "st-hint st-hint-inline" }, [
-            "Read at your natural pace · ",
-            h("kbd", { text: "Esc" }),
-            " to cancel",
-          ]),
+          h("span", { class: "st-hint st-hint-inline" }, ["Read at your natural pace"]),
         ]),
       ]),
     );
