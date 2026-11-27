@@ -105,6 +105,8 @@ let cancelGraceTimer: ReturnType<typeof setTimeout> | null = null;
 const CANCEL_GRACE_MS = 3000;
 
 function setState(state: AppState, message?: string): void {
+  // The main window's Home shows the same state in its dictation box.
+  void emit("pill-state", { state }).catch(() => {});
   if (copiedStatusTimer !== null && state !== "idle") {
     clearTimeout(copiedStatusTimer);
     copiedStatusTimer = null;
@@ -609,6 +611,11 @@ void listen<ShortcutSettings>("settings-updated", (event) => {
 // record button does, unless a dictation is already under way.
 void listen("pill-start-recording", () => {
   void startRecording();
+}).catch((error) => addEvent("warning", errorMessage(error)));
+
+// Home's dictate button: start a dictation, or stop the one under way.
+void listen("pill-toggle-recording", () => {
+  void toggleRecording();
 }).catch((error) => addEvent("warning", errorMessage(error)));
 
 // Emitted by the Rust CGEventTap when hold-Fn push-to-talk is enabled.

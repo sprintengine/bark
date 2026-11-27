@@ -3,191 +3,300 @@ import { listen } from "@tauri-apps/api/event";
 
 import "./dashboardShell";
 import "./homeStats";
-import "./notes";
 import "./dictionary";
 import "./trainingData";
 import "./activity";
 import "./modelDashboard";
 import "./settingsModelSummaries";
 import "./updates";
-import { selectSettingsCategory } from "./settingsNavigation";
+import { categories, currentCategory, PAGES, resolveCategory, selectSettingsCategory, settingsQuery } from "./settingsNavigation";
 import "./sidebarStatus";
 import { createSpeedTest } from "./speedTest";
 import { createVoiceAccuracyTest } from "./voiceAccuracyTest";
-import "./settingsPremium.css";
-// Crystal theme last: it restyles the surfaces the sheets above lay out.
-import "./crystal.css";
+import * as history from "./historyStore";
+import { initThreadList, focusSearch as focusHistorySearch } from "./threadList";
+import { renderDictation } from "./dictationView";
+import "./homeView";
+import { initPalette, isPaletteOpen, openPalette, PALETTE_SHORTCUT } from "./palette";
+import { isMacOS } from "./shortcuts";
+import { monogramEl } from "./icons";
+// The window's look, last: it lays out the shell and restyles the feature sheets above.
+import "./bark.css";
 
-// The home window shell: owns sidebar navigation between the screens.
-// The Settings screen's own controls are driven independently by settings.ts,
-// the Home screen's stats by homeStats.ts, and the Notes library by notes.ts.
+// The main window's shell, as on the Mac: the thread list (or the settings
+// list) down the left, a breadcrumb top bar, and one screen at a time. Every
+// way of getting somewhere (the sidebar, links, ⌘K, the pill's gear) ends up
+// in `navigate`.
 
-const SCREENS = ["home", "notes", "dictionary", "activity", "models", "settings"] as const;
-type Screen = (typeof SCREENS)[number];
+type Section = "home" | "models" | "training" | "settings" | "speedtest" | "voicetest";
 
-const TITLES: Record<Screen, string> = {
-  home: "Home",
-  notes: "Notes",
-  dictionary: "Dictionary",
-  activity: "Activity",
-  settings: "Settings",
-  models: "Models",
-};
-
-// A quiet line under the title, where the screen has one worth saying.
-const SUBTITLES: Partial<Record<Screen, string>> = {
-  models: "Speech and polish models",
-  dictionary: "Applied to every dictation",
-};
-
-// Home greets rather than naming itself, with the date beneath.
-function greeting(now = new Date()): string {
-  const hour = now.getHours();
-  return hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-}
-
-const navItems = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-item"));
+const shell = document.getElementById("shell")!;
 const screens = Array.from(document.querySelectorAll<HTMLElement>(".screen"));
-const screenTitle = document.getElementById("screenTitle");
-const screenSubtitle = document.getElementById("screenSubtitle");
-const notesSearch = document.getElementById("notesSearch");
-const homeActions = document.getElementById("homeActions");
+const breadcrumb = document.getElementById("breadcrumb")!;
+const micPicker = document.getElementById("micPicker")!;
+const panelToggle = document.getElementById("panelToggle") as HTMLButtonElement;
+const historyPane = document.getElementById("historyPane")!;
+const settingsPane = document.getElementById("settingsPane")!;
+const dictationScreen = document.getElementById("screen-dictation")!;
+const content = document.getElementById("content")!;
 
-// The speed test is a sub-route of Home, not a nav screen: it renders into its
-// own #screen-speedtest section and is opened from the Home screen.
+document.documentElement.dataset.platform = isMacOS() ? "mac" : "other";
+
+let section: Section = "home";
+let selectedId: string | null = null;
+
 const speedTestContainer = document.getElementById("speedTest");
-const speedTest = speedTestContainer
-  ? createSpeedTest({ container: speedTestContainer, onExit: () => go("home") })
-  : null;
-
-// The voice accuracy test is a second Home sub-route, mounted the same way.
+const speedTest = speedTestContainer ? createSpeedTest({ container: speedTestContainer, onExit: () => navigate("home") }) : null;
 const voiceTestContainer = document.getElementById("voiceTest");
-const voiceTest = voiceTestContainer
-  ? createVoiceAccuracyTest({ container: voiceTestContainer, onExit: () => go("home") })
-  : null;
+const voiceTest = voiceTestContainer ? createVoiceAccuracyTest({ container: voiceTestContainer, onExit: () => navigate("home") }) : null;
 
-function setHeading(title: string, subtitle = ""): void {
-  if (screenTitle) screenTitle.textContent = title;
-  if (screenSubtitle) {
-    screenSubtitle.textContent = subtitle;
-    screenSubtitle.hidden = !subtitle;
+export function selectedDictation(): string | null { return selectedId; }
+
+// ── Sidebar ──
+
+const SIDEBAR_KEY = "bark.sidebarHidden";
+function setSidebar(visible: boolean): void {
+  shell.dataset.sidebar = visible ? "visible" : "hidden";
+  try { localStorage.setItem(SIDEBAR_KEY, visible ? "0" : "1"); } catch { /* session only */ }
+  for (const button of document.querySelectorAll<HTMLElement>('[data-action="toggle-sidebar"]')) {
+    const label = visible ? "Hide sidebar" : "Show sidebar";
+    button.setAttribute("aria-label", label);
+    button.title = `${label} (${isMacOS() ? "⌃⌘S" : "Ctrl+Shift+S"})`;
   }
 }
+try { setSidebar(localStorage.getItem(SIDEBAR_KEY) !== "1"); } catch { setSidebar(true); }
 
-function setHomeHeading(): void {
-  setHeading(greeting(), new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }));
+// ── Breadcrumb ──
+
+function crumb(text: string, onClick?: () => void): HTMLElement {
+  if (onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "crumb crumb--link";
+    button.textContent = text;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+  const span = document.createElement("span");
+  span.className = "crumb crumb--current";
+  span.textContent = text;
+  return span;
 }
 
-function isScreen(value: string): value is Screen {
-  return (SCREENS as readonly string[]).includes(value);
+function separator(): HTMLElement {
+  const span = document.createElement("span");
+  span.className = "crumb-sep";
+  span.setAttribute("aria-hidden", "true");
+  span.textContent = "/";
+  return span;
 }
 
-function go(screen: Screen): void {
+function renderBreadcrumb(): void {
+  const parts: HTMLElement[] = [];
+  const item = section === "home" ? history.dictation(selectedId) : null;
+  if (item) {
+    const name = history.appName(item);
+    parts.push(monogramEl(name, item.isNote, "md"), crumb(name, () => navigate("home")), separator(), crumb(history.title(item)));
+    parts[1].title = "Back to Home (esc)";
+  } else if (section === "settings") {
+    parts.push(crumb("Settings", () => selectSettingsCategory("general")), separator(),
+      crumb(settingsQuery() ? "Search" : PAGES[currentCategory()].title));
+  } else {
+    const titles: Record<Section, string> = { home: "Home", models: "Models", training: "Post-training", settings: "Settings", speedtest: "Speed test", voicetest: "Accuracy test" };
+    if (section === "speedtest" || section === "voicetest") parts.push(crumb("Home", () => navigate("home")), separator());
+    parts.push(crumb(titles[section]));
+  }
+  breadcrumb.replaceChildren(...parts);
+}
+
+// ── Navigation ──
+
+function showScreen(id: string): void {
+  for (const screen of screens) screen.classList.toggle("active", screen.id === id);
+}
+
+/** Routes: home, dictation/<id>, models, training, settings[/<page>[#<id>]], speedtest, voicetest. */
+export function navigate(route: string): void {
+  const [path, anchor] = route.split("#");
+  const [head, rest] = [path.split("/")[0], path.split("/").slice(1).join("/")];
   speedTest?.stop();
   voiceTest?.stop();
-  for (const item of navItems) {
-    if (item.dataset.screen === screen) {
-      item.setAttribute("aria-current", "page");
-    } else {
-      item.removeAttribute("aria-current");
-    }
+  const wasSettings = section === "settings";
+
+  switch (head) {
+    case "dictation":
+      section = "home";
+      selectedId = history.find(rest)?.id ?? null;
+      break;
+    case "notes":
+    case "home":
+      section = "home";
+      selectedId = null;
+      break;
+    case "models":
+    case "training":
+    case "speedtest":
+    case "voicetest":
+      section = head;
+      selectedId = null;
+      break;
+    case "dictionary":
+    case "activity":
+      section = "settings";
+      selectSettingsCategory(head);
+      break;
+    case "settings":
+      section = "settings";
+      if (rest && resolveCategory(rest)) selectSettingsCategory(rest);
+      break;
+    default:
+      return;
   }
-  for (const section of screens) {
-    section.classList.toggle("active", section.id === `screen-${screen}`);
+
+  shell.dataset.section = section;
+  historyPane.hidden = section === "settings";
+  settingsPane.hidden = section !== "settings";
+  for (const button of document.querySelectorAll<HTMLElement>("[data-nav]")) {
+    const on = button.dataset.nav === section && (section !== "home" || selectedId === null);
+    if (on) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current");
   }
-  if (screen === "home") setHomeHeading();
-  else setHeading(TITLES[screen], SUBTITLES[screen]);
-  if (notesSearch) {
-    notesSearch.hidden = screen !== "notes";
+
+  if (section === "home" && selectedId) {
+    showScreen("screen-dictation");
+    renderDictation(dictationScreen, selectedId);
+  } else {
+    showScreen(`screen-${section}`);
   }
-  if (homeActions) homeActions.hidden = screen !== "home";
+  micPicker.hidden = !(section === "home" && !selectedId);
+  panelToggle.hidden = !(section === "home" && selectedId);
   const saveStatus = document.getElementById("settingsSaveStatus");
-  if (saveStatus) saveStatus.hidden = screen !== "settings";
-  document.dispatchEvent(new CustomEvent("home-screen-changed", { detail: { screen } }));
-}
+  if (saveStatus) saveStatus.hidden = section !== "settings";
+  if (section === "speedtest") speedTest?.start();
+  if (section === "voicetest") voiceTest?.start();
+  if (!(section === "home" && selectedId)) content.scrollTop = 0;
 
-// Both tests are Home sub-routes: keep the Home nav item highlighted, swap the
-// visible section, and make sure the other test's controller is stopped first.
-function openSubRoute(sectionId: string, title: string): void {
-  speedTest?.stop();
-  voiceTest?.stop();
-  for (const item of navItems) {
-    if (item.dataset.screen === "home") {
-      item.setAttribute("aria-current", "page");
-    } else {
-      item.removeAttribute("aria-current");
+  renderBreadcrumb();
+  document.dispatchEvent(new CustomEvent("home-screen-changed", { detail: { screen: section, dictation: selectedId } }));
+  if (section === "settings" && !wasSettings) document.getElementById("settingsSearch")?.blur();
+  if (anchor) {
+    const target = document.getElementById(anchor);
+    const row = target?.closest<HTMLElement>(".row") ?? target;
+    if (row) {
+      row.closest("details")?.setAttribute("open", "");
+      requestAnimationFrame(() => {
+        row.scrollIntoView({ block: "center" });
+        row.classList.add("row--flash");
+        setTimeout(() => row.classList.remove("row--flash"), 1200);
+        target?.focus({ preventScroll: true });
+      });
     }
   }
-  for (const section of screens) {
-    section.classList.toggle("active", section.id === sectionId);
+}
+
+document.addEventListener("settings-category-changed", () => { if (section === "settings") renderBreadcrumb(); });
+history.subscribe(() => {
+  if (section === "home" && selectedId) {
+    if (!history.dictation(selectedId)) navigate("home");
+    else { renderDictation(dictationScreen, selectedId); renderBreadcrumb(); }
   }
-  setHeading(title);
-  if (notesSearch) notesSearch.hidden = true;
-  if (homeActions) homeActions.hidden = true;
-  const saveStatus = document.getElementById("settingsSaveStatus");
-  if (saveStatus) saveStatus.hidden = true;
-  document.dispatchEvent(new CustomEvent("home-screen-changed", { detail: { screen: sectionId } }));
-}
-
-function openSpeedTest(): void {
-  if (!speedTest) return;
-  openSubRoute("screen-speedtest", "Speed test");
-  speedTest.start();
-}
-
-function openVoiceTest(): void {
-  if (!voiceTest) return;
-  openSubRoute("screen-voicetest", "Accuracy test");
-  voiceTest.start();
-}
-
-for (const item of navItems) {
-  item.addEventListener("click", () => {
-    const target = item.dataset.screen;
-    if (target && isScreen(target)) {
-      go(target);
-    }
-  });
-}
-
-for (const opener of document.querySelectorAll<HTMLElement>("[data-route]")) {
-  opener.addEventListener("click", () => {
-    const target = opener.dataset.route;
-    if (target && isScreen(target)) {
-      if (target === "settings" && opener.dataset.settingsTarget) {
-        selectSettingsCategory(opener.dataset.settingsTarget);
-      }
-      go(target);
-      if (screenTitle) {
-        screenTitle.tabIndex = -1;
-        screenTitle.focus();
-      }
-    }
-  });
-}
-
-for (const opener of document.querySelectorAll<HTMLElement>('[data-open="speedtest"]')) {
-  opener.addEventListener("click", openSpeedTest);
-}
-
-for (const opener of document.querySelectorAll<HTMLElement>('[data-open="voicetest"]')) {
-  opener.addEventListener("click", openVoiceTest);
-}
-
-// The setup guide is its own window (onboarding.rs); Settings and the empty
-// Home reopen it.
-for (const opener of document.querySelectorAll<HTMLElement>('[data-open="onboarding"]')) {
-  opener.addEventListener("click", () => { void invoke("open_onboarding_window").catch(() => {}); });
-}
-
-// The pill's gear opens this window and asks it to deep-link to a screen.
-void listen<string>("home-navigate", (event) => {
-  if (typeof event.payload === "string" && isScreen(event.payload)) {
-    go(event.payload);
-  }
-}).catch(() => {
-  /* navigation deep-link is best-effort; the window still opens on Home */
 });
 
-// The window opens on Home: replace the static fallback title with its greeting.
-setHomeHeading();
+// One listener for every link-like control, including ones drawn later.
+document.addEventListener("click", (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>("[data-route], [data-open], [data-settings-target], [data-nav], [data-action]");
+  if (!target || (target as HTMLButtonElement).disabled) return;
+  if (target.dataset.nav) {
+    navigate(target.dataset.nav);
+  } else if (target.dataset.route) {
+    const route = target.dataset.route === "settings" && target.dataset.settingsTarget
+      ? `settings/${target.dataset.settingsTarget}` : target.dataset.route;
+    navigate(route);
+  } else if (target.dataset.settingsTarget) {
+    navigate(`settings/${target.dataset.settingsTarget}`);
+  } else if (target.dataset.open === "speedtest" || target.dataset.open === "voicetest") {
+    navigate(target.dataset.open);
+  } else if (target.dataset.open === "onboarding") {
+    void invoke("open_onboarding_window").catch(() => {});
+  } else if (target.dataset.action === "toggle-sidebar") {
+    setSidebar(shell.dataset.sidebar === "hidden");
+  } else if (target.dataset.action === "back") {
+    navigate("home");
+  } else {
+    return;
+  }
+  event.preventDefault();
+});
+
+// Tooltips: the system's own, as `.help` gives on the Mac.
+for (const el of document.querySelectorAll<HTMLElement>("[data-tip]")) {
+  if (!el.title) el.title = el.dataset.tip!;
+}
+
+// ── Keyboard ──
+
+const mod = (event: KeyboardEvent) => (isMacOS() ? event.metaKey : event.ctrlKey) && !event.altKey;
+document.addEventListener("keydown", (event) => {
+  if (isPaletteOpen()) return;
+  if (mod(event) && !event.shiftKey && /^[1-4]$/.test(event.key)) {
+    event.preventDefault();
+    navigate((["home", "models", "training", "settings"] as const)[Number(event.key) - 1]);
+  } else if (mod(event) && event.shiftKey && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    setSidebar(shell.dataset.sidebar === "hidden");
+  } else if (mod(event) && !event.shiftKey && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    setSidebar(true);
+    if (section === "settings") document.getElementById("settingsSearch")?.focus();
+    else focusHistorySearch();
+  } else if (event.key === "Escape" && !event.defaultPrevented) {
+    const field = (event.target as HTMLElement).closest("input, textarea, select");
+    if (field && field.id !== "settingsSearch") return;
+    if (document.querySelector(".shortcut[data-capturing], .shortcut.capturing")) return;
+    if (section === "settings" && !settingsQuery()) navigate("home");
+    else if (section === "home" && selectedId) navigate("home");
+    else if (section === "speedtest" || section === "voicetest") navigate("home");
+  }
+});
+
+// ⌘K / Ctrl+K: search and commands.
+initPalette();
+document.addEventListener("bark-navigate", (event) => {
+  const route = (event as CustomEvent<{ route: string }>).detail?.route;
+  if (typeof route === "string") navigate(route);
+});
+const paletteKey = document.getElementById("paletteKey");
+if (paletteKey) {
+  paletteKey.textContent = PALETTE_SHORTCUT.replace("+", " ");
+  paletteKey.addEventListener("click", () => openPalette());
+}
+const settingsSearchKey = document.getElementById("settingsSearchKey");
+if (settingsSearchKey) settingsSearchKey.textContent = isMacOS() ? "⌘F" : "Ctrl F";
+
+// The pill's gear and the tray open this window on a screen.
+void listen<string>("home-navigate", (event) => {
+  if (typeof event.payload === "string") navigate(event.payload);
+}).catch(() => { /* best-effort; the window still opens on Home */ });
+
+// "Bark 0.1.0 · Stable" at the foot of the settings list, and on About.
+type VersionStatus = { currentVersion?: string; channel?: string; buildChannel?: string };
+function showVersion(status: VersionStatus | null | undefined): void {
+  if (!status?.currentVersion) return;
+  const channel = status.channel === "nightly" ? "Nightly" : "Stable";
+  document.getElementById("sidebarVersion")!.textContent = `Bark ${status.currentVersion} · ${channel}`;
+  document.getElementById("aboutVersion")!.textContent = `Version ${status.currentVersion} · ${channel} channel`;
+}
+void listen<VersionStatus>("update-status", (event) => showVersion(event.payload)).catch(() => {});
+void invoke<VersionStatus>("get_update_status").then(showVersion).catch(() => {});
+
+initThreadList({ navigate, selected: () => (section === "home" ? selectedId : null) });
+void history.refresh();
+
+// Kept for links that still name a category directly.
+export { categories };
+
+// Deep links for looking at a screen: home.html#settings/general.
+const initial = decodeURIComponent(location.hash.slice(1));
+if (initial) {
+  void history.refresh().then(() => navigate(initial));
+}
+navigate("home");

@@ -3,7 +3,8 @@
 // module first on every page in dev only (vite.config.ts); it does nothing
 // inside the real app or without `?demo`, and is never in a build.
 //
-// `?demo&theme=light` picks the theme; `?demo&empty` starts with no history.
+// `?demo&theme=light` picks the theme; `?demo&empty` starts with no history;
+// `?demo&platform=mac` draws the Mac build (Windows is the default).
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 
 const params = new URLSearchParams(location.search);
@@ -121,7 +122,17 @@ function respond(cmd: string, args: Record<string, unknown> | undefined): unknow
 }
 
 if (active) {
+  if (params.get("platform") !== "mac") Object.defineProperty(navigator, "platform", { get: () => "Win32" });
   mockWindows("home");
+  // A headless browser has no microphones; give the pickers two to show.
+  Object.defineProperty(navigator, "mediaDevices", { value: {
+    enumerateDevices: async () => [
+      { kind: "audioinput", label: "Microphone Array (Realtek Audio)", deviceId: "array", groupId: "a" },
+      { kind: "audioinput", label: "Headset Microphone (USB Audio)", deviceId: "usb", groupId: "b" },
+    ],
+    getUserMedia: async () => { throw new Error("No microphone in the demo"); },
+    addEventListener: () => {},
+  } });
   mockIPC((cmd, args) => respond(cmd, args as Record<string, unknown> | undefined));
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark") localStorage.setItem("fairspoken.appearance", theme);
