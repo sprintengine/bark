@@ -105,6 +105,8 @@ let cancelGraceTimer: ReturnType<typeof setTimeout> | null = null;
 const CANCEL_GRACE_MS = 3000;
 
 function setState(state: AppState, message?: string): void {
+  // The main window's Home shows the same state in its dictation box.
+  void emit("pill-state", { state }).catch(() => {});
   if (copiedStatusTimer !== null && state !== "idle") {
     clearTimeout(copiedStatusTimer);
     copiedStatusTimer = null;
@@ -123,7 +125,7 @@ function setState(state: AppState, message?: string): void {
   );
   recordBtn.title = state === "recording" ? "Stop recording" : state === "transcribing" ? "Cancel transcription" : state === "error" ? "Click to retry" : "Click to record";
   recordBtn.disabled = false;
-  statusLabel.textContent = message ?? stateLabel(state);
+  showLabel(message ?? stateLabel(state));
 
   if (state === "recording") {
     startTimer();
@@ -152,7 +154,7 @@ function scheduleCantHearHint(): void {
   cantHearTimer = setTimeout(() => {
     cantHearTimer = null;
     if (appState === "recording" && !voiceHeard) {
-      statusLabel.textContent = "Can't hear you";
+      showLabel("Can't hear you");
     }
   }, CANT_HEAR_AFTER_MS);
 }
@@ -168,7 +170,7 @@ function markVoiceHeard(): void {
   if (voiceHeard) return;
   voiceHeard = true;
   if (appState === "recording" && statusLabel.textContent === "Can't hear you") {
-    statusLabel.textContent = stateLabel("recording");
+    showLabel(stateLabel("recording"));
   }
 }
 
@@ -194,6 +196,26 @@ function updatePillLayout(): void {
   );
 }
 
+// A message reads as a title and, after a dash, a quieter detail ("Not
+// copied — saved in History"), as on the Mac pill; "press Ctrl+V to paste"
+// is drawn as a keycap. The text read aloud is the same words.
+function showLabel(message: string): void {
+  const dash = message.indexOf(" — ");
+  const title = dash < 0 ? message : message.slice(0, dash);
+  const detail = dash < 0 ? "" : message.slice(dash + 3);
+  const part = (tag: "span" | "kbd", className: string, text: string) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    node.textContent = text;
+    return node;
+  };
+  const parts: (Node | string)[] = [part("span", "label-title", title)];
+  const paste = /^press (.+) to paste$/.exec(detail);
+  if (paste) parts.push(" ", part("kbd", "", paste[1]), " ", part("span", "label-detail", "to paste"));
+  else if (detail) parts.push(" ", part("span", "label-detail", detail));
+  statusLabel.replaceChildren(...parts);
+}
+
 function stateLabel(state: AppState): string {
   if (state === "starting") return "Starting";
   if (state === "recording") return "Recording";
@@ -202,21 +224,21 @@ function stateLabel(state: AppState): string {
   return "Ready";
 }
 
-// Reduce a backend error to something the 280px error capsule can carry;
+// Reduce a backend error to something the 268px error capsule can carry;
 // the full message still lands in the Activity log.
 function shortErrorMessage(message: string): string {
   const normalized = message.replace(/\s+/g, " ").trim();
   const lower = normalized.toLowerCase();
-  if (lower.includes("microphone permission")) return "Mic access denied";
+  if (lower.includes("microphone permission")) return "Microphone access is off";
   if (lower.includes("no default input device") || lower.includes("input device")) return "No microphone found";
   if (lower.includes("model files are missing")) return "Model not downloaded";
-  if (lower.includes("allowance used")) return "Cloud allowance used — see Settings";
-  if (lower.includes("cloud sign-in expired")) return "Cloud sign-in expired — see Settings";
-  if (lower.includes("took too long")) return "Took too long, try again";
+  if (lower.includes("allowance used")) return "Cloud allowance used up";
+  if (lower.includes("cloud sign-in expired")) return "Cloud sign-in expired";
+  if (lower.includes("took too long")) return "Took too long — try again";
   if (lower.includes("speech model is still busy")) return "Still finishing the last one";
-  if (lower.includes("no speech")) return "No speech heard — check the mic";
-  if (!normalized) return "Error";
-  return normalized.length <= 40 ? normalized : `${normalized.slice(0, 39)}…`;
+  if (lower.includes("no speech")) return "Nothing heard — check the mic";
+  if (!normalized) return "Something went wrong";
+  return normalized.length <= 34 ? normalized : `${normalized.slice(0, 33)}…`;
 }
 
 function canStartRecording(): boolean {
@@ -280,9 +302,13 @@ const COPIED_FLASH_MS = 1400;
 const NOTICE_MS = 4000;
 const PASTE_KEYS = navigator.userAgent.includes("Mac") ? "⌘V" : "Ctrl+V";
 
-// `notice` replaces the Copied flash with a longer message the user has to
-// act on: the text did not reach the cursor.
-function showCopiedStatus(notice: string | null = null): void {
+// Where a finished dictation went: "Pasted" when it reached the cursor,
+// "Copied" when it is on the clipboard as asked (or recopied from Home). A
+// dictation that did not reach the cursor gets a longer notice the user has
+// to act on instead. `delivery` is null for a recopy.
+function showCopiedStatus(delivery: DictationDelivery | null = null): void {
+  const notice = deliveryNotice(delivery, PASTE_KEYS);
+  document.body.dataset.outcome = delivery ?? "copied";
   if (notice !== null) {
     // Telling the user where the text is matters more than the undo offer.
     dropPolishUndoOffer();
@@ -300,7 +326,7 @@ function showCopiedStatus(notice: string | null = null): void {
   }
   copiedShowing = true;
   copiedNotice = notice !== null;
-  setState("idle", notice ?? "Copied");
+  setState("idle", notice ?? (delivery === "inserted" ? "Pasted" : "Copied"));
   copiedStatusTimer = setTimeout(() => {
     copiedStatusTimer = null;
     copiedShowing = false;
@@ -338,11 +364,14 @@ async function undoPolishedTranscript(): Promise<void> {
     return;
   }
   copiedShowing = true;
-  copiedNotice = false;
+  // "Original copied" needs the notice's wider capsule.
+  copiedNotice = true;
+  document.body.dataset.outcome = "copied";
   setState("idle", "Original copied");
   copiedStatusTimer = setTimeout(() => {
     copiedStatusTimer = null;
     copiedShowing = false;
+    copiedNotice = false;
     if (appState === "idle") setState("idle", "Ready");
   }, 1400);
 }
@@ -476,7 +505,7 @@ async function stopAndTranscribe(): Promise<void> {
     }
     if (transcript) {
       if (delivery !== "notCopied") addEvent("info", "Transcript copied to clipboard");
-      showCopiedStatus(deliveryNotice(delivery, PASTE_KEYS));
+      showCopiedStatus(delivery);
     } else {
       addEvent("warning", "No transcript returned");
       setState("idle", "Ready");
@@ -605,6 +634,17 @@ void listen<ShortcutSettings>("settings-updated", (event) => {
   void registerGlobalShortcuts(event.payload);
 }).catch((error) => addEvent("warning", errorMessage(error)));
 
+// The main window's Ctrl+K palette ("New dictation"): start one, as the
+// record button does, unless a dictation is already under way.
+void listen("pill-start-recording", () => {
+  void startRecording();
+}).catch((error) => addEvent("warning", errorMessage(error)));
+
+// Home's dictate button: start a dictation, or stop the one under way.
+void listen("pill-toggle-recording", () => {
+  void toggleRecording();
+}).catch((error) => addEvent("warning", errorMessage(error)));
+
 // Emitted by the Rust CGEventTap when hold-Fn push-to-talk is enabled.
 void listen<{ pressed: boolean }>("fn-push-to-talk", (event) => {
   void pushToTalk(event.payload.pressed);
@@ -634,7 +674,7 @@ void listen<RecordingAutoStoppedEvent>("recording-auto-stopped", (event) => {
   if (appState !== "recording" && appState !== "transcribing") return;
   endDictationInUi();
   if (event.payload.committed) {
-    showCopiedStatus(deliveryNotice(event.payload.delivery, PASTE_KEYS));
+    showCopiedStatus(event.payload.delivery);
   } else {
     setState("idle", "Ready");
   }

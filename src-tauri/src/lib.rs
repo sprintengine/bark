@@ -1110,6 +1110,15 @@ async fn delete_note(app: AppHandle, id: String) -> Result<(), String> {
     .await
 }
 
+/// A note typed (or dictated) into Home's composer, kept in the library like
+/// a dictation. It has no recording, so its duration is zero.
+#[tauri::command]
+async fn add_note(app: AppHandle, text: String) -> Result<Note, String> {
+    let note = run_blocking(app.clone(), move |_, services| save_note(services, text, 0.0)).await?;
+    let _ = app.emit("notes-updated", &note);
+    Ok(note)
+}
+
 #[tauri::command]
 fn copy_note(id: String, services: State<'_, AppServices>) -> Result<Note, String> {
     let note = services
@@ -3799,6 +3808,7 @@ pub fn run() {
             update_note,
             set_note_pinned,
             delete_note,
+            add_note,
             copy_note,
             get_transcript_history,
             copy_transcript_history_item,

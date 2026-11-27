@@ -5,7 +5,18 @@ import { resolve } from "node:path";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
+// In dev only, every page loads the demo backend first; it stays inert unless
+// the page is opened in a plain browser with `?demo` (src/demo/demoBackend.ts).
+const demoBackend = {
+  name: "bark-demo-backend",
+  apply: "serve" as const,
+  transformIndexHtml: () => [
+    { tag: "script", attrs: { type: "module", src: "/src/demo/demoBackend.ts" }, injectTo: "head-prepend" as const },
+  ],
+};
+
 export default defineConfig(async () => ({
+  plugins: [demoBackend],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

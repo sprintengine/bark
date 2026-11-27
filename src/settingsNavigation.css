@@ -1,9 +1,0 @@
-/* Settings layout: the category tab strip stays under the title while the
-   chosen page scrolls beneath it. Presentation lives in crystal.css. */
-.content:has(> #screen-settings.active) { padding: 0; overflow: hidden; display: flex; }
-#screen-settings.active { flex: 1; min-height: 0; min-width: 0; }
-.settings-workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.settings-navigation { flex: none; display: flex; margin: 0 var(--page-gutter, 32px); }
-.settings-content { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 22px var(--page-gutter, 32px) 40px; }
-.settings-content .settings-form { width: 100%; }
-.settings-page[hidden] { display: none; }

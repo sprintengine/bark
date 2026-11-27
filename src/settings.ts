@@ -215,8 +215,8 @@ function updatePolishUi(settings: Settings): void {
   const hasToken = local || (cloudAvailable && settings.cloudAuthToken.trim() !== "");
   polishEnabled.disabled = !hasToken;
   polishHelp.textContent = local
-    ? "Removes fillers and self-corrections, on this device."
-    : !cloudAvailable ? "Bark Cloud is not in this build. Choose This device."
+    ? "Removes fillers and self-corrections, on this computer."
+    : !cloudAvailable ? "Bark Cloud is not in this build. Choose This PC."
     : hasToken ? "Sends transcript text, never audio, to Bark Cloud."
     : "Add a Bark Cloud token below to turn this on.";
   polishCloudAuthToken.closest<HTMLElement>("[data-polish-cloud]")?.toggleAttribute("hidden", local || !cloudAvailable);
@@ -226,10 +226,10 @@ function updatePolishUi(settings: Settings): void {
   // The format decision reads the focused app through macOS Accessibility.
   polishFormatPanel.hidden = polishTonesPanel.hidden || !isMacOS();
   formatAiDetectionHelp.textContent = local
-    ? "Asks the polish model once per site or app, on this device."
+    ? "Asks the polish model once per site or app, on this computer."
     : "Asks Bark Cloud once per site or app, sending its name and title.";
   contextAwarenessHelp.textContent = local
-    ? "Reads text near your cursor to spell names right. Stays on this device."
+    ? "Reads text near your cursor to spell names right. Stays on this computer."
     : "Reads text near your cursor to spell names right. Sent to Bark Cloud with polish.";
 }
 
@@ -335,7 +335,8 @@ function updateTranscriptionLocationUi(location: TranscriptionLocation): void {
   // a remote host (or Bark Cloud) serves whatever its operator runs.
   modelField.hidden = !local;
   modelDownload.hidden = !local;
-  remoteHostPanel.hidden = location !== "remote-host";
+  // Bark Server has a page of its own, shown whichever place transcribes.
+  remoteHostPanel.hidden = false;
   cloudPanel.hidden = location !== "cloud";
   if (location === "remote-host") showRemoteHost(currentSettings);
   if (location === "cloud") {
@@ -493,4 +494,9 @@ void listen<Settings>("settings-updated", (event) => {
   if (sameSettings(next, currentSettings)) return;
   currentSettings = next;
   applyToForm(currentSettings);
+});
+
+// Opening Bark Server shows the chosen server, or looks for one.
+document.addEventListener("settings-category-changed", (event) => {
+  if ((event as CustomEvent<{ category: string }>).detail?.category === "server") showRemoteHost(currentSettings);
 });

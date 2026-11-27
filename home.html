@@ -9,384 +9,448 @@
   <script type="module" src="/src/settings.ts" defer></script>
 </head>
 <body>
-  <div class="app">
-    <div class="workspace">
-      <!-- ── Sidebar: brand, places, then the engine status and updates ── -->
-      <aside class="sidebar" aria-label="App navigation">
-        <!-- Room for the native traffic lights; drags the window. -->
-        <div class="sidebar-chrome" data-tauri-drag-region></div>
-        <div class="sidebar-brand" data-tauri-drag-region>
-          <span class="brand-mark" aria-hidden="true"><img src="./src/assets/brand/dog-tile.jpg" alt=""></span>
-          <span class="brand-name">Bark</span>
-        </div>
-        <nav class="nav" aria-label="Primary">
-          <button class="nav-item" type="button" data-screen="home" aria-current="page"><span class="nav-tile nav-tile--home" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 10.5v3M8.5 7.5v9M12 4.5v15M15.5 8v8M19 10.5v3"/></svg></span><span class="nav-label">Home</span></button>
-          <button class="nav-item" type="button" data-screen="notes"><span class="nav-tile nav-tile--notes" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="3.5" width="13" height="17" rx="2.5"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/></svg></span><span class="nav-label">Notes</span></button>
-          <button class="nav-item" type="button" data-screen="dictionary"><span class="nav-tile nav-tile--dictionary" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14.5H7.5A2.5 2.5 0 0 0 5 20Z"/><path d="M5 20a1.5 1.5 0 0 0 1.5 1H19"/><path d="m9.5 13.5 2.5-6 2.5 6M10.3 11.6h3.4"/></svg></span><span class="nav-label">Dictionary</span></button>
-          <button class="nav-item" type="button" data-screen="models"><span class="nav-tile nav-tile--models" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.5 8 4.25-8 4.25-8-4.25Z"/><path d="m4 12 8 4.25L20 12M4 16.25l8 4.25 8-4.25"/></svg></span><span class="nav-label">Models</span></button>
-          <button class="nav-item" type="button" data-screen="activity"><span class="nav-tile nav-tile--activity" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5h4l2.5 5.5 5-12 2.5 6.5h4"/></svg></span><span class="nav-label">Activity</span></button>
-          <button class="nav-item" type="button" data-screen="settings" id="settingsRailButton"><span class="nav-tile nav-tile--settings" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9.81 4.93 10.09 2.59h3.82l.28 2.34 1.26.52 1.85-1.45 2.7 2.7-1.45 1.85.52 1.26 2.34.28v3.82l-2.34.28-.52 1.26 1.45 1.85-2.7 2.7-1.85-1.45-1.26.52-.28 2.34h-3.82l-.28-2.34-1.26-.52-1.85 1.45-2.7-2.7 1.45-1.85-.52-1.26-2.34-.28v-3.82l2.34-.28.52-1.26L4 6.7 6.7 4l1.85 1.45Z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="nav-label">Settings</span><span class="nav-badge" id="settingsUpdateBadge" aria-hidden="true" hidden></span></button>
-        </nav>
-        <div class="nav-spacer"></div>
-        <div class="sidebar-foot">
-          <!-- What transcribes, whether it is ready, and the shortcut; driven by sidebarStatus.ts. -->
-          <button class="sidebar-status" id="sidebarStatus" type="button" data-route="models" data-state="idle">
-            <span class="sidebar-status-head">
-              <span class="status-dot" aria-hidden="true"></span>
-              <span class="sidebar-status-text">
-                <span class="sidebar-status-name" id="sidebarStatusName">Speech model</span>
-                <span class="sidebar-status-state" id="sidebarStatusState">Checking…</span>
-              </span>
-            </span>
-            <span class="sidebar-status-shortcut">
-              <span>Dictate</span>
-              <span class="ds-kbd-chord" id="sidebarShortcut"></span>
-            </span>
-          </button>
-          <button class="update-button" id="updateButton" type="button" data-state="idle" aria-label="Check for updates" data-tooltip="Check for updates" hidden>
-            <span class="update-glyph" aria-hidden="true"><svg class="update-ring" viewBox="0 0 40 40"><circle class="update-ring-track" cx="20" cy="20" r="17"/><circle class="update-ring-fill" cx="20" cy="20" r="17" pathLength="100"/></svg><svg class="update-icon update-icon--sync" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg><svg class="update-icon update-icon--download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5M7.5 10 12 14.5 16.5 10"/><path d="M4.5 14.5v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3.5"/></svg><svg class="update-icon update-icon--restart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4v4.2h-4.2"/></svg><span class="update-count ds-badge-count ds-badge-count--accent ds-badge-count--corner">1</span><span class="update-dot"></span></span>
-            <span class="update-text" aria-hidden="true"><span class="update-title" id="updateTitle">Check for updates</span><span class="update-detail" id="updateDetail"></span></span>
-          </button>
-        </div>
-      </aside>
+  <!-- The main window, as on the Mac: the dictation history as a thread list
+       down the left, and the main area beside it under a breadcrumb top bar.
+       In Settings the sidebar becomes the settings list. -->
+  <div class="shell" id="shell" data-section="home">
+    <aside class="sidebar" id="sidebar" aria-label="Bark">
+      <div class="sb-header" data-tauri-drag-region>
+        <button class="icon-btn" type="button" data-action="toggle-sidebar" aria-label="Hide sidebar" data-tip="Hide sidebar (Ctrl+Shift+S)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9.5 5v14"/><path d="M5.5 8.5h2M5.5 11h2" stroke-linecap="round"/></svg>
+        </button>
+        <span class="wordmark" data-tauri-drag-region><span class="brand-mark" aria-hidden="true"><img src="./src/assets/brand/dog-tile.jpg" alt=""></span><span class="wordmark-name">Bark</span></span>
+      </div>
 
-    <!-- ── Main ── -->
-    <div class="main">
-      <!-- The space above and around the title drags the window. -->
+      <!-- ── Dictations ── -->
+      <div class="sb-pane" id="historyPane">
+        <div class="sb-search" id="historySearchBox">
+          <svg class="sb-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
+          <input id="historySearch" type="search" placeholder="Search" aria-label="Search dictations" autocomplete="off" spellcheck="false" />
+          <button class="icon-btn icon-btn--sm" id="historySearchClear" type="button" aria-label="Clear search" hidden>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm3.3 11.9-1.4 1.4L12 13.4l-1.9 1.9-1.4-1.4 1.9-1.9-1.9-1.9 1.4-1.4 1.9 1.9 1.9-1.9 1.4 1.4-1.9 1.9 1.9 1.9Z"/></svg>
+          </button>
+          <button class="icon-btn icon-btn--sm" id="historyFilter" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Filter, All dictations" data-tip="Show: All dictations">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+          </button>
+          <button class="keycap keycap--button" id="paletteKey" type="button" aria-label="Search and commands" data-tip="Search and commands (Ctrl+K)">Ctrl K</button>
+        </div>
+        <div class="menu" id="historyFilterMenu" role="menu" aria-label="Show" hidden>
+          <button type="button" role="menuitemradio" data-filter="all" aria-checked="true">All dictations</button>
+          <button type="button" role="menuitemradio" data-filter="notes" aria-checked="false">Notes</button>
+          <button type="button" role="menuitemradio" data-filter="pinned" aria-checked="false">Pinned</button>
+          <div class="menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" data-filter-action="delete-all" class="menu-danger">Delete all dictations…</button>
+        </div>
+        <div class="thread-list" id="threadList" role="listbox" aria-label="Dictations" tabindex="0"></div>
+        <button class="update-row" id="updateButton" type="button" data-state="idle" aria-label="Check for updates" data-tooltip="Check for updates" hidden>
+          <span class="update-glyph" aria-hidden="true"><svg class="update-ring" viewBox="0 0 40 40"><circle class="update-ring-track" cx="20" cy="20" r="17"/><circle class="update-ring-fill" cx="20" cy="20" r="17" pathLength="100"/></svg><svg class="update-icon update-icon--sync" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg><svg class="update-icon update-icon--download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5M7.5 10 12 14.5 16.5 10"/><path d="M4.5 14.5v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3.5"/></svg><svg class="update-icon update-icon--restart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4v4.2h-4.2"/></svg><span class="update-count ds-badge-count ds-badge-count--accent ds-badge-count--corner">1</span><span class="update-dot"></span></span>
+          <span class="update-text" aria-hidden="true"><span class="update-title" id="updateTitle">Check for updates</span><span class="update-detail" id="updateDetail"></span></span>
+        </button>
+        <!-- The model in use and whether it is ready; driven by sidebarStatus.ts. -->
+        <button class="model-status" id="sidebarStatus" type="button" data-route="models" data-state="idle">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="model-status-name" id="sidebarStatusName">Speech model</span>
+          <span class="model-status-state" id="sidebarStatusState">Checking…</span>
+          <span class="sr-only" id="sidebarShortcut"></span>
+        </button>
+        <nav class="foot-nav" aria-label="Sections">
+          <button class="icon-btn icon-btn--nav" type="button" data-nav="home" aria-label="Home" data-tip="Home (Ctrl+1)" aria-current="page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1Z"/></svg>
+          </button>
+          <button class="icon-btn icon-btn--nav" type="button" data-nav="models" aria-label="Models" data-tip="Models (Ctrl+2)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="m12 3.5 8.5 4.5-8.5 4.5L3.5 8Z"/><path d="m3.5 12 8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5"/></svg>
+          </button>
+          <button class="icon-btn icon-btn--nav" type="button" data-nav="training" aria-label="Post-training" data-tip="Post-training (Ctrl+3)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12h4l2.5-6 3.5 12 3-9 1.5 3h4.5"/></svg>
+          </button>
+          <span class="foot-spacer"></span>
+          <button class="icon-btn icon-btn--nav" type="button" data-nav="settings" id="settingsRailButton" aria-label="Settings" data-tip="Settings (Ctrl+4)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+            <span class="nav-dot" id="settingsUpdateBadge" aria-hidden="true" hidden></span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- ── Settings ── -->
+      <div class="sb-pane" id="settingsPane" hidden>
+        <div class="sb-search">
+          <svg class="sb-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
+          <input id="settingsSearch" type="search" placeholder="Search settings" aria-label="Search settings" autocomplete="off" spellcheck="false" />
+          <kbd class="keycap" id="settingsSearchKey">Ctrl F</kbd>
+        </div>
+        <nav class="settings-nav" aria-label="Settings">
+          <div class="settings-nav-label">Bark</div>
+          <button type="button" class="settings-nav-item" data-settings-category="general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg><span>General</span></button>
+          <button type="button" class="settings-nav-item" data-settings-category="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9"/><path d="M4.5 4.5V9H9M12 8v4.5l3 2"/></svg><span>History</span></button>
+          <button type="button" class="settings-nav-item" data-settings-category="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 21 19.5H3Z"/><path d="M12 10v4M12 16.8v.2"/></svg><span>Activity</span><span class="settings-nav-count" id="activityNavCount"></span></button>
+          <div class="settings-nav-label">Dictation</div>
+          <button type="button" class="settings-nav-item" data-settings-category="transcription"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 10.5v3M7.5 8v8M11 5v14M14.5 8.5v7M18 6.5v11M21 10.5v3"/></svg><span>Transcription</span></button>
+          <button type="button" class="settings-nav-item" data-settings-category="styles"><span class="nav-aa" aria-hidden="true">Aa</span><span>App styles</span></button>
+          <button type="button" class="settings-nav-item" data-settings-category="dictionary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h11.5a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a1.5 1.5 0 0 1-1.5-1.5v-14A1.5 1.5 0 0 1 6 3.5Z"/><path d="M8.5 3.5v17"/></svg><span>Dictionary</span><span class="settings-nav-count" id="dictionaryNavCount"></span></button>
+          <button type="button" class="settings-nav-item" data-settings-category="server"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="6.5" rx="1.5"/><rect x="3.5" y="13" width="17" height="6.5" rx="1.5"/><path d="M7 7.75h.01M7 16.25h.01M11 7.75h6M11 16.25h6" stroke-linecap="round"/></svg><span>Bark Server</span></button>
+          <div class="settings-nav-sep" role="separator"></div>
+          <button type="button" class="settings-nav-item" data-settings-category="updates" id="updatesNavItem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg><span>Updates</span><span class="nav-dot" id="updatesNavBadge" aria-hidden="true" hidden></span></button>
+          <button type="button" class="settings-nav-item" data-settings-category="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg><span>About</span></button>
+        </nav>
+        <div class="sb-foot">
+          <button class="back-row" type="button" data-action="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Back to Bark</span><kbd class="keycap">esc</kbd></button>
+          <div class="sb-version" id="sidebarVersion">Bark</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- Where you are, and the tools for this screen. Its empty space drags the window. -->
       <header class="topbar" data-tauri-drag-region>
-        <div class="page-title" data-tauri-drag-region>
-          <h1 id="screenTitle">Home</h1>
-          <p class="page-subtitle" id="screenSubtitle" hidden></p>
-        </div>
+        <button class="icon-btn topbar-sidebar" type="button" data-action="toggle-sidebar" aria-label="Show sidebar" data-tip="Show sidebar (Ctrl+Shift+S)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9.5 5v14"/><path d="M5.5 8.5h2M5.5 11h2" stroke-linecap="round"/></svg>
+        </button>
+        <nav class="breadcrumb" id="breadcrumb" aria-label="Where you are" data-tauri-drag-region></nav>
+        <span class="topbar-spacer" data-tauri-drag-region></span>
         <p id="settingsSaveStatus" class="settings-save-status" role="status" hidden></p>
-        <div class="topbar-actions" id="homeActions">
-          <button class="btn" data-open="voicetest" type="button">Accuracy test</button>
-          <button class="btn" data-open="speedtest" type="button">Speed test</button>
-        </div>
-        <div class="search" id="notesSearch" hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg>
-          <input id="notesSearchInput" type="search" placeholder="Search notes" aria-label="Search notes" />
+        <div class="topbar-tools" id="topbarTools">
+          <label class="mic-picker" id="micPicker" data-tip="Microphone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+            <select id="micPickerSelect" aria-label="Microphone"><option value="">System default</option></select>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+          </label>
+          <button class="icon-btn" id="panelToggle" type="button" aria-label="Hide actions" aria-pressed="true" data-tip="Hide actions" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M14.5 5v14"/><path d="M16.5 8.5h2M16.5 11h2" stroke-linecap="round"/></svg>
+          </button>
         </div>
       </header>
 
-      <div class="content">
-        <!-- ════ HOME (stats, driven by homeStats.ts) ════ -->
-        <section class="screen active" id="screen-home">
-          <div class="empty" id="homeEmpty" hidden>
-            <span class="empty-mark" aria-hidden="true"><img src="./src/assets/brand/dog-tile.jpg" alt=""></span>
-            <div class="e-title">Start with your voice</div>
-            <div class="e-sub">Press your shortcut in any app and speak. Your pace, words and time saved appear here.</div>
-            <div class="e-actions">
-              <button class="btn btn-primary" data-open="onboarding" type="button">Set up Bark</button>
-              <button class="btn" data-open="speedtest" type="button">Run a speed test</button>
+      <div class="content" id="content">
+        <!-- ════ HOME: the new-dictation screen (home.ts / homeStats.ts) ════ -->
+        <section class="screen active" id="screen-home" aria-label="Home">
+          <div class="page page--home">
+            <div class="home-heading">
+              <h1 class="home-title" id="homeTitle">Press your shortcut and speak.</h1>
+              <p class="home-sub" id="homeSub">Press it again and Bark types it wherever your cursor is. If nothing can take it, it goes on the clipboard.</p>
             </div>
-          </div>
 
-          <div id="homeStats" hidden>
-            <!-- Four headline figures in one card, split by hairlines. -->
-            <section class="card stat-strip" aria-label="Your dictation">
-              <div class="stat"><div class="stat-label">Average pace</div><div class="stat-value"><span class="num" id="statWpm">0</span><span class="stat-unit">wpm</span></div><div class="stat-meta">measured as you speak</div></div>
-              <div class="stat"><div class="stat-label">Words</div><div class="stat-value"><span class="num" id="statTotalWords">0</span></div><div class="stat-meta" id="statWeekDelta"></div></div>
-              <div class="stat"><div class="stat-label">Apps used</div><div class="stat-value"><span class="num" id="statApps">–</span></div><div class="stat-meta" id="statAppsMeta"></div></div>
-              <div class="stat stat--accent"><div class="stat-label">Time saved</div><div class="stat-value num" id="statTimeSaved">—</div><div class="stat-meta" id="statTimeSavedSub"></div></div>
-            </section>
-
-            <!-- The last few dictations as cards, each with its app, when, and copy. -->
-            <section class="home-section" aria-labelledby="recentTitle" id="recentSection" hidden>
-              <div class="section-head">
-                <h2 id="recentTitle">Recent dictations</h2>
-                <button class="link-btn" type="button" data-route="notes">See all</button>
+            <div class="composer" id="composer">
+              <div class="composer-field">
+                <div class="composer-placeholder" id="composerPlaceholder" aria-hidden="true"></div>
+                <textarea id="composerInput" rows="1" aria-label="Try it here" aria-describedby="composerHint"></textarea>
+                <span class="sr-only" id="composerHint">Type or dictate, then press Control Enter to save it as a note.</span>
               </div>
-              <ol class="recent-list" id="recentList"></ol>
-            </section>
+              <div class="composer-bar">
+                <span class="composer-kind" id="composerKind" data-tip="What you type or dictate here is kept in history as a note"><span class="type-glyph" aria-hidden="true"></span>Note</span>
+                <span class="composer-saved" id="composerSaved" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Saved to history <button class="link" type="button" id="composerOpen">Open</button></span>
+                <span class="composer-spacer"></span>
+                <button class="engine-chip" id="engineChip" type="button" data-route="models" data-tip="Where dictation runs">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="10.5" rx="1.5"/><path d="M2 19h20" stroke-linecap="round"/></svg>
+                  <span class="engine-name" id="engineName">Parakeet v3</span><span class="engine-where" id="engineWhere">This PC</span>
+                  <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+                </button>
+                <button class="round-btn" id="composerSave" type="button" aria-label="Save as a note" data-tip="Save as a note (Ctrl+Enter)" hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+                </button>
+                <button class="round-btn" id="composerDictate" type="button" aria-label="Start dictation" data-tip="Dictate here">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="key-hints" id="keyHints"></div>
 
-            <div class="home-grid">
-              <section class="card home-card" aria-labelledby="weekChartTitle">
-                <div class="card-head">
-                  <h2 id="weekChartTitle">This week</h2>
-                  <span class="card-meta num" id="statThisWeek"></span>
+            <!-- Before the first dictation: how to start. -->
+            <div class="group-card setup-card" id="homeEmpty" hidden>
+              <div class="grow">
+                <div class="grow-text">
+                  <div class="grow-title">Finish setting up</div>
+                  <div class="grow-detail">Allow the microphone, get the speech model and try a first dictation.</div>
                 </div>
-                <div class="chart" id="statChart" aria-label="Words per day"></div>
-              </section>
-              <section class="card home-card" aria-labelledby="totalsTitle">
-                <div class="card-head"><h2 id="totalsTitle">All time</h2></div>
-                <dl class="totals-list">
-                  <div><dt>Streak</dt><dd class="num"><span id="statStreak">0</span> days <span class="totals-aside" id="statBestStreak"></span></dd></div>
-                  <div><dt>Spoken time</dt><dd class="num" id="statSpokenTime">0 m</dd></div>
-                  <div id="statZeroEditTile" hidden><dt>Sent without edits</dt><dd class="num"><span id="statZeroEdit">–</span> <span class="totals-aside" id="statZeroEditMeta"></span></dd></div>
-                  <!-- Last, so the note under the list explains this figure. -->
-                  <div><dt>Money saved</dt><dd class="num" id="statMoneySaved">$0</dd></div>
-                </dl>
-                <p class="totals-note" id="statMoneySavedMeta">vs cloud transcription</p>
-              </section>
+                <button class="btn btn-primary" data-open="onboarding" type="button">Continue Setup</button>
+              </div>
             </div>
 
-            <section class="home-section" aria-labelledby="performanceTitle" id="performanceSection" hidden>
+            <!-- The week in four numbers (homeStats.ts). -->
+            <div id="homeStats" hidden>
+              <div class="group-card week-stats" aria-label="This week">
+                <div class="tile"><div class="tile-label">Words this week</div><div class="tile-value"><span class="num" id="statThisWeek">0</span></div><div class="tile-note" id="statWeekDelta"></div></div>
+                <button class="tile tile--button" type="button" data-open="speedtest" data-tip="A typical typing pace. Take the speed test to use your own."><div class="tile-label">Time saved</div><div class="tile-value num" id="statTimeSaved">—</div><div class="tile-note"><span id="statTimeSavedSub"></span> <svg class="chev-r" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></div></button>
+                <div class="tile"><div class="tile-label">Average pace</div><div class="tile-value"><span class="num" id="statWpm">0</span><span class="tile-unit">wpm</span></div><div class="tile-note" id="statPaceNote">this week</div></div>
+                <div class="tile"><div class="tile-label">Sent without edits</div><div class="tile-value num" id="statZeroEdit">–</div><div class="tile-note" id="statZeroEditMeta">once you have dictated</div></div>
+              </div>
+            </div>
+
+            <!-- The model in use, and Bark Server when one is set up. -->
+            <section class="home-model" aria-labelledby="homeModelTitle">
               <div class="section-head">
-                <h2 id="performanceTitle">Last dictation</h2>
-                <span class="section-meta" id="perfSummary"></span>
+                <h2 id="homeModelTitle">Model</h2>
+                <button class="btn btn-ghost" type="button" data-route="models">Manage models <svg class="chev-r" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
               </div>
-              <div class="card stat-strip stat-strip--compact">
-                <div class="stat"><div class="stat-label">Wait after release</div><div class="stat-value num" id="perfTotal">–</div><div class="stat-meta" id="perfTotalMeta"></div></div>
-                <div class="stat"><div class="stat-label">Final transcription</div><div class="stat-value num" id="perfTranscribe">–</div><div class="stat-meta" id="perfTranscribeMeta"></div></div>
-                <div class="stat"><div class="stat-label">Speech model</div><div class="stat-value num" id="perfModel">–</div><div class="stat-meta" id="perfModelMeta"></div></div>
-                <div class="stat"><div class="stat-label">Polish</div><div class="stat-value num" id="perfPolish">–</div><div class="stat-meta" id="perfPolishMeta"></div></div>
-              </div>
+              <div class="group-card" id="homeModelCard"></div>
             </section>
-          </div>
-          <section id="monthlyUsage" aria-label="Monthly dictation activity"></section>
-        </section>
-
-        <!-- ════ NOTES (library, driven by notes.ts) ════ -->
-        <section class="screen" id="screen-notes">
-          <div class="notes">
-            <div class="note-list settings-card" id="noteList" role="listbox" aria-label="Notes"></div>
-            <div class="note-detail settings-card" id="noteDetail"></div>
           </div>
         </section>
 
-        <!-- ════ DICTIONARY (vocab + corrections + snippets, driven by dictionary.ts) ════ -->
-        <section class="screen" id="screen-dictionary">
-          <div class="dict-stack">
-            <section class="settings-section" aria-labelledby="suggestionsTitle" id="suggestionsSection" hidden>
-              <h2 id="suggestionsTitle">Suggestions</h2>
-              <div class="settings-card" id="suggestionRows"></div>
-            </section>
+        <!-- ════ A DICTATION, opened from the thread list (dictationView.ts) ════ -->
+        <section class="screen" id="screen-dictation" aria-label="Dictation"></section>
 
-            <section class="settings-section" aria-labelledby="vocabTitle">
-              <h2 id="vocabTitle">Vocabulary</h2>
-              <div class="settings-card">
-                <form class="row row--field" id="vocabAdd">
-                  <label class="sr-only" for="vocabInput">Add a word</label>
-                  <input id="vocabInput" class="setting-input" type="text" placeholder="Add a name or term" aria-label="Add vocabulary word" autocomplete="off" />
-                  <button class="btn" type="submit">Add</button>
-                </form>
-                <div class="chips" id="vocabChips"></div>
+        <!-- ════ MODELS (a library table, modelDashboard.ts) ════ -->
+        <section class="screen" id="screen-models" aria-label="Models">
+          <div class="page page--wide">
+            <div class="page-title"><h1>Models</h1><p>Speech recognition and polish, on this computer</p></div>
+            <div class="model-toolbar">
+              <span class="ds-field-box" id="modelSearchBox">
+                <svg class="model-search-hint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
+                <input id="modelSearch" class="ds-input ds-input--seamless" type="search" placeholder="Search models" autocomplete="off" maxlength="120" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="modelSearchListbox" aria-label="Search models on this device and Hugging Face." aria-describedby="modelSearchStatus" />
+                <button type="button" id="modelSearchClear" class="model-search-clear" hidden>Clear</button>
+              </span>
+              <button class="icon-btn" id="refreshModels" type="button" aria-label="Refresh from Hugging Face" title="Refresh from Hugging Face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg></button>
+            </div>
+            <div class="model-filters">
+              <div class="seg" id="modelKindFilter" role="group" aria-label="Kind">
+                <button type="button" data-value="all" aria-pressed="true">All</button>
+                <button type="button" data-value="speech" aria-pressed="false">Speech</button>
+                <button type="button" data-value="polish" aria-pressed="false">Polish</button>
               </div>
-            </section>
-
-            <section class="settings-section" aria-labelledby="correctionsTitle">
-              <div class="settings-section-header">
-                <h2 id="correctionsTitle">Corrections</h2>
-                <button class="btn btn-sm" id="addCorrection" type="button">Add</button>
+              <span class="select-face">
+                <select id="modelLanguageFilter" class="setting-select" aria-label="Language">
+                  <option value="all">Any language</option>
+                  <option value="en">English only</option>
+                  <option value="multi">Multilingual</option>
+                </select>
+              </span>
+              <button type="button" class="filter-chip" id="modelDownloadedFilter" aria-pressed="false">Downloaded</button>
+              <button type="button" class="filter-chip" id="modelLocalFilter" aria-pressed="false">On this PC</button>
+            </div>
+            <div class="model-search-status" id="modelSearchStatus" role="status" aria-live="polite"></div>
+            <div id="modelSearchListbox" class="ds-popover model-search-popover" role="listbox" aria-label="Model search results" hidden></div>
+            <p id="modelFeedback" class="model-feedback" role="status" aria-live="polite"></p>
+            <div class="model-summary" id="modelSummary">
+              <span id="dictationProvider"></span>
+              <span id="polishProvider"></span>
+              <span class="model-summary-actions" id="polishProviderActions"></span>
+            </div>
+            <div class="card model-table" id="modelTable" role="table" aria-label="Models" aria-describedby="modelFootnote">
+              <div class="model-table-head" role="row" id="modelSort">
+                <span role="columnheader"><span class="sr-only">Favourite</span></span>
+                <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="name">Name</button></span>
+                <span role="columnheader">Kind</span>
+                <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="speed" aria-describedby="modelFootnote">Speed</button></span>
+                <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="accuracy" aria-describedby="modelFootnote">Accuracy</button></span>
+                <span role="columnheader" class="col-size"><button type="button" class="model-sort-btn" data-sort="size">Size</button></span>
+                <span role="columnheader">Runs on</span>
+                <span role="columnheader"><span class="sr-only">Action</span></span>
               </div>
-              <div class="settings-card" id="correctionRows"></div>
+              <div id="modelRows" role="rowgroup"></div>
+            </div>
+            <p class="model-footnote" id="modelFootnote">Speech ratings come from reference measurements: word error rate and speed on 20 English clips, through the Mac app's engines on an M4 Mac. This app runs some models differently, so read them as a comparison. est. marks an estimate. A model's details show its speed on this computer once it has transcribed here.</p>
+            <section class="home-section" aria-labelledby="hubTitle" id="hubSection" hidden>
+              <div class="section-head"><h2 id="hubTitle">From Hugging Face</h2></div>
+              <div class="card" id="modelSearchResults" aria-busy="false"></div>
             </section>
+          </div>
+        </section>
 
-            <section class="settings-section" aria-labelledby="snippetsTitle">
-              <div class="settings-section-header">
-                <h2 id="snippetsTitle">Snippets</h2>
-                <button class="btn btn-sm" id="addSnippet" type="button">Add</button>
-              </div>
-              <div class="settings-card" id="snippetRows"></div>
-            </section>
-
-            <section class="settings-section" aria-labelledby="packsTitle">
-              <h2 id="packsTitle">Packs</h2>
-              <div class="settings-card" id="packRows"></div>
-            </section>
-
-            <section class="settings-section" aria-labelledby="learningTitle">
-              <h2 id="learningTitle">Learning</h2>
+        <!-- ════ POST-TRAINING (trainingData.ts) ════ -->
+        <section class="screen" id="screen-training" aria-label="Post-training">
+          <div class="page settings-page-col">
+            <div class="page-title"><h1>Post-training</h1><p>Collect recordings of your voice now; training on them arrives in a later update.</p></div>
+            <section class="settings-section">
+              <h2>Recording</h2>
               <div class="settings-card">
                 <div class="row">
                   <div class="row-text">
-                    <label class="row-label" for="learnFromEdits">Learn from my corrections</label>
-                    <div class="row-help">Names you fix join your vocabulary; medicine names are only suggested.</div>
+                    <label class="row-label" for="trainingCapture">Save recordings to improve models</label>
+                    <div class="row-help">Keeps the audio of each dictation and what the model heard, so it can learn your voice later. Nothing is uploaded.</div>
+                  </div>
+                  <div class="row-control"><input id="trainingCapture" class="switch" type="checkbox" role="switch" form="settingsForm" /></div>
+                </div>
+                <div class="row">
+                  <div class="row-text">
+                    <label class="row-label" for="trainingRetentionDays">Keep recordings</label>
+                    <div class="row-help">Older recordings are deleted on their own.</div>
                   </div>
                   <div class="row-control">
-                    <input id="learnFromEdits" class="switch" type="checkbox" role="switch" />
+                    <select id="trainingRetentionDays" class="setting-select w-sm" form="settingsForm">
+                      <option value="0">Until deleted</option>
+                      <option value="30">For 30 days</option>
+                      <option value="90">For 90 days</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <p class="section-footer">Recordings can include anything you dictate, so keep them on a drive you control. They stay on this computer.</p>
+            </section>
+            <section class="settings-section">
+              <h2>Your recordings</h2>
+              <div class="settings-card">
+                <div class="row">
+                  <div class="row-text">
+                    <div class="row-label">Kept dictations</div>
+                    <div class="row-help" id="trainingDataSummary" aria-live="polite">None yet.</div>
+                  </div>
+                  <div class="row-control">
+                    <button class="btn" id="trainingDataDelete" type="button">Delete all</button>
+                    <button class="btn" id="trainingDataExport" type="button">Export…</button>
                   </div>
                 </div>
               </div>
             </section>
+            <section class="settings-section">
+              <h2>Post-train</h2>
+              <ol class="settings-card steps">
+                <li><span class="step-num">1</span>Save your dictations as you work.</li>
+                <li><span class="step-num">2</span>Transcribe them again with a larger, slower model, and find where Parakeet went wrong.</li>
+                <li><span class="step-num">3</span>Fine-tune Parakeet on your voice and accent.</li>
+                <li><span class="step-num">4</span>Test it on recordings it never trained on, and switch only if it's better.</li>
+              </ol>
+            </section>
           </div>
         </section>
 
-        <!-- ════ ACTIVITY (warnings + errors, driven by activity.ts) ════ -->
-        <section class="screen" id="screen-activity">
-          <div class="settings-card">
-            <div class="row">
-              <div class="row-text">
-                <div class="row-label" id="activitySummary"></div>
-              </div>
-              <div class="row-control">
-                <button class="btn btn-ghost" id="clearActivityButton" type="button">Clear</button>
-              </div>
-            </div>
-            <div class="activity-list" id="activityList" aria-live="polite" aria-label="Activity"></div>
-          </div>
-        </section>
-
-        <!-- ════ MODELS (a library table, driven by modelDashboard.ts) ════ -->
-        <section class="screen" id="screen-models" aria-label="Models">
-          <div class="model-toolbar">
-            <span class="ds-field-box" id="modelSearchBox">
-              <svg class="model-search-hint" viewBox="0 0 11 11" fill="none" aria-hidden="true"><circle cx="4.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M7 7l2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-              <input id="modelSearch" class="ds-input ds-input--seamless" type="search" placeholder="Search models" autocomplete="off" maxlength="120" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="modelSearchListbox" aria-label="Search models on this device and Hugging Face." aria-describedby="modelSearchStatus" />
-              <button type="button" id="modelSearchClear" class="model-search-clear" hidden>Clear</button>
-            </span>
-            <div class="seg" id="modelKindFilter" role="group" aria-label="Kind">
-              <button type="button" data-value="all" aria-pressed="true">All</button>
-              <button type="button" data-value="speech" aria-pressed="false">Speech</button>
-              <button type="button" data-value="polish" aria-pressed="false">Polish</button>
-            </div>
-            <select id="modelLanguageFilter" class="setting-select" aria-label="Language">
-              <option value="all">All languages</option>
-              <option value="en">English only</option>
-              <option value="multi">Multilingual</option>
-            </select>
-            <button type="button" class="filter-chip" id="modelDownloadedFilter" aria-pressed="false">Downloaded</button>
-            <button type="button" class="filter-chip" id="modelLocalFilter" aria-pressed="false">On this device</button>
-            <span class="model-toolbar-spacer"></span>
-            <button class="icon-btn" id="refreshModels" type="button" aria-label="Refresh from Hugging Face" title="Refresh from Hugging Face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg></button>
-          </div>
-          <div class="model-search-status" id="modelSearchStatus" role="status" aria-live="polite"></div>
-          <div id="modelSearchListbox" class="ds-popover model-search-popover" role="listbox" aria-label="Model search results" hidden></div>
-          <p id="modelFeedback" class="model-feedback" role="status" aria-live="polite"></p>
-          <div class="model-summary" id="modelSummary">
-            <span id="dictationProvider"></span>
-            <span id="polishProvider"></span>
-            <span class="model-summary-actions" id="polishProviderActions"></span>
-          </div>
-          <div class="card model-table" id="modelTable" role="table" aria-label="Models" aria-describedby="modelFootnote">
-            <div class="model-table-head" role="row" id="modelSort">
-              <span role="columnheader"><span class="sr-only">Favourite</span></span>
-              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="name">Model</button></span>
-              <span role="columnheader">Kind</span>
-              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="speed" aria-describedby="modelFootnote">Speed</button></span>
-              <span role="columnheader"><button type="button" class="model-sort-btn" data-sort="accuracy" aria-describedby="modelFootnote">Accuracy</button></span>
-              <span role="columnheader" class="col-size"><button type="button" class="model-sort-btn" data-sort="size">Size</button></span>
-              <span role="columnheader">Runs on</span>
-              <span role="columnheader"><span class="sr-only">Action</span></span>
-            </div>
-            <div id="modelRows" role="rowgroup"></div>
-          </div>
-          <p class="model-footnote" id="modelFootnote">Speech ratings come from reference measurements: word error rate and speed on 20 English clips, through the Mac app's engines on an M4 Mac. This app runs some models differently, so read them as a comparison. est. marks an estimate. A model's details show its speed on this computer once it has transcribed here.</p>
-          <section class="home-section" aria-labelledby="hubTitle" id="hubSection" hidden>
-            <div class="section-head"><h2 id="hubTitle">From Hugging Face</h2></div>
-            <div class="card" id="modelSearchResults" aria-busy="false"></div>
-          </section>
-        </section>
-
-        <!-- ════ SETTINGS (driven by settings.ts) ════ -->
-        <section class="screen" id="screen-settings"><div class="settings-workspace">
-          <nav class="settings-navigation" aria-label="Settings categories">
-            <button type="button" class="settings-nav-item" data-settings-category="general" aria-controls="settings-general" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M9.81 4.93 10.09 2.59h3.82l.28 2.34 1.26.52 1.85-1.45 2.7 2.7-1.45 1.85.52 1.26 2.34.28v3.82l-2.34.28-.52 1.26 1.45 1.85-2.7 2.7-1.85-1.45-1.26.52-.28 2.34h-3.82l-.28-2.34-1.26-.52-1.85 1.45-2.7-2.7 1.45-1.85-.52-1.26-2.34-.28v-3.82l2.34-.28.52-1.26L4 6.7 6.7 4l1.85 1.45Z"/><circle cx="12" cy="12" r="3.2"/></svg><span>General</span></button>
-            <button type="button" class="settings-nav-item" data-settings-category="keybindings" aria-controls="settings-keybindings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M8 14.5h8"/></svg><span>Shortcuts</span></button>
-            <button type="button" class="settings-nav-item" data-settings-category="audio" aria-controls="settings-audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3"/></svg><span>Audio</span></button>
-            <button type="button" class="settings-nav-item" data-settings-category="transcription" aria-controls="settings-transcription"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 10.5v3M7.5 7v10M11 4v16M14.5 8v8M18 5.5v13M21 10.5v3"/></svg><span>Transcription</span></button>
-            <button type="button" class="settings-nav-item" data-settings-category="polish" aria-controls="settings-polish"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4.5 11.6 9a2 2 0 0 0 1.2 1.2L17.5 12l-4.7 1.7a2 2 0 0 0-1.2 1.2L10 19.5l-1.6-4.6a2 2 0 0 0-1.2-1.2L2.5 12l4.7-1.8A2 2 0 0 0 8.4 9L10 4.5ZM18.5 3v4M16.5 5h4M18 17v3M16.5 18.5h3"/></svg><span>Text polish</span></button>
-            <button type="button" class="settings-nav-item" data-settings-category="appearance" aria-controls="settings-appearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor"/></svg><span>Appearance</span></button>
-            <button type="button" class="settings-nav-item" data-settings-category="updates" aria-controls="settings-updates" id="updatesNavItem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg><span>Updates</span><span class="settings-nav-badge" id="updatesNavBadge" aria-hidden="true" hidden></span></button>
-          </nav>
-          <div class="settings-content"><form class="settings-form" id="settingsForm">
+        <!-- ════ SETTINGS: one page at a time, chosen in the sidebar (settingsNavigation.ts, settings.ts) ════ -->
+        <section class="screen" id="screen-settings" aria-label="Settings">
+          <div class="settings-content">
+            <div class="page settings-page-col">
+              <div class="page-title" id="settingsPageTitle"><h1 id="settingsTitle">General</h1><p id="settingsSubtitle"></p></div>
+              <p class="settings-empty" id="settingsNoResults" hidden></p>
+              <form class="settings-form" id="settingsForm">
 
 <!-- ── General ── -->
 <section class="settings-page" data-settings-page="general" id="settings-general" aria-label="General">
-  <section class="settings-section" aria-label="General">
+  <section class="settings-section">
+    <h2>Shortcut</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><label class="row-label" for="alwaysOnTop">Keep pill on top</label></div>
-        <div class="row-control"><input id="alwaysOnTop" class="switch" type="checkbox" role="switch" /></div>
+        <div class="row-text"><div class="row-label">Dictation shortcut</div><div class="row-help">Press it in any app to start dictating. Esc cancels a recording.</div></div>
+        <div class="row-control">
+          <button class="shortcut" id="recordingShortcutChip" type="button" data-label="Recording" aria-label="Dictation shortcut">
+            <span class="keys" aria-hidden="true"></span>
+            <span class="capture-hint">Press keys · esc cancels</span>
+          </button>
+        </div>
       </div>
       <div class="row">
-        <div class="row-text"><label class="row-label" for="interactionSounds">Start and stop sounds</label></div>
+        <div class="row-text"><div class="row-label">Show copied messages</div><div class="row-help">Opens the list of your recent dictations over the app in front.</div></div>
+        <div class="row-control">
+          <button class="shortcut" id="transcriptStackShortcutChip" type="button" data-label="Copied messages" aria-label="Copied messages shortcut">
+            <span class="keys" aria-hidden="true"></span>
+            <span class="capture-hint">Press keys · esc cancels</span>
+          </button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-text"><div class="row-label" id="recordingModeLabel">Shortcut mode</div><div class="row-help">Press to start and press again to stop, or hold it while you speak.</div></div>
+        <div class="row-control">
+          <div class="seg" id="recordingModeSeg" role="group" aria-labelledby="recordingModeLabel">
+            <button type="button" data-value="toggle" aria-pressed="true">Press to start and stop</button>
+            <button type="button" data-value="push-to-talk" aria-pressed="false">Hold to talk</button>
+          </div>
+        </div>
+      </div>
+      <div class="row" id="fnPushToTalkRow">
+        <div class="row-text">
+          <label class="row-label" for="fnPushToTalk">Hold fn to dictate</label>
+          <div class="row-help">Hold the fn (globe) key and speak; let go and Bark types it. Needs the Input Monitoring permission.</div>
+        </div>
+        <div class="row-control"><input id="fnPushToTalk" class="switch" type="checkbox" role="switch" /></div>
+      </div>
+    </div>
+    <div class="section-footer" id="shortcutStatus" aria-live="polite"></div>
+  </section>
+
+  <section class="settings-section">
+    <h2>Microphone</h2>
+    <div class="settings-card">
+      <div class="row">
+        <div class="row-text"><label class="row-label" for="audioDeviceSelect">Microphone</label><div class="row-help">Bark listens on this one only while you dictate.</div></div>
+        <div class="row-control mic-control">
+          <button class="icon-btn" id="refreshDevices" type="button" aria-label="Refresh microphones" title="Refresh microphones">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg>
+          </button>
+          <select id="audioDeviceSelect" class="setting-select w-lg">
+            <option value="">System default</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-text"><div class="row-label">Level</div><div class="row-help">Speak as you would to dictate. The bars should reach past halfway.</div></div>
+        <div class="row-control"><div class="level" aria-hidden="true"><span id="inputMeter"></span></div></div>
+      </div>
+      <div class="row">
+        <div class="row-text"><div class="row-label">Accuracy test</div><div class="row-help">Read a passage aloud and see how much of it the model got right.</div></div>
+        <div class="row-control"><button class="btn" data-open="voicetest" type="button">Test</button></div>
+      </div>
+      <div class="row">
+        <div class="row-text"><label class="row-label" for="maxRecordingSeconds">Longest recording</label><div class="row-help">A recording stops on its own after this long.</div></div>
+        <div class="row-control">
+          <select id="maxRecordingSeconds" class="setting-select w-sm">
+            <option value="30">30 seconds</option>
+            <option value="60">1 minute</option>
+            <option value="120">2 minutes</option>
+            <option value="180">3 minutes</option>
+            <option value="300">5 minutes</option>
+            <option value="600">10 minutes</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>When you stop speaking</h2>
+    <div class="settings-card">
+      <div class="row" id="insertAtCursorRow">
+        <div class="row-text">
+          <label class="row-label" for="insertAtCursor">Paste into the current app</label>
+          <div class="row-help">Types where your cursor is. With no text field, it goes on the clipboard.</div>
+        </div>
+        <div class="row-control"><input id="insertAtCursor" class="switch" type="checkbox" role="switch" /></div>
+      </div>
+      <div class="row" id="accessibilityInsertRow">
+        <div class="row-text">
+          <label class="row-label" for="accessibilityInsert">Insert without pasting</label>
+          <div class="row-help">Native Mac apps only; Electron apps, terminals and web pages ignore it.</div>
+        </div>
+        <div class="row-control"><input id="accessibilityInsert" class="switch" type="checkbox" role="switch" /></div>
+      </div>
+      <div class="row">
+        <div class="row-text"><label class="row-label" for="interactionSounds">Start and stop sounds</label><div class="row-help">A soft click as recording starts and ends.</div></div>
         <div class="row-control"><input id="interactionSounds" class="switch" type="checkbox" role="switch" /></div>
       </div>
       <div class="row">
-        <div class="row-text">
-          <label class="row-label" for="noteRetentionMinutes">Delete notes</label>
-          <div class="row-help">Pinned notes are kept.</div>
-        </div>
+        <div class="row-text"><label class="row-label" for="alwaysOnTop">Keep the pill on top</label><div class="row-help">The recording pill stays above other windows.</div></div>
+        <div class="row-control"><input id="alwaysOnTop" class="switch" type="checkbox" role="switch" /></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>Appearance</h2>
+    <div class="settings-card">
+      <div class="row">
+        <div class="row-text"><div class="row-label" id="appearanceLabel">Theme</div><div class="row-help" id="appearanceStatus" role="status">Follows your system appearance.</div></div>
         <div class="row-control">
-          <select id="noteRetentionMinutes" class="setting-select w-sm">
-            <option value="0">Never</option>
-            <option value="15">After 15 minutes</option>
-            <option value="60">After 1 hour</option>
-            <option value="480">After 8 hours</option>
-            <option value="1440">After 1 day</option>
-            <option value="10080">After 1 week</option>
-            <option value="43200">After 30 days</option>
-          </select>
+          <div class="seg" id="appearanceChoices" role="group" aria-labelledby="appearanceLabel">
+            <button type="button" data-appearance="system" aria-pressed="true">System</button>
+            <button type="button" data-appearance="light" aria-pressed="false">Light</button>
+            <button type="button" data-appearance="dark" aria-pressed="false">Dark</button>
+          </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>Setup</h2>
+    <div class="settings-card">
       <div class="row">
-        <div class="row-text">
-          <div class="row-label">Setup guide</div>
-          <div class="row-help">Permissions, microphone, model and a first dictation.</div>
-        </div>
+        <div class="row-text"><div class="row-label">Setup guide</div><div class="row-help">Walk through permissions, the model and a first dictation again.</div></div>
         <div class="row-control"><button class="btn" type="button" data-open="onboarding">Open</button></div>
       </div>
     </div>
-    <p class="settings-section-help general-privacy">Your dictations, notes and settings are stored on this computer.</p>
   </section>
-  <details class="settings-section settings-disclosure" aria-labelledby="trainingDataTitle">
-    <summary><h2 id="trainingDataTitle">Training data</h2></summary>
-    <div class="settings-card">
-      <div class="row">
-        <div class="row-text">
-          <label class="row-label" for="trainingCapture">Keep dictations for training</label>
-          <div class="row-help training-warning">Audio and text stay on this device and may hold sensitive information.</div>
-        </div>
-        <div class="row-control"><input id="trainingCapture" class="switch" type="checkbox" role="switch" /></div>
-      </div>
-      <div class="row">
-        <div class="row-text"><label class="row-label" for="trainingRetentionDays">Keep recordings</label></div>
-        <div class="row-control">
-          <select id="trainingRetentionDays" class="setting-select w-sm">
-            <option value="0">Until deleted</option>
-            <option value="30">For 30 days</option>
-            <option value="90">For 90 days</option>
-          </select>
-        </div>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <div class="row-label">Kept dictations</div>
-          <div class="row-help" id="trainingDataSummary" aria-live="polite">None yet.</div>
-        </div>
-        <div class="row-control">
-          <button class="btn btn-ghost" id="trainingDataDelete" type="button">Delete all</button>
-          <button class="btn" id="trainingDataExport" type="button">Export…</button>
-        </div>
-      </div>
-    </div>
-  </details>
-</section>
 
-<!-- ── Audio ── -->
-<section class="settings-page" data-settings-page="audio" id="settings-audio" aria-label="Audio" hidden>
-  <section class="settings-section" aria-label="Microphone">
+  <details class="settings-section settings-disclosure">
+    <summary><h2>Advanced audio</h2></summary>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><label class="row-label" for="audioDeviceSelect">Microphone</label></div>
-        <div class="row-control mic-control">
-          <div class="mic-line">
-            <button class="icon-btn" id="refreshDevices" type="button" aria-label="Refresh microphones" title="Refresh microphones">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M20 12a8 8 0 0 1-13.7 5.7M4 12A8 8 0 0 1 17.7 6.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                <path d="M20 5v5h-5M4 19v-5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <select id="audioDeviceSelect" class="setting-select w-lg">
-              <option value="">Default microphone</option>
-            </select>
-          </div>
-          <div class="level" aria-hidden="true"><span id="inputMeter"></span></div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="row-text"><div class="row-label">Accuracy test</div></div>
-        <div class="row-control"><button class="btn" data-open="voicetest" type="button">Run</button></div>
-      </div>
-    </div>
-  </section>
-  <details class="settings-section settings-disclosure" aria-labelledby="audioAdvancedTitle">
-    <summary><h2 id="audioAdvancedTitle">Advanced</h2></summary>
-    <div class="settings-card">
-      <div class="row">
-        <div class="row-text"><label class="row-label" for="inputGain">Input gain</label></div>
+        <div class="row-text"><label class="row-label" for="inputGain">Input gain</label><div class="row-help">Raise it if the level bars barely move.</div></div>
         <div class="row-control">
           <select id="inputGain" class="setting-select w-xs">
             <option value="1">1×</option>
@@ -405,120 +469,63 @@
         <div class="row-text"><label class="row-label" for="echoCancellation">Echo cancellation</label></div>
         <div class="row-control"><input id="echoCancellation" class="switch" type="checkbox" role="switch" /></div>
       </div>
-      <div class="row">
-        <div class="row-text"><label class="row-label" for="maxRecordingSeconds">Stop recording after</label></div>
-        <div class="row-control">
-          <select id="maxRecordingSeconds" class="setting-select w-sm">
-            <option value="30">30 seconds</option>
-            <option value="60">1 minute</option>
-            <option value="120">2 minutes</option>
-            <option value="180">3 minutes</option>
-            <option value="300">5 minutes</option>
-            <option value="600">10 minutes</option>
-          </select>
-        </div>
-      </div>
     </div>
   </details>
 </section>
 
-<!-- ── Transcription ── -->
-<section class="settings-page" data-settings-page="transcription" id="settings-transcription" aria-label="Transcription" hidden>
-  <section class="settings-section" aria-label="Service">
+<!-- ── History ── -->
+<section class="settings-page" data-settings-page="history" id="settings-history" aria-label="History" hidden>
+  <section class="settings-section">
+    <h2>Keep</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><div class="row-label" id="locationLabel">Transcribe on</div></div>
+        <div class="row-text">
+          <label class="row-label" for="noteRetentionMinutes">Delete dictations and notes</label>
+          <div class="row-help">Older ones are removed after this long. Pinned ones are kept, and so are your usage stats.</div>
+        </div>
+        <div class="row-control">
+          <select id="noteRetentionMinutes" class="setting-select w-sm">
+            <option value="0">Never</option>
+            <option value="15">After 15 minutes</option>
+            <option value="60">After 1 hour</option>
+            <option value="480">After 8 hours</option>
+            <option value="1440">After 1 day</option>
+            <option value="10080">After 1 week</option>
+            <option value="43200">After 30 days</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-text"><div class="row-label">On this computer</div><div class="row-help" id="historyCount">Your dictations and notes stay on this computer.</div></div>
+      </div>
+    </div>
+  </section>
+  <section class="settings-section">
+    <h2>Delete</h2>
+    <div class="settings-card">
+      <div class="row">
+        <div class="row-text"><div class="row-label">Delete all dictations and notes</div><div class="row-help">Their text is removed from this computer. Usage stats and any kept recordings stay.</div></div>
+        <div class="row-control"><button class="btn btn-danger" type="button" data-action="delete-all">Delete All…</button></div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- ── Transcription ── -->
+<section class="settings-page" data-settings-page="transcription" id="settings-transcription" aria-label="Transcription" hidden>
+  <section class="settings-section">
+    <h2>Where Bark listens</h2>
+    <div class="settings-card">
+      <div class="row">
+        <div class="row-text"><div class="row-label" id="locationLabel">Transcribe on</div><div class="row-help">Audio never leaves this computer unless you choose your Bark Server or Bark Cloud.</div></div>
         <div class="row-control">
           <div class="seg" id="locationSeg" role="group" aria-labelledby="locationLabel">
-            <button type="button" data-value="local" aria-pressed="true">This device</button>
-            <button type="button" data-value="remote-host" aria-pressed="false">My host</button>
+            <button type="button" data-value="local" aria-pressed="true">This PC</button>
+            <button type="button" data-value="remote-host" aria-pressed="false">Bark Server</button>
             <button type="button" data-value="cloud" aria-pressed="false">Cloud</button>
           </div>
         </div>
       </div>
-      <div class="row" id="modelField">
-        <div class="row-text">
-          <label class="row-label" for="modelSelect">Model</label>
-          <div class="row-help model-identity" id="speechModelIdentity"><span id="selectedSpeechModel">NVIDIA</span><span class="meta num" id="modelSize">RAM ~2.5G</span></div>
-        </div>
-        <div class="row-control">
-          <select id="modelSelect" class="setting-select w-lg">
-            <option value="parakeet-tdt-0.6b-v3">Parakeet TDT 0.6B v3</option>
-            <option value="parakeet-ultra">Parakeet Ultra 0.6B</option>
-            <option value="parakeet-tdt-0.6b-v2">Parakeet TDT 0.6B v2 · English</option>
-          </select>
-          <button class="btn btn-ghost" type="button" data-route="models">Manage</button>
-        </div>
-      </div>
-      <div class="model-state" id="modelDownload" data-state="idle" aria-live="polite">
-        <span class="status num" id="modelDownloadStatus">Checking model…</span>
-        <div class="progress"><span id="modelDownloadBar"></span></div>
-        <button class="btn" id="modelPrepare" type="button">Download</button>
-      </div>
-
-      <!-- My host: scan → pick → password. Typing an address is the fallback. -->
-      <div id="remoteHostPanel" class="host-panel" aria-live="polite" hidden>
-        <div class="row host-status">
-          <div class="row-text">
-            <div class="row-label">Host</div>
-            <div class="row-help status-text" id="remoteStatus">Not connected</div>
-          </div>
-          <div class="row-control">
-            <button class="btn" id="remoteTest" type="button">Test</button>
-          </div>
-        </div>
-        <div class="row host-finder">
-          <div class="row-text">
-            <div class="row-label">Hosts on your tailnet</div>
-            <div class="row-help" id="tailnetStatus" role="status"></div>
-          </div>
-          <div class="row-control">
-            <button class="btn" id="tailnetScan" type="button">Scan</button>
-          </div>
-        </div>
-        <div class="tailnet-hosts" id="tailnetHosts" role="list" aria-label="Hosts found" hidden></div>
-        <div class="row pair-row" id="tailnetPairRow" hidden>
-          <div class="row-text">
-            <label class="row-label" for="tailnetPassword">Password</label>
-            <div class="row-help" id="tailnetPairHelp"></div>
-          </div>
-          <div class="row-control">
-            <input id="tailnetPassword" class="setting-input w-md" type="password" autocomplete="off" placeholder="Pairing password" />
-            <button class="btn btn-ghost" id="tailnetPairCancel" type="button">Cancel</button>
-            <button class="btn btn-primary" id="tailnetPair" type="button">Connect</button>
-          </div>
-        </div>
-        <details class="row-disclosure" id="remoteManual">
-          <summary>Enter address manually</summary>
-          <div class="row">
-            <div class="row-text"><label class="row-label" for="tailnetAddress">Machine name</label></div>
-            <div class="row-control">
-              <input id="tailnetAddress" class="setting-input mono w-md" type="text" placeholder="studio-mac or name:port" autocomplete="off" autocapitalize="off" spellcheck="false" />
-              <button class="btn" id="tailnetProbe" type="button">Check</button>
-            </div>
-          </div>
-          <div class="row">
-            <div class="row-text"><label class="row-label" for="remoteUrl">Host URL</label></div>
-            <div class="row-control">
-              <input id="remoteUrl" class="setting-input mono w-lg" type="url" placeholder="https://host.example.com" />
-            </div>
-          </div>
-          <div class="row">
-            <div class="row-text"><label class="row-label" for="remoteAuthToken">Token</label></div>
-            <div class="row-control">
-              <input id="remoteAuthToken" class="setting-input mono w-lg" type="password" autocomplete="off" />
-            </div>
-          </div>
-          <div class="row">
-            <div class="row-text"><label class="row-label" for="remoteTimeoutSeconds">Timeout</label></div>
-            <div class="row-control">
-              <input id="remoteTimeoutSeconds" class="setting-input num w-xs" type="number" min="5" max="300" step="5" />
-              <span class="meta">seconds</span>
-            </div>
-          </div>
-        </details>
-      </div>
-
       <div id="cloudPanel" aria-live="polite" hidden>
         <div class="row">
           <div class="row-text">
@@ -537,10 +544,29 @@
     </div>
   </section>
 
-  <section class="settings-section" aria-label="Recognition and output">
+  <section class="settings-section">
+    <div class="section-head"><h2>Model</h2><button class="btn btn-ghost" type="button" data-route="models">Browse models <svg class="chev-r" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
     <div class="settings-card">
+      <div class="row" id="modelField">
+        <div class="row-text">
+          <label class="row-label" for="modelSelect">Speech model</label>
+          <div class="row-help model-identity" id="speechModelIdentity"><span id="selectedSpeechModel">NVIDIA</span><span class="meta num" id="modelSize">RAM ~2.5G</span></div>
+        </div>
+        <div class="row-control">
+          <select id="modelSelect" class="setting-select w-lg">
+            <option value="parakeet-tdt-0.6b-v3">Parakeet TDT 0.6B v3</option>
+            <option value="parakeet-ultra">Parakeet Ultra 0.6B</option>
+            <option value="parakeet-tdt-0.6b-v2">Parakeet TDT 0.6B v2 · English</option>
+          </select>
+        </div>
+      </div>
+      <div class="model-state" id="modelDownload" data-state="idle" aria-live="polite">
+        <span class="status num" id="modelDownloadStatus">Checking model…</span>
+        <div class="progress"><span id="modelDownloadBar"></span></div>
+        <button class="btn" id="modelPrepare" type="button">Download</button>
+      </div>
       <div class="row">
-        <div class="row-text"><label class="row-label" for="langSelect">Language</label></div>
+        <div class="row-text"><label class="row-label" for="langSelect">Language</label><div class="row-help">The language you speak, or let the model tell.</div></div>
         <div class="row-control">
           <select id="langSelect" class="setting-select w-md">
             <option value="auto">Auto-detect</option>
@@ -555,18 +581,57 @@
           </select>
         </div>
       </div>
-      <div class="row" id="insertAtCursorRow">
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>Cleanup</h2>
+    <div class="settings-card">
+      <div class="row">
+        <div class="row-text"><label class="row-label" for="postProcess">Apply your dictionary</label><div class="row-help">Your words, corrections and snippets, in every dictation.</div></div>
+        <div class="row-control"><input id="postProcess" class="switch" type="checkbox" role="switch" /></div>
+      </div>
+      <div class="row">
         <div class="row-text">
-          <label class="row-label" for="insertAtCursor">Insert at cursor</label>
-          <div class="row-help">Needs the Accessibility permission.</div>
+          <label class="row-label" for="polishEnabled">AI polish</label>
+          <div class="row-help" id="polishHelp"></div>
         </div>
-        <div class="row-control"><input id="insertAtCursor" class="switch" type="checkbox" role="switch" /></div>
+        <div class="row-control"><input id="polishEnabled" class="switch" type="checkbox" role="switch" /></div>
+      </div>
+      <div class="row">
+        <div class="row-text"><label class="row-label" for="polishProviderSelect">Polish runs on</label></div>
+        <div class="row-control">
+          <select id="polishProviderSelect" class="setting-select w-md"><option value="local">This PC</option><option value="cloud">Bark Cloud</option></select>
+        </div>
+      </div>
+      <div class="row" id="polishLocalModelRow">
+        <div class="row-text">
+          <div class="row-label">Polish model</div>
+          <div class="row-help"><span class="model-identity" id="polishModelIdentity"><span id="selectedPolishModel">Qwen3.5 0.8B</span></span></div>
+        </div>
+        <div class="row-control"><button class="btn" type="button" data-route="models">Manage</button></div>
+      </div>
+      <div id="polishCloudPanel" data-polish-cloud hidden>
+        <div class="row">
+          <div class="row-text">
+            <label class="row-label" for="polishCloudAuthToken">Cloud token</label>
+            <div class="row-help">Same token as cloud dictation.</div>
+          </div>
+          <div class="row-control"><input id="polishCloudAuthToken" class="setting-input mono w-lg" type="password" autocomplete="off" /></div>
+        </div>
+      </div>
+      <div class="row" id="contextAwarenessRow">
+        <div class="row-text">
+          <label class="row-label" for="contextAwareness">Context awareness</label>
+          <div class="row-help" id="contextAwarenessHelp"></div>
+        </div>
+        <div class="row-control"><input id="contextAwareness" class="switch" type="checkbox" role="switch" /></div>
       </div>
     </div>
   </section>
 
-  <details class="settings-section settings-disclosure" aria-labelledby="transcriptionAdvancedTitle">
-    <summary><h2 id="transcriptionAdvancedTitle">Advanced</h2></summary>
+  <details class="settings-section settings-disclosure">
+    <summary><h2>Advanced</h2></summary>
     <div class="settings-card">
       <div class="row" id="superModeRow">
         <div class="row-text">
@@ -596,171 +661,15 @@
         <div class="row-text"><label class="row-label" for="useGpu">GPU acceleration</label></div>
         <div class="row-control"><input id="useGpu" class="switch" type="checkbox" role="switch" /></div>
       </div>
-      <div class="row" id="accessibilityInsertRow">
-        <div class="row-text">
-          <label class="row-label" for="accessibilityInsert">Insert without pasting</label>
-          <div class="row-help">Native Mac apps only; Electron apps, terminals and web pages ignore it.</div>
-        </div>
-        <div class="row-control"><input id="accessibilityInsert" class="switch" type="checkbox" role="switch" /></div>
-      </div>
-    </div>
-  </details>
-</section>
-
-<!-- ── Text polish ── -->
-<section class="settings-page" data-settings-page="polish" id="settings-polish" aria-label="Text polish" hidden>
-  <section class="settings-section" aria-label="Cleanup">
-    <div class="settings-card">
-      <div class="row">
-        <div class="row-text">
-          <label class="row-label" for="polishEnabled">AI polish</label>
-          <div class="row-help" id="polishHelp"></div>
-        </div>
-        <div class="row-control"><input id="polishEnabled" class="switch" type="checkbox" role="switch" /></div>
-      </div>
-      <div class="row">
-        <div class="row-text"><label class="row-label" for="polishProviderSelect">Runs on</label></div>
-        <div class="row-control">
-          <select id="polishProviderSelect" class="setting-select w-md"><option value="local">This device</option><option value="cloud">Bark Cloud</option></select>
-        </div>
-      </div>
-      <div class="row" id="polishLocalModelRow">
-        <div class="row-text">
-          <div class="row-label">Model</div>
-          <div class="row-help"><span class="model-identity" id="polishModelIdentity"><span id="selectedPolishModel">Qwen3.5 0.8B</span></span></div>
-        </div>
-        <div class="row-control"><button class="btn btn-ghost" type="button" data-route="models">Manage</button></div>
-      </div>
-      <div id="polishCloudPanel" data-polish-cloud hidden>
-        <div class="row">
-          <div class="row-text">
-            <label class="row-label" for="polishCloudAuthToken">Cloud token</label>
-            <div class="row-help">Same token as cloud dictation.</div>
-          </div>
-          <div class="row-control"><input id="polishCloudAuthToken" class="setting-input mono w-lg" type="password" autocomplete="off" /></div>
-        </div>
-      </div>
-      <div class="row" id="contextAwarenessRow">
-        <div class="row-text">
-          <label class="row-label" for="contextAwareness">Context awareness</label>
-          <div class="row-help" id="contextAwarenessHelp"></div>
-        </div>
-        <div class="row-control"><input id="contextAwareness" class="switch" type="checkbox" role="switch" /></div>
-      </div>
-      <div class="row">
-        <div class="row-text"><label class="row-label" for="postProcess">Apply dictionary</label></div>
-        <div class="row-control">
-          <button class="btn btn-ghost" type="button" data-route="dictionary">Open</button>
-          <input id="postProcess" class="switch" type="checkbox" role="switch" />
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <details id="polishTonesPanel" hidden class="settings-section settings-disclosure" aria-labelledby="writing-styleTitle">
-    <summary><h2 id="writing-styleTitle">Tone per app</h2></summary>
-    <div class="settings-card">
-      <div class="row">
-        <div class="row-text">
-          <div class="row-label" id="polishToneMessagingLabel">Messaging</div>
-          <div class="row-help">Slack, iMessage, WhatsApp</div>
-        </div>
-        <div class="row-control">
-          <div class="seg" id="polishToneMessaging" role="group" aria-labelledby="polishToneMessagingLabel">
-            <button type="button" data-value="default" aria-pressed="true">Default</button>
-            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
-            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
-            <button type="button" data-value="off" aria-pressed="false">Off</button>
-          </div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <div class="row-label" id="polishToneEmailLabel">Email</div>
-          <div class="row-help">Mail, Outlook, Superhuman</div>
-        </div>
-        <div class="row-control">
-          <div class="seg" id="polishToneEmail" role="group" aria-labelledby="polishToneEmailLabel">
-            <button type="button" data-value="default" aria-pressed="true">Default</button>
-            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
-            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
-            <button type="button" data-value="off" aria-pressed="false">Off</button>
-          </div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <div class="row-label" id="polishToneDocsLabel">Documents</div>
-          <div class="row-help">Pages, Word, Notion, Obsidian</div>
-        </div>
-        <div class="row-control">
-          <div class="seg" id="polishToneDocs" role="group" aria-labelledby="polishToneDocsLabel">
-            <button type="button" data-value="default" aria-pressed="true">Default</button>
-            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
-            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
-            <button type="button" data-value="off" aria-pressed="false">Off</button>
-          </div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <div class="row-label" id="polishToneCodeLabel">Code editors</div>
-          <div class="row-help">VS Code, Cursor, Xcode. Terminals are never polished.</div>
-        </div>
-        <div class="row-control">
-          <div class="seg" id="polishToneCode" role="group" aria-labelledby="polishToneCodeLabel">
-            <button type="button" data-value="default" aria-pressed="true">Default</button>
-            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
-            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
-            <button type="button" data-value="off" aria-pressed="false">Off</button>
-          </div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <div class="row-label" id="polishToneOtherLabel">Everything else</div>
-        </div>
-        <div class="row-control">
-          <div class="seg" id="polishToneOther" role="group" aria-labelledby="polishToneOtherLabel">
-            <button type="button" data-value="default" aria-pressed="true">Default</button>
-            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
-            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
-            <button type="button" data-value="off" aria-pressed="false">Off</button>
-          </div>
-        </div>
-      </div>
     </div>
   </details>
 
-  <details id="polishFormatPanel" hidden class="settings-section settings-disclosure" aria-labelledby="formatTitle">
-    <summary><h2 id="formatTitle">Formatting</h2></summary>
+  <details class="settings-section settings-disclosure" id="polishDeveloperPanel">
+    <summary><h2>Developer</h2></summary>
     <div class="settings-card">
       <div class="row">
         <div class="row-text">
-          <label class="row-label" for="formatAiDetection">Detect format for unknown apps</label>
-          <div class="row-help" id="formatAiDetectionHelp"></div>
-        </div>
-        <div class="row-control"><input id="formatAiDetection" class="switch" type="checkbox" role="switch" /></div>
-      </div>
-      <!-- Not a <form>: it sits inside #settingsForm, and nested forms are dropped by the parser. -->
-      <div class="row" id="formatMappingAdd" role="group" aria-label="Set a format">
-        <div class="row-text"><label class="row-label" for="formatMappingKey">Set a format</label></div>
-        <div class="row-control">
-          <input id="formatMappingKey" class="setting-input w-md" type="text" placeholder="example.com or app:bundle.id" autocomplete="off" />
-          <select id="formatMappingFormat" class="setting-select w-sm" aria-label="Format"></select>
-          <button class="btn" id="formatMappingSet" type="button">Set</button>
-        </div>
-      </div>
-    </div>
-    <div class="settings-card" id="formatMappingRows" aria-label="Sites and apps with a format"></div>
-  </details>
-
-  <details class="settings-section settings-disclosure" id="polishDeveloperPanel" aria-labelledby="polishDeveloperTitle">
-    <summary><h2 id="polishDeveloperTitle">Developer</h2></summary>
-    <div class="settings-card">
-      <div class="row">
-        <div class="row-text">
-          <label class="row-label" for="polishLocalModelPath">Model file</label>
+          <label class="row-label" for="polishLocalModelPath">Polish model file</label>
           <div class="row-help">A .gguf path. Replaces the selected model while set.</div>
         </div>
         <div class="row-control"><input id="polishLocalModelPath" class="setting-input mono w-lg" type="text" placeholder="/path/to/model.gguf" autocomplete="off" spellcheck="false" /></div>
@@ -782,62 +691,197 @@
   </details>
 </section>
 
-<!-- ── Keybindings ── -->
-<section class="settings-page" data-settings-page="keybindings" id="settings-keybindings" aria-label="Keybindings" hidden>
-  <section class="settings-section" aria-label="Shortcuts">
+<!-- ── App styles: how AI polish shapes text for each kind of app ── -->
+<section class="settings-page" data-settings-page="styles" id="settings-styles" aria-label="App styles" hidden>
+  <p class="settings-empty" id="stylesNeedPolish">App styles shape your words with AI polish. Turn it on in <button class="link" type="button" data-settings-target="transcription">Transcription</button> to choose them.</p>
+  <section class="settings-section" id="polishTonesPanel" hidden>
+    <h2>Defaults</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><div class="row-label">Record</div></div>
-        <div class="row-control">
-          <button class="shortcut" id="recordingShortcutChip" type="button" data-label="Recording" aria-label="Recording shortcut">
-            <span class="keys" aria-hidden="true"></span>
-            <span class="capture-hint">Press keys · esc cancels</span>
-          </button>
+        <div class="row-text">
+          <div class="row-label" id="polishToneMessagingLabel">Chat</div>
+          <div class="row-help">Slack, Teams, WhatsApp</div>
         </div>
-      </div>
-      <div class="row">
-        <div class="row-text"><div class="row-label" id="recordingModeLabel">Mode</div></div>
         <div class="row-control">
-          <div class="seg" id="recordingModeSeg" role="group" aria-labelledby="recordingModeLabel">
-            <button type="button" data-value="toggle" aria-pressed="true">Toggle</button>
-            <button type="button" data-value="push-to-talk" aria-pressed="false">Push to talk</button>
+          <div class="seg" id="polishToneMessaging" role="group" aria-labelledby="polishToneMessagingLabel">
+            <button type="button" data-value="default" aria-pressed="true">Default</button>
+            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
+            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
+            <button type="button" data-value="off" aria-pressed="false">Verbatim</button>
           </div>
         </div>
       </div>
-      <div class="row" id="fnPushToTalkRow">
+      <div class="row">
         <div class="row-text">
-          <label class="row-label" for="fnPushToTalk">Hold Fn to talk</label>
-          <div class="row-help">Needs the Input Monitoring permission.</div>
+          <div class="row-label" id="polishToneEmailLabel">Email</div>
+          <div class="row-help">Outlook, Thunderbird, webmail</div>
         </div>
-        <div class="row-control"><input id="fnPushToTalk" class="switch" type="checkbox" role="switch" /></div>
+        <div class="row-control">
+          <div class="seg" id="polishToneEmail" role="group" aria-labelledby="polishToneEmailLabel">
+            <button type="button" data-value="default" aria-pressed="true">Default</button>
+            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
+            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
+            <button type="button" data-value="off" aria-pressed="false">Verbatim</button>
+          </div>
+        </div>
       </div>
       <div class="row">
-        <div class="row-text"><div class="row-label">Show copied messages</div></div>
+        <div class="row-text">
+          <div class="row-label" id="polishToneDocsLabel">Documents</div>
+          <div class="row-help">Word, Google Docs, Notion, Obsidian</div>
+        </div>
         <div class="row-control">
-          <button class="shortcut" id="transcriptStackShortcutChip" type="button" data-label="Copied messages" aria-label="Copied messages shortcut">
-            <span class="keys" aria-hidden="true"></span>
-            <span class="capture-hint">Press keys · esc cancels</span>
-          </button>
+          <div class="seg" id="polishToneDocs" role="group" aria-labelledby="polishToneDocsLabel">
+            <button type="button" data-value="default" aria-pressed="true">Default</button>
+            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
+            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
+            <button type="button" data-value="off" aria-pressed="false">Verbatim</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-text">
+          <div class="row-label" id="polishToneCodeLabel">Code</div>
+          <div class="row-help">VS Code and other editors. Terminals are always word for word.</div>
+        </div>
+        <div class="row-control">
+          <div class="seg" id="polishToneCode" role="group" aria-labelledby="polishToneCodeLabel">
+            <button type="button" data-value="default" aria-pressed="true">Default</button>
+            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
+            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
+            <button type="button" data-value="off" aria-pressed="false">Verbatim</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-text">
+          <div class="row-label" id="polishToneOtherLabel">Everything else</div>
+          <div class="row-help">Any app or site not covered above, or listed below.</div>
+        </div>
+        <div class="row-control">
+          <div class="seg" id="polishToneOther" role="group" aria-labelledby="polishToneOtherLabel">
+            <button type="button" data-value="default" aria-pressed="true">Default</button>
+            <button type="button" data-value="casual" aria-pressed="false">Casual</button>
+            <button type="button" data-value="formal" aria-pressed="false">Formal</button>
+            <button type="button" data-value="off" aria-pressed="false">Verbatim</button>
+          </div>
         </div>
       </div>
     </div>
   </section>
-  <div class="section-note" id="shortcutStatus" aria-live="polite"></div>
+
+  <section class="settings-section" id="polishFormatPanel" hidden>
+    <h2>Apps and sites</h2>
+    <div class="settings-card">
+      <div class="row">
+        <div class="row-text">
+          <label class="row-label" for="formatAiDetection">Detect the format for unknown apps</label>
+          <div class="row-help" id="formatAiDetectionHelp"></div>
+        </div>
+        <div class="row-control"><input id="formatAiDetection" class="switch" type="checkbox" role="switch" /></div>
+      </div>
+      <!-- Not a <form>: it sits inside #settingsForm, and nested forms are dropped by the parser. -->
+      <div class="row" id="formatMappingAdd" role="group" aria-label="Add an app or site">
+        <div class="row-text"><label class="row-label" for="formatMappingKey">Add an app or site</label><div class="row-help">Its address (mail.example.com) or app:its id.</div></div>
+        <div class="row-control">
+          <input id="formatMappingKey" class="setting-input w-md" type="text" placeholder="example.com or app:bundle.id" autocomplete="off" />
+          <select id="formatMappingFormat" class="setting-select w-sm" aria-label="Format"></select>
+          <button class="btn" id="formatMappingSet" type="button">Add</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-card format-rows" id="formatMappingRows" aria-label="Apps and sites with a format"></div>
+  </section>
 </section>
 
-<!-- ── Appearance ── -->
-<section class="settings-page" data-settings-page="appearance" id="settings-appearance" aria-label="Appearance" hidden><section class="settings-section" aria-label="Color scheme"><div id="appearanceChoices" class="appearance-choices" role="group" aria-label="Color scheme"><button class="appearance-card ds-card-button ds-card-button--bordered" data-appearance="system" type="button" aria-pressed="true"><span class="appearance-preview" aria-hidden="true"><span class="appearance-preview-pane" data-mode="light"><span class="preview-rail"><i></i><i></i><i></i></span><span class="preview-main"><i></i><i></i><i></i><span class="preview-control"></span></span></span><span class="appearance-preview-pane" data-mode="dark"><span class="preview-rail"><i></i><i></i><i></i></span><span class="preview-main"><i></i><i></i><i></i><span class="preview-control"></span></span></span></span><span class="appearance-label">System</span></button><button class="appearance-card ds-card-button ds-card-button--bordered" data-appearance="light" type="button" aria-pressed="false"><span class="appearance-preview" aria-hidden="true"><span class="appearance-preview-pane" data-mode="light"><span class="preview-rail"><i></i><i></i><i></i></span><span class="preview-main"><i></i><i></i><i></i><span class="preview-control"></span></span></span></span><span class="appearance-label">Light</span></button><button class="appearance-card ds-card-button ds-card-button--bordered" data-appearance="dark" type="button" aria-pressed="false"><span class="appearance-preview" aria-hidden="true"><span class="appearance-preview-pane" data-mode="dark"><span class="preview-rail"><i></i><i></i><i></i></span><span class="preview-main"><i></i><i></i><i></i><span class="preview-control"></span></span></span></span><span class="appearance-label">Dark</span></button></div><p class="sr-only" id="appearanceStatus" role="status">Follows your system appearance.</p></section></section>
+<!-- ── Bark Server ── -->
+<section class="settings-page" data-settings-page="server" id="settings-server" aria-label="Bark Server" hidden>
+  <div id="remoteHostPanel" class="host-panel" aria-live="polite">
+    <section class="settings-section">
+      <h2>Your server</h2>
+      <div class="settings-card">
+        <div class="row host-status">
+          <div class="row-text">
+            <div class="row-label">Bark Server</div>
+            <div class="row-help status-text mono" id="remoteStatus">Not connected</div>
+          </div>
+          <div class="row-control">
+            <button class="btn" id="remoteTest" type="button">Test</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-text"><div class="row-label">Use Bark Server for dictation</div><div class="row-help">Off, Bark transcribes on this computer. You can switch in Transcription too.</div></div>
+          <div class="row-control"><button class="btn" type="button" data-settings-target="transcription">Transcription…</button></div>
+        </div>
+      </div>
+    </section>
+    <section class="settings-section">
+      <div class="section-head"><h2>On your network</h2><button class="btn" id="tailnetScan" type="button">Find</button></div>
+      <div class="settings-card">
+        <div class="row host-finder">
+          <div class="row-text">
+            <div class="row-label">Servers on your tailnet</div>
+            <div class="row-help" id="tailnetStatus" role="status">Find looks for Bark Server on your other machines.</div>
+          </div>
+        </div>
+        <div class="tailnet-hosts" id="tailnetHosts" role="list" aria-label="Servers found" hidden></div>
+        <div class="row pair-row" id="tailnetPairRow" hidden>
+          <div class="row-text">
+            <label class="row-label" for="tailnetPassword">Password</label>
+            <div class="row-help" id="tailnetPairHelp"></div>
+          </div>
+          <div class="row-control">
+            <input id="tailnetPassword" class="setting-input w-md" type="password" autocomplete="off" placeholder="Pairing password" />
+            <button class="btn" id="tailnetPairCancel" type="button">Cancel</button>
+            <button class="btn btn-primary" id="tailnetPair" type="button">Connect</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <details class="settings-section settings-disclosure" id="remoteManual">
+      <summary><h2>Enter it yourself</h2></summary>
+      <div class="settings-card">
+        <div class="row">
+          <div class="row-text"><label class="row-label" for="tailnetAddress">Machine name</label><div class="row-help">Its name on your network; Bark finds the address.</div></div>
+          <div class="row-control">
+            <input id="tailnetAddress" class="setting-input mono w-md" type="text" placeholder="build-box or name:port" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <button class="btn" id="tailnetProbe" type="button">Check</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-text"><label class="row-label" for="remoteUrl">Address</label><div class="row-help">The server's address, with its port.</div></div>
+          <div class="row-control">
+            <input id="remoteUrl" class="setting-input mono w-lg" type="url" placeholder="https://host.example.com" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-text"><label class="row-label" for="remoteAuthToken">Token</label><div class="row-help">From Bark Server › Connect, on the server.</div></div>
+          <div class="row-control">
+            <input id="remoteAuthToken" class="setting-input mono w-lg" type="password" autocomplete="off" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-text"><label class="row-label" for="remoteTimeoutSeconds">Timeout</label><div class="row-help">How long to wait for the server.</div></div>
+          <div class="row-control">
+            <input id="remoteTimeoutSeconds" class="setting-input num w-xs" type="number" min="5" max="300" step="5" />
+            <span class="meta">seconds</span>
+          </div>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
 
 <!-- ── Updates ── -->
 <section class="settings-page" data-settings-page="updates" id="settings-updates" aria-label="Updates" hidden>
-  <section class="settings-section" aria-label="Updates">
+  <section class="settings-section">
+    <h2>This version</h2>
     <div class="settings-card">
       <div class="row">
         <div class="row-text">
           <div class="row-label">Bark <span id="appVersion" class="num"></span> <span class="update-channel-chip" id="appChannel"></span></div>
           <div class="row-help" id="updateStatus" role="status" aria-live="polite"></div>
           <div class="update-progress" id="updateProgress" hidden><span></span></div>
-          <div class="row-help" id="updateLastChecked"></div>
         </div>
         <div class="row-control">
           <button id="updateAction" class="btn" type="button">Check for updates</button>
@@ -855,29 +899,107 @@
           </div>
         </div>
       </div>
-      <p class="section-note" id="updateStableNote" hidden></p>
+      <div class="row">
+        <div class="row-text"><div class="row-label">Last checked</div></div>
+        <div class="row-control"><span class="meta" id="updateLastChecked"></span></div>
+      </div>
     </div>
+    <p class="section-footer" id="updateStableNote" hidden></p>
+    <p class="section-footer">Bark checks for new versions and asks before installing one.</p>
   </section>
 </section>
 
-</form></div></div></section>
+<!-- ── About ── -->
+<section class="settings-page" data-settings-page="about" id="settings-about" aria-label="About" hidden>
+  <div class="about-head">
+    <span class="brand-mark brand-mark--large" aria-hidden="true"><img src="./src/assets/brand/dog-tile.jpg" alt=""></span>
+    <div><div class="about-name">Bark</div><div class="about-version" id="aboutVersion">Version</div></div>
+  </div>
+  <section class="settings-section">
+    <h2>Details</h2>
+    <div class="settings-card">
+      <div class="row">
+        <div class="row-text"><div class="row-label">Speech engines</div><div class="row-help">Parakeet and Whisper, running on this computer.</div></div>
+      </div>
+    </div>
+  </section>
+  <section class="settings-section">
+    <h2>Privacy</h2>
+    <div class="settings-card"><p class="card-text">Audio stays in memory and is never saved, unless you turn on Save recordings to improve models. Your dictations, notes and settings stay on this computer. With Bark Server, audio goes to that server only; with Bark Cloud, to Bark Cloud.</p></div>
+  </section>
+</section>
 
-        <!-- ════ SPEED TEST (type-vs-speak, driven by speedTest.ts) ════
-             A sub-route of Home, launched from the Home screen rather than the
-             sidebar nav. The controller renders all states into #speedTest. -->
+              </form>
+
+<!-- ── Dictionary (outside #settingsForm: it has a form of its own) ── -->
+<section class="settings-page" data-settings-page="dictionary" id="screen-dictionary" aria-label="Dictionary" hidden>
+  <section class="settings-section" aria-labelledby="suggestionsTitle" id="suggestionsSection" hidden>
+    <h2 id="suggestionsTitle">Suggestions</h2>
+    <div class="settings-card" id="suggestionRows"></div>
+    <p class="section-footer">Fixes you made that are never applied on their own. Accept one to correct it from now on.</p>
+  </section>
+  <section class="settings-section" aria-labelledby="vocabTitle">
+    <h2 id="vocabTitle">Your words</h2>
+    <div class="settings-card">
+      <form class="row row--field" id="vocabAdd">
+        <label class="sr-only" for="vocabInput">Add a word</label>
+        <input id="vocabInput" class="setting-input" type="text" placeholder="Add a name or term" aria-label="Add vocabulary word" autocomplete="off" />
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <div class="chips" id="vocabChips"></div>
+    </div>
+    <p class="section-footer">Spelt your way in every dictation, and sent to Bark Server as hints.</p>
+  </section>
+  <section class="settings-section" aria-labelledby="correctionsTitle">
+    <div class="section-head"><h2 id="correctionsTitle">Corrections</h2><button class="btn" id="addCorrection" type="button">Add</button></div>
+    <div class="settings-card" id="correctionRows"></div>
+    <p class="section-footer">Whole words and phrases, replaced in every dictation.</p>
+  </section>
+  <section class="settings-section" aria-labelledby="snippetsTitle">
+    <div class="section-head"><h2 id="snippetsTitle">Snippets</h2><button class="btn" id="addSnippet" type="button">Add</button></div>
+    <div class="settings-card" id="snippetRows"></div>
+    <p class="section-footer">Say the trigger and Bark types the whole text.</p>
+  </section>
+  <section class="settings-section" aria-labelledby="learningTitle">
+    <h2 id="learningTitle">Learning</h2>
+    <div class="settings-card">
+      <div class="row">
+        <div class="row-text">
+          <label class="row-label" for="learnFromEdits">Learn from your corrections</label>
+          <div class="row-help">Names you fix join your words; medicine names are only suggested. Only the word pair is kept, never what you wrote.</div>
+        </div>
+        <div class="row-control"><input id="learnFromEdits" class="switch" type="checkbox" role="switch" /></div>
+      </div>
+    </div>
+  </section>
+  <section class="settings-section" aria-labelledby="packsTitle">
+    <h2 id="packsTitle">Packs</h2>
+    <div class="settings-card" id="packRows"></div>
+  </section>
+</section>
+
+<!-- ── Activity: warnings and errors worth a look (activity.ts) ── -->
+<section class="settings-page" data-settings-page="activity" id="screen-activity" aria-label="Activity" hidden>
+  <section class="settings-section">
+    <div class="section-head"><h2 id="activitySummary">Activity</h2><button class="btn" id="clearActivityButton" type="button">Clear</button></div>
+    <div class="settings-card activity-list" id="activityList" aria-live="polite" aria-label="Activity"></div>
+  </section>
+</section>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════ SPEED TEST (speedTest.ts): opened from Home's Time saved ════ -->
         <section class="screen" id="screen-speedtest">
           <div class="st" id="speedTest"></div>
         </section>
 
-        <!-- ════ VOICE ACCURACY TEST (read-aloud diagnostic, driven by voiceAccuracyTest.ts) ════
-             A sub-route of Home like the speed test, launched from Home and
-             Settings → Audio rather than the sidebar nav. -->
+        <!-- ════ ACCURACY TEST (voiceAccuracyTest.ts): opened from General › Microphone ════ -->
         <section class="screen" id="screen-voicetest">
           <div class="st" id="voiceTest"></div>
         </section>
       </div>
-    </div>
-    </div>
+    </main>
   </div>
 </body>
 </html>

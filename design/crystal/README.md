@@ -3,6 +3,15 @@
 One look for every Bark surface: the Mac apps (SwiftUI, Liquid Glass), the desktop app
 (Tauri web UI), the host's web dashboard and the Android app.
 
+> **The desktop app now follows Bark for Mac.** Its main window, pill, setup guide and ⌘K
+> (Ctrl+K) palette are drawn as the Mac app draws them: a true-black (or near-white) opaque
+> ground, one blue accent, the dictation history as a thread list, and Settings with its own
+> sidebar. `src/crystalTokens.css` carries the Mac's values from `Theme.swift` as `--bark-*`
+> (the `--crystal-*` names below point at them) and `src/bark.css` lays out the main window.
+> Only the operating system's chrome differs: native window buttons, Ctrl rather than ⌘, and
+> the tray rather than the menu bar. `npm run dev` and `home.html?demo` show any screen on demo
+> data. The frosted, green look described below is how the desktop app looked before.
+
 Crystal is **a frosted frame around opaque content**. The window's chrome (the sidebar) is the
 system's own frost; everything you read or act on stands on solid, rounded cards. Colour is a
 hint, not a theme: one accent, used sparingly, plus a coloured tile per place in the sidebar.

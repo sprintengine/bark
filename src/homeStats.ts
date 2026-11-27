@@ -1,332 +1,77 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { mountMonthlyUsage, type MonthlyBucket } from "./monthlyUsage";
-import { appsUsed, renderRecentDictations } from "./homeRecent";
+import * as history from "./historyStore";
 
-// Renders the Home screen from the persistent usage_stats aggregate. Numbers
-// here are real: time saved compares typing the dictated words at 40 wpm
-// against the actual recording time, and the speaking pace is measured.
-
-interface WeeklyBucket {
-  dayLabel: string;
-  words: number;
-  isToday: boolean;
-}
+// Home's week in four numbers, as on the Mac: words this week, time saved
+// (which opens the speed test), average pace, and how often a dictation went
+// out without an edit. Before the first dictation, the setup card takes their
+// place.
 
 interface UsageStatsSummary {
   hasData: boolean;
   zeroEditRate7d?: number | null;
   zeroEditRate30d?: number | null;
-  polishedZeroEditRate30d?: number | null;
-  rawZeroEditRate30d?: number | null;
   totalWords: number;
   totalDictations: number;
   totalRecordingSeconds: number;
   timeSavedSeconds: number;
   typingWpm: number;
   speakingWpm: number;
-  moneySavedUsd: number;
-  cloudRateUsdPerMinute: number;
-  currentStreak: number;
-  bestStreak: number;
   thisWeekWords: number;
   lastWeekWords: number;
-  week: WeeklyBucket[];
-  months: MonthlyBucket[];
-  unallocatedWords: number;
 }
 
 const TYPING_WPM = 40;
+const byId = (id: string) => document.getElementById(id)!;
 
-const homeEmpty = byId("homeEmpty");
-const homeStats = byId("homeStats");
-const statTimeSaved = byId("statTimeSaved");
-const statTimeSavedSub = byId("statTimeSavedSub");
-const statTotalWords = byId("statTotalWords");
-const statSpokenTime = byId("statSpokenTime");
-const statThisWeek = byId("statThisWeek");
-const statApps = byId("statApps");
-const statAppsMeta = byId("statAppsMeta");
-const statWeekDelta = byId("statWeekDelta");
-const statStreak = byId("statStreak");
-const statBestStreak = byId("statBestStreak");
-const statWpm = byId("statWpm");
-const statMoneySaved = byId("statMoneySaved");
-const statMoneySavedMeta = byId("statMoneySavedMeta");
-const statZeroEditTile = byId("statZeroEditTile");
-const statZeroEdit = byId("statZeroEdit");
-const statZeroEditMeta = byId("statZeroEditMeta");
-const statChart = byId("statChart");
-const renderMonthlyUsage = mountMonthlyUsage(byId("monthlyUsage"));
-
-function byId(id: string): HTMLElement {
-  const node = document.getElementById(id);
-  if (!node) throw new Error(`Missing #${id}`);
-  return node;
+/** "3h 32m", "14m". */
+export function hoursMinutes(seconds: number): string {
+  const minutes = Math.floor(Math.max(0, seconds) / 60);
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
 }
 
-function formatDuration(seconds: number): string {
-  const total = Math.max(0, Math.round(seconds));
-  if (total < 60) return "<1 m";
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.round((total % 3600) / 60);
-  if (hours > 0) return `${hours} h ${minutes} m`;
-  return `${minutes} m`;
-}
+function render(summary: UsageStatsSummary | null): void {
+  const has = Boolean(summary?.hasData && summary.totalDictations > 0);
+  byId("homeEmpty").hidden = has;
+  byId("homeStats").hidden = !has;
+  if (!summary || !has) return;
 
-// The headline duration sets its units small beside the numerals ("132h 12m"),
-// with the plain text kept whole for assistive tech.
-function renderHeadlineDuration(node: HTMLElement, text: string): void {
-  const spoken = document.createElement("span");
-  spoken.className = "sr-only";
-  spoken.textContent = text;
-  const shown = text.split(" ").map((part) => {
-    const span = document.createElement("span");
-    span.textContent = part;
-    if (!/\d/.test(part)) span.className = "unit";
-    span.setAttribute("aria-hidden", "true");
-    return span;
-  });
-  node.replaceChildren(spoken, ...shown);
-}
+  const words = summary.thisWeekWords;
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const dictations = history.dictations().filter((item) => !item.isNote && item.createdAt >= weekAgo).length;
+  byId("statThisWeek").textContent = words.toLocaleString();
+  byId("statWeekDelta").textContent = dictations > 0
+    ? `${dictations.toLocaleString()} dictation${dictations === 1 ? "" : "s"}`
+    : `${summary.lastWeekWords.toLocaleString()} last week`;
 
-const usdFormat = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
-// The cloud rate is fractions of a cent; the same currency style, more digits.
-const rateFormat = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 3 });
+  const typing = summary.typingWpm > 0 ? summary.typingWpm : TYPING_WPM;
+  const speaking = summary.speakingWpm;
+  const saved = speaking > 0 ? (words / typing - words / speaking) * 60 : 0;
+  byId("statTimeSaved").textContent = hoursMinutes(saved);
+  byId("statTimeSavedSub").textContent = `vs typing at ${Math.round(typing)} wpm`;
+  const tile = byId("statTimeSaved").closest<HTMLElement>(".tile");
+  if (tile) tile.title = typing === TYPING_WPM ? "A typical typing pace. Take the speed test to use your own." : "Your typing speed from the speed test. Take it again.";
 
-function formatMoney(usd: number): string {
-  if (usd > 0 && usd < 0.005) return `<${usdFormat.format(0.01)}`;
-  return usdFormat.format(usd);
-}
+  byId("statWpm").textContent = speaking > 0 ? String(Math.round(speaking)) : "–";
+  byId("statPaceNote").textContent = speaking > 0 ? "measured as you speak" : "speak a little more";
 
-function weekDeltaLabel(thisWeek: number, lastWeek: number): string {
-  if (lastWeek === 0) return thisWeek > 0 ? "first active week" : "no words yet";
-  const pct = Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
-  const sign = pct > 0 ? "+" : "";
-  return `${sign}${pct}% vs last week`;
-}
-
-function renderChart(week: WeeklyBucket[]): void {
-  const max = Math.max(1, ...week.map((bucket) => bucket.words));
-  statChart.replaceChildren(
-    ...week.map((bucket) => {
-      const col = document.createElement("div");
-      col.className = bucket.isToday ? "bar-col is-today" : "bar-col";
-
-      const bar = document.createElement("div");
-      bar.className = bucket.isToday ? "bar today" : "bar";
-      bar.style.height = `${(bucket.words / max) * 100}%`;
-      bar.title = `${bucket.words.toLocaleString()} words`;
-
-      const day = document.createElement("div");
-      day.className = "bar-day";
-      day.textContent = bucket.dayLabel;
-
-      col.append(bar, day);
-      return col;
-    }),
-  );
-}
-
-const monthlyUsage = byId("monthlyUsage");
-
-function renderStats(summary: UsageStatsSummary): void {
-  renderMonthlyUsage(summary);
-  // Months of zeros say nothing a first-run welcome doesn't.
-  monthlyUsage.hidden = !summary.hasData;
-  // A first run leads with setup; the tests come once there is something to compare.
-  document.body.classList.toggle("is-first-run", !summary.hasData);
-  if (!summary.hasData) {
-    homeEmpty.hidden = false;
-    homeStats.hidden = true;
-    return;
-  }
-  homeEmpty.hidden = true;
-  homeStats.hidden = false;
-
-  renderHeadlineDuration(statTimeSaved, formatDuration(summary.timeSavedSeconds));
-  const typingWpm = Math.round(summary.typingWpm) || TYPING_WPM;
-  statTimeSavedSub.textContent =
-    `vs typing at ${typingWpm} wpm`;
-
-  statTotalWords.textContent = summary.totalWords.toLocaleString();
-  // Written as the headline writes durations: "5h 57m".
-  statSpokenTime.textContent = formatDuration(summary.totalRecordingSeconds).replace(/ ([hm])\b/g, "$1");
-  statThisWeek.textContent = `${summary.thisWeekWords.toLocaleString()} words`;
-  statWeekDelta.textContent = weekDeltaLabel(summary.thisWeekWords, summary.lastWeekWords);
-  statStreak.textContent = String(summary.currentStreak);
-  statBestStreak.textContent = `· best ${summary.bestStreak}`;
-  statWpm.textContent = String(summary.speakingWpm);
-  statMoneySaved.textContent = formatMoney(summary.moneySavedUsd);
-  statMoneySavedMeta.textContent =
-    `vs cloud at ${rateFormat.format(summary.cloudRateUsdPerMinute)} a minute`;
-
-  renderZeroEdit(summary);
-  renderChart(summary.week);
-}
-
-// The epic's north-star metric: dictations that needed no follow-up within
-// 5 minutes. Hidden until 20 completed dictations exist in the window; the
-// polished/raw split appears once each arm has enough data.
-function renderZeroEdit(summary: UsageStatsSummary): void {
-  const rate = summary.zeroEditRate30d;
-  if (rate === null || rate === undefined) {
-    statZeroEditTile.hidden = true;
-    return;
-  }
-  statZeroEditTile.hidden = false;
-  statZeroEdit.textContent = `${Math.round(rate * 100)}%`;
-  const polished = summary.polishedZeroEditRate30d;
-  const raw = summary.rawZeroEditRate30d;
-  statZeroEditMeta.textContent =
-    polished !== null && polished !== undefined && raw !== null && raw !== undefined
-      ? `· polished ${Math.round(polished * 100)}%, raw ${Math.round(raw * 100)}%`
-      : "· last 30 days";
-}
-
-interface DictationTimings {
-  transcribeMs: number;
-  speechModelMs: number;
-  polishMs: number;
-  totalMs: number;
-}
-
-interface HistoryEntry {
-  id: string;
-  createdAt: number;
-  text: string;
-  durationSeconds: number;
-  appName?: string | null;
-  timings?: DictationTimings | null;
-}
-
-interface TimedDictation {
-  durationSeconds: number;
-  timings: DictationTimings;
-}
-
-function setText(id: string, text: string): void {
-  byId(id).textContent = text;
-}
-
-function formatMs(ms: number): string {
-  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
-}
-
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-// Where the wait after releasing the key goes. The last dictation is the
-// headline; the median of the recent ones says whether it was typical.
-async function refreshPerformance(): Promise<void> {
-  const section = document.getElementById("performanceSection");
-  if (!section) return;
-  let timed: TimedDictation[] = [];
-  let history: HistoryEntry[] = [];
-  try {
-    history = await invoke<HistoryEntry[]>("get_transcript_history");
-    timed = history.filter((item): item is HistoryEntry & TimedDictation => Boolean(item.timings));
-  } catch {
-    /* outside the app: keep the section hidden */
-  }
-  renderRecent(history);
-  renderApps(history);
-  section.hidden = timed.length === 0;
-  if (timed.length === 0) return;
-
-  const last = timed[0];
-  const typical = (pick: (t: DictationTimings) => number, all = timed) =>
-    `typically ${formatMs(median(all.map((item) => pick(item.timings))))}`;
-  setText("perfSummary", `${last.durationSeconds.toFixed(1)} s of speech`);
-  setText("perfTotal", formatMs(last.timings.totalMs));
-  setText("perfTotalMeta", typical((t) => t.totalMs));
-  setText("perfTranscribe", formatMs(last.timings.transcribeMs));
-  setText("perfTranscribeMeta", typical((t) => t.transcribeMs));
-
-  const local = timed.filter((item) => item.timings.speechModelMs > 0);
-  if (last.timings.speechModelMs > 0) {
-    const speed = (last.durationSeconds * 1000) / last.timings.speechModelMs;
-    setText("perfModel", formatMs(last.timings.speechModelMs));
-    setText("perfModelMeta", `${speed.toFixed(0)}× real time · ${typical((t) => t.speechModelMs, local)}`);
-  } else {
-    setText("perfModel", "–");
-    setText("perfModelMeta", "On your host");
-  }
-
-  const polished = timed.filter((item) => item.timings.polishMs > 0);
-  setText("perfPolish", last.timings.polishMs > 0 ? formatMs(last.timings.polishMs) : "off");
-  setText("perfPolishMeta", polished.length > 0 ? typical((t) => t.polishMs, polished) : "");
-}
-
-function renderRecent(history: HistoryEntry[]): void {
-  const section = byId("recentSection");
-  section.hidden = history.length === 0;
-  renderRecentDictations(byId("recentList"), history);
-}
-
-// Apps the recent dictations went into. Older dictations carry no app, so
-// the count says which window it covers.
-function renderApps(history: HistoryEntry[]): void {
-  const { count, named } = appsUsed(history);
-  statApps.textContent = named === 0 ? "–" : String(count);
-  statAppsMeta.textContent = named === 0 ? "recorded from now on" : "across recent dictations";
+  const rate = summary.zeroEditRate7d ?? summary.zeroEditRate30d;
+  byId("statZeroEdit").textContent = rate == null ? "–" : `${Math.round(rate * 100)}%`;
+  byId("statZeroEditMeta").textContent = rate == null ? "once you have dictated" : summary.zeroEditRate7d != null ? "this week" : "last 30 days";
 }
 
 async function refresh(): Promise<void> {
-  void refreshPerformance();
-  let summary: UsageStatsSummary;
   try {
-    summary = await invoke<UsageStatsSummary>("get_usage_stats");
+    render(await invoke<UsageStatsSummary>("get_usage_stats"));
   } catch {
-    // No stats available yet (or running outside the app): show the welcome
-    // state rather than inventing numbers.
-    renderStats(emptyStats());
-    renderMonthlyUsage(null);
-    return;
+    render(null);
   }
-
-  renderStats(summary);
 }
 
-function emptyStats(): UsageStatsSummary {
-  return {
-    hasData: false,
-    totalWords: 0,
-    totalDictations: 0,
-    totalRecordingSeconds: 0,
-    timeSavedSeconds: 0,
-    typingWpm: TYPING_WPM,
-    speakingWpm: 0,
-    moneySavedUsd: 0,
-    cloudRateUsdPerMinute: 0.006,
-    currentStreak: 0,
-    bestStreak: 0,
-    thisWeekWords: 0,
-    lastWeekWords: 0,
-    week: [],
-    months: [],
-    unallocatedWords: 0,
-  };
-}
-
-// A finished dictation changes the aggregate; refresh when one lands.
-void listen("transcript-history-updated", () => {
-  void refresh();
-}).catch(() => {
-  /* live refresh is best-effort; the initial load still populates */
+void listen("transcript-history-updated", () => void refresh()).catch(() => {});
+void listen("usage-stats-updated", () => void refresh()).catch(() => {});
+history.subscribe(() => void refresh());
+document.addEventListener("home-screen-changed", (event) => {
+  if ((event as CustomEvent<{ screen: string }>).detail?.screen === "home") void refresh();
 });
-
-// Setting a measured typing speed in the speed test changes time saved.
-void listen("usage-stats-updated", () => {
-  void refresh();
-}).catch(() => {
-  /* best-effort */
-});
-
 void refresh();
-
-// Refresh the current calendar month when returning to Home after a long session.
-document.querySelector('.nav-item[data-screen="home"]')?.addEventListener("click", () => { void refresh(); });

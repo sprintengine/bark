@@ -24,7 +24,7 @@ export async function loadAudioDevices(): Promise<void> {
   const devices = await navigator.mediaDevices?.enumerateDevices().catch(() => []) ?? [];
   const inputs = devices.filter((device) => device.kind === "audioinput");
 
-  audioDeviceSelect.replaceChildren(new Option("Default microphone", ""));
+  audioDeviceSelect.replaceChildren(new Option("System default", ""));
   inputs.forEach((device, index) => {
     audioDeviceSelect.appendChild(new Option(device.label || `Microphone ${index + 1}`, device.deviceId));
   });
@@ -118,7 +118,7 @@ let meterScreenVisible = false;
 // refresh that would reopen the same device with the same processing is a
 // no-op unless `force` asks for a restart (the Refresh microphones button).
 export function refreshMeter(force = false): void {
-  if (meterScreenVisible && required<HTMLElement>("screen-settings").classList.contains("active") && !document.querySelector<HTMLElement>("[data-settings-page=audio]")?.hidden && document.visibilityState === "visible") {
+  if (meterScreenVisible && required<HTMLElement>("screen-settings").classList.contains("active") && !document.querySelector<HTMLElement>("[data-settings-page=general]")?.hidden && document.visibilityState === "visible") {
     if (!force && meterKey !== null && meterKey === meterConfig(host.readFromForm())) return;
     void startMeter();
   } else {
@@ -132,12 +132,13 @@ export function initMicMeter(formHost: SettingsFormHost): void {
     void loadAudioDevices();
     refreshMeter(true);
   });
-  // Observe only Audio; hidden categories release this meter's own stream.
-  // The backend dictation capture has a separate lifetime.
+  // Observe only General's Level row: scrolled away or on another page, the
+  // meter releases its own stream. The backend dictation capture has a
+  // separate lifetime.
   new IntersectionObserver((entries) => {
     meterScreenVisible = entries.some((entry) => entry.isIntersecting);
     refreshMeter();
-  }).observe(document.querySelector<HTMLElement>("[data-settings-page=audio]")!);
+  }).observe(required<HTMLElement>("inputMeter").closest<HTMLElement>(".row") ?? document.querySelector<HTMLElement>("[data-settings-page=general]")!);
   const settingsScreen = required<HTMLElement>("screen-settings");
   document.addEventListener("home-screen-changed", () => refreshMeter());
   document.addEventListener("settings-category-changed", () => refreshMeter());
