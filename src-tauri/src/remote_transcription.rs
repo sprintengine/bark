@@ -1030,6 +1030,6 @@ mod tests {
         let err = validate_remote_base_url("http://example.com:48173")
             .expect_err("public HTTP host should be rejected");
 
-        assert!(err.contains("HTTPS"));
+        assert!(err.contains("must start with https://"));
     }
 }
