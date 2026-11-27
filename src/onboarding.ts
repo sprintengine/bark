@@ -2,14 +2,15 @@ import "./appearance";
 import "./onboarding.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { accelTokens, keyGlyph, keyWord } from "./shortcuts";
+import { shortcutHint } from "./shortcuts";
 import { SPEECH_MODELS, formatBytes, isMeasured, speechInfo, starterChoices } from "./modelCatalog";
 import dogTile from "./assets/brand/dog-tile.jpg";
 
 // First-run setup in its own window: welcome, permissions, a microphone
 // check, a speech model, a first dictation, the training-data choice, done.
 // It opens until finished (onboarding.rs) and again from Settings → General.
-// Every step can be passed; the app works with whatever was set.
+// Every step can be passed; the app works with whatever was set. Drawn as
+// the Mac setup guide is (apps/macos/Fairspoken/Sources/UI/Onboarding).
 
 type Step = "welcome" | "permissions" | "mic" | "model" | "try" | "improve" | "done";
 const STEPS: Step[] = ["welcome", "permissions", "mic", "model", "try", "improve", "done"];
@@ -32,7 +33,7 @@ interface SpeechModel { model: string; cached: boolean }
 interface PrepareProgress { model: string; percentage: number; message: string; done: boolean; error?: string }
 interface HistoryItem { text: string; durationSeconds: number }
 
-const progressList = document.getElementById("obProgress")!;
+const progressHost = document.getElementById("obProgress")!;
 const stepHost = document.getElementById("obStep")!;
 const backButton = document.getElementById("obBack") as HTMLButtonElement;
 const skipButton = document.getElementById("obSkip") as HTMLButtonElement;
@@ -44,6 +45,8 @@ let permissions: PermissionStatus = { platform: "macos", microphone: "unknown", 
 let speech: SpeechModel[] = [];
 let chosenModel = "parakeet-tdt-0.6b-v3";
 const download = { model: "", percentage: 0, message: "", active: false, error: "" };
+/** The microphone check heard speech (null until it has run). */
+let micHeard: boolean | null = null;
 /** Teardown for whatever the current step started (streams, polls, listeners). */
 let leaveStep: (() => void) | null = null;
 
@@ -62,33 +65,73 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, 
 function svg(markup: string): SVGSVGElement {
   const holder = document.createElement("span");
   holder.innerHTML = markup;
-  return holder.firstElementChild as SVGSVGElement;
+  const icon = holder.firstElementChild as SVGSVGElement;
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
 }
+const STROKE = 'fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"';
 const ICONS = {
-  wave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4.5 10.5v3M8 7.5v9M11.5 4.5v15M15 8v8M18.5 10v4"/></svg>',
-  mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>',
-  cursor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h2.5M12.5 4H15M12 4v16M9 20h2.5M12.5 20H15"/></svg>',
-  keyboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg>',
-  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>',
-  apps: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>',
-  sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5 13.8 9a2 2 0 0 0 1.2 1.2l5.5 1.8-5.5 1.8a2 2 0 0 0-1.2 1.2L12 20.5 10.2 15A2 2 0 0 0 9 13.8L3.5 12 9 10.2A2 2 0 0 0 10.2 9Z"/></svg>',
-  stack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.5 8 4.25-8 4.25-8-4.25Z"/><path d="m4 12 8 4.25L20 12M4 16.25l8 4.25 8-4.25"/></svg>',
-  bubble: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 17h-8l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5Z"/></svg>',
-  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 19.5s-7.5-4.4-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z"/></svg>',
-  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 12.5 4.5 4.5 8.5-9.5"/></svg>',
+  mic: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>`,
+  cursor: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="2"><path d="M3 18 7 6l4 12M4.5 14h5"/><path d="M15 5h2.5M19.5 5H22M18.5 5v14M15 19h2.5M19.5 19H22"/></svg>`,
+  keyboard: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="2"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7.5 14h9"/></svg>`,
+  lock: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="2"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
+  bolt: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="1.8"><path d="M13 2.5 5 13.5h6l-1 8 8-11h-6Z" fill="currentColor"/></svg>`,
+  globe: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3Z"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="2.2"><path d="m5.5 12.5 4.5 4.5 8.5-9.5"/></svg>`,
+  checkCircle: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7.5 12.3 3 3 6-6.6" fill="none" stroke="var(--ob-on-mark)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  dashedCircle: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="2" stroke-dasharray="3.1 3.2"><circle cx="12" cy="12" r="9"/></svg>`,
+  minusCircle: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>`,
+  alertCircle: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M12 7v6M12 16.6v.1" fill="none" stroke="var(--ob-on-mark)" stroke-width="2.2" stroke-linecap="round"/></svg>`,
+  warning: `<svg viewBox="0 0 24 24"><path d="M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" fill="currentColor"/><path d="M12 9v5M12 17.1v.1" fill="none" stroke="var(--ob-on-mark)" stroke-width="2.2" stroke-linecap="round"/></svg>`,
+  wave: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="2"><path d="M4.5 10.5v3M8 7.5v9M11.5 4.5v15M15 8v8M18.5 10v4"/></svg>`,
+  download: `<svg viewBox="0 0 24 24" ${STROKE} stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v8M8.5 12.5 12 16l3.5-3.5"/></svg>`,
+  stop: `<svg viewBox="0 0 24 24"><rect x="7.5" y="7.5" width="9" height="9" rx="1.8" fill="currentColor"/></svg>`,
 };
+type Icon = keyof typeof ICONS;
 
-function tile(icon: keyof typeof ICONS, tone: string, size: "lg" | "md" = "md"): HTMLElement {
-  return h("span", { class: `ob-tile ob-tile--${tone} ob-tile--${size}`, "aria-hidden": "true" }, [svg(ICONS[icon])]);
+/** A soft tile: the symbol in its colour on a faint wash of it. */
+function tile(icon: Icon, tone: "red" | "blue" | "gray"): HTMLElement {
+  return h("span", { class: `ob-tile ob-tile--${tone}`, "aria-hidden": "true" }, [svg(ICONS[icon])]);
 }
 
-function keycaps(shortcut: string): HTMLElement {
-  const tokens = accelTokens(shortcut);
-  return h("span", { class: "ob-keys", "aria-label": tokens.map(keyWord).join(" ") }, tokens.map((token) => h("kbd", {}, [keyGlyph(token)])));
+function badge(text: string, style: "neutral" | "info" | "outline" = "neutral", title?: string): HTMLElement {
+  return h("span", { class: `ob-badge ob-badge--${style}`, title: title ?? false }, [text]);
 }
 
-function header(icon: keyof typeof ICONS, tone: string, title: string, subtitle: string): HTMLElement {
-  return h("header", { class: "ob-head" }, [tile(icon, tone, "lg"), h("h1", { tabindex: "-1" }, [title]), h("p", {}, [subtitle])]);
+/** The shortcut as people read it: "Ctrl+Shift+1", or "⌘⇧1" on a Mac. */
+function shortcutText(): string {
+  return shortcutHint(settings?.recordingShortcut ?? "");
+}
+
+/** A step's title and its one line of explanation. */
+function header(title: string, subtitle: string | Child[]): HTMLElement {
+  return h("header", { class: "ob-head" }, [
+    h("h1", { tabindex: "-1" }, [title]),
+    h("p", {}, typeof subtitle === "string" ? [subtitle] : subtitle),
+  ]);
+}
+
+/** A grouped list: rows on one card, a hairline between them. */
+function group(rows: Child[], attrs: Record<string, string | boolean> = {}): HTMLElement {
+  return h("div", { ...attrs, class: `ob-group${attrs.class ? ` ${attrs.class}` : ""}` }, rows);
+}
+
+/** A row: the title (with badges), its description, and its control on the right. */
+function row(title: Child[], detail: Child[] | string, end: Child[] = [], lead?: Child): HTMLElement {
+  return h("div", { class: "ob-row" }, [
+    lead,
+    h("div", { class: "ob-row-text" }, [
+      h("div", { class: "ob-row-title" }, title),
+      detail.length ? h("div", { class: "ob-row-detail" }, typeof detail === "string" ? [detail] : detail) : null,
+    ]),
+    end.some(Boolean) ? h("div", { class: "ob-row-end" }, end) : null,
+  ]);
+}
+
+function smallButton(label: string, onClick: () => void): HTMLButtonElement {
+  const button = h("button", { class: "ob-btn ob-btn--outline", type: "button" }, [label]);
+  button.addEventListener("click", onClick);
+  return button;
 }
 
 async function readSettings(): Promise<Settings> {
@@ -103,56 +146,35 @@ async function saveSettings(patch: Partial<Settings>): Promise<void> {
   settings = { ...latest, ...patch };
 }
 
+const onThisComputer = () => (permissions.platform === "macos" ? "on this Mac" : "on this computer");
+
 // ── Steps ───────────────────────────────────────────────────────────────
 function renderWelcome(): void {
-  const points = h("ul", { class: "ob-points" }, [
-    point("apps", "blue", "Works in every app", "Press a shortcut, speak, and the words land where you type."),
-    point("lock", "green", "Stays on this computer", "Speech is recognised here. No account, no upload."),
-    point("sparkle", "violet", "Cleans up as you go", "Fillers and false starts are tidied, and you can always undo."),
-  ]);
+  const chip = (icon: Icon, text: string) => h("span", { class: "ob-chip" }, [svg(ICONS[icon]), text]);
   stepHost.replaceChildren(
-    h("header", { class: "ob-head ob-head--hero" }, [
+    h("div", { class: "ob-welcome" }, [
       h("span", { class: "ob-mark", "aria-hidden": "true" }, [h("img", { src: dogTile, alt: "" })]),
-      h("h1", { tabindex: "-1" }, ["Welcome to Bark"]),
-      h("p", {}, ["Speak anywhere you type. Fast, private, and on your computer."]),
+      h("h1", { tabindex: "-1" }, ["Welcome to ", h("span", { class: "ob-wordmark" }, ["Bark"])]),
+      h("p", {}, ["Speak in any app. Your words appear where you type,", h("br"), "transcribed privately on your own devices."]),
+      h("div", { class: "ob-chips" }, [
+        chip("lock", permissions.platform === "macos" ? "On this Mac" : "On this computer"),
+        chip("bolt", "Text in a blink"),
+        chip("globe", "25 languages"),
+      ]),
+      h("p", { class: "ob-welcome-note" }, ["Setup takes about two minutes."]),
     ]),
-    points,
   );
   setFooter({ next: "Get started" });
 }
 
-function point(icon: keyof typeof ICONS, tone: string, title: string, body: string): HTMLElement {
-  return h("li", { class: "ob-point" }, [tile(icon, tone), h("div", {}, [h("strong", {}, [title]), h("span", {}, [body])])]);
-}
-
-function permissionLabel(state: Permission): [string, string] {
-  switch (state) {
-    case "granted": return ["Allowed", "ok"];
-    case "denied": return ["Not allowed", "warn"];
-    case "not-determined": return ["Not asked yet", "idle"];
-    case "not-needed": return ["Not needed", "idle"];
-    default: return ["Not checked", "idle"];
-  }
-}
-
-function permissionCard(kind: "microphone" | "accessibility" | "inputMonitoring", icon: keyof typeof ICONS, tone: string, title: string, body: string, optional: boolean): HTMLElement {
+function permissionCard(kind: "microphone" | "accessibility" | "inputMonitoring", icon: Icon, tone: "red" | "blue" | "gray", title: string, detail: string, required: boolean): HTMLElement {
   const state = permissions[kind];
-  const [label, labelTone] = permissionLabel(state);
-  const status = h("span", { class: `ob-status ob-status--${labelTone}` }, [state === "granted" ? svg(ICONS.check) : null, label]);
   // macOS reports Accessibility only as on or off; its first ask is a prompt.
   const opensSettings = state === "denied" && kind !== "accessibility";
-  const action = state === "granted" || state === "not-needed"
-    ? null
-    : h("button", { class: "ob-btn ob-btn--sm", type: "button" }, [opensSettings ? "Open Settings" : "Allow"]);
-  action?.addEventListener("click", () => { void requestPermission(kind); });
-  return h("li", { class: `ob-card ob-perm${state === "granted" ? " is-granted" : ""}` }, [
-    tile(icon, tone),
-    h("div", { class: "ob-card-text" }, [
-      h("strong", {}, [title, optional ? h("span", { class: "ob-badge" }, ["Optional"]) : null]),
-      h("span", {}, [body]),
-    ]),
-    h("div", { class: "ob-card-end" }, [status, action]),
-  ]);
+  const end = state === "granted" || state === "not-needed"
+    ? h("span", { class: "ob-allowed" }, [svg(ICONS.checkCircle), state === "granted" ? "Allowed" : "Not needed"])
+    : smallButton(opensSettings ? "Open Settings" : "Allow", () => { void requestPermission(kind); });
+  return row([title, badge(required ? "Required" : "Optional", required ? "info" : "neutral")], detail, [end], tile(icon, tone));
 }
 
 async function refreshPermissions(): Promise<void> {
@@ -190,17 +212,18 @@ async function requestPermission(kind: "microphone" | "accessibility" | "inputMo
 
 function renderPermissions(): void {
   const mac = permissions.platform === "macos";
-  const cards = h("ul", { class: "ob-cards" }, [
-    permissionCard("microphone", "mic", "red", "Microphone", "To hear you. Audio stays on this computer.", false),
-    mac ? permissionCard("accessibility", "cursor", "blue", "Accessibility", "To type the text where your cursor is.", false) : null,
-    mac ? permissionCard("inputMonitoring", "keyboard", "grey", "Input Monitoring", "Only for holding Fn to talk.", true) : null,
-  ]);
+  const remote = settings?.transcriptionLocation === "remote-host";
   stepHost.replaceChildren(
-    header("lock", "green", mac ? "Allow a few things" : "Allow the microphone", mac
-      ? "Bark needs your microphone. Accessibility lets it type for you."
-      : "Bark needs your microphone to hear you."),
-    cards,
-    h("p", { class: "ob-note" }, [mac ? "You can change these later in System Settings → Privacy & Security." : "You can change this later in your system's privacy settings."]),
+    header("Allow access", mac
+      ? "Bark asks only for what dictation needs. You can change these in System Settings at any time."
+      : "Bark asks only for what dictation needs. You can change this in your system's privacy settings at any time."),
+    group([
+      permissionCard("microphone", "mic", "red", "Microphone", remote
+        ? "Hears you only while you dictate. Audio goes only to your network device."
+        : `Hears you only while you dictate. Audio stays ${onThisComputer()}.`, true),
+      mac ? permissionCard("accessibility", "cursor", "blue", "Accessibility", "Types your words into the app you're using. Without it, dictations are copied for you to paste.", false) : null,
+      mac && settings?.fnPushToTalk ? permissionCard("inputMonitoring", "keyboard", "gray", "Input Monitoring", "Lets you hold fn to dictate.", false) : null,
+    ]),
   );
   setFooter({ next: permissions.microphone === "granted" ? "Continue" : "Continue without", back: true });
 }
@@ -225,26 +248,29 @@ function micProblem(error: unknown): string {
   const name = error instanceof DOMException ? error.name : "";
   if (name === "NotAllowedError" || name === "SecurityError") {
     return permissions.platform === "macos"
-      ? "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone."
-      : "Microphone access is off. Allow it in your system's privacy settings.";
+      ? "Microphone access is turned off for Bark. Turn it on in System Settings → Privacy & Security → Microphone."
+      : "Microphone access is turned off for Bark. Allow it in your system's privacy settings.";
   }
-  if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone found. Plug one in, or pick another above.";
-  if (name === "NotReadableError") return "That microphone is busy or unavailable. Close apps using it, or pick another.";
-  return "The microphone couldn't start. Pick another, or try again.";
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone found. Connect one, then try again.";
+  if (name === "NotReadableError") return "The microphone wouldn't start: it's busy or unavailable. Choose another, or try again.";
+  return "The microphone wouldn't start. Choose another, or try again.";
 }
+
+const MIC_BARS = 44;
 
 function enterMic(): void {
   const select = h("select", { class: "ob-select", id: "obMicSelect", "aria-label": "Microphone" });
-  const bars = h("div", { class: "ob-wave", "aria-hidden": "true" }, Array.from({ length: 36 }, () => h("span")));
-  const status = h("p", { class: "ob-mic-status", role: "status" }, ["Listening…"]);
-  const card = h("div", { class: "ob-card ob-mic" }, [
-    h("label", { class: "ob-field" }, [h("span", {}, ["Microphone"]), select]),
-    bars,
+  const bars = h("div", { class: "ob-level", "aria-hidden": "true" }, Array.from({ length: MIC_BARS }, () => h("span")));
+  const icon = h("span", { class: "ob-check-icon" });
+  const message = h("span", { class: "ob-check-text" });
+  const retry = h("button", { class: "ob-btn ob-btn--outline", type: "button", hidden: true }, ["Try again"]);
+  const status = h("div", { class: "ob-check-line", role: "status" }, [icon, message, retry]);
+  const card = group([
+    row(["Microphone"], "Bark listens on this one only while you dictate.", [select]),
+    h("div", { class: "ob-level-row" }, [bars]),
     status,
-  ]);
-  const retry = h("button", { class: "ob-btn ob-btn--sm", type: "button", hidden: true }, ["Try again"]);
-  card.append(retry);
-  stepHost.replaceChildren(header("mic", "red", "Check your microphone", "Say a few words. The bars should move as you speak."), card);
+  ], { class: "ob-mic" });
+  stepHost.replaceChildren(header("Test your microphone", "Say a few words. The bars should move as you speak."), card);
   setFooter({ next: "Continue", back: true });
 
   let stream: MediaStream | null = null;
@@ -256,15 +282,26 @@ function enterMic(): void {
   // Set when the step is left: a device list or a retry that resolves later
   // must not open the microphone again.
   let disposed = false;
-  const levels: number[] = Array(36).fill(0);
-  const say = (text: string, tone?: "ok" | "warn") => {
-    status.textContent = text;
-    if (tone) status.dataset.tone = tone; else delete status.dataset.tone;
+  const levels: number[] = Array(MIC_BARS).fill(0);
+  type Tone = "listening" | "ok" | "warn";
+  const say = (text: string, tone: Tone) => {
+    message.textContent = text;
+    status.dataset.tone = tone;
+    icon.replaceChildren(svg(ICONS[tone === "ok" ? "checkCircle" : tone === "warn" ? "warning" : "wave"]));
+  };
+  const draw = (active: boolean) => {
+    [...bars.children].forEach((bar, i) => {
+      const style = (bar as HTMLElement).style;
+      style.height = `${Math.max(4, (active ? levels[i] : 0) * 64).toFixed(1)}px`;
+      style.opacity = active ? (0.35 + 0.65 * i / (MIC_BARS - 1)).toFixed(3) : "0.25";
+    });
   };
   // A failed start greys the meter and offers to try again.
   const failed = (text: string) => {
     say(text, "warn");
     card.classList.add("is-failed");
+    levels.fill(0);
+    draw(false);
     retry.hidden = false;
   };
   retry.addEventListener("click", () => { void start(); });
@@ -280,9 +317,9 @@ function enterMic(): void {
     stop();
     const mine = session;
     heard = 0;
-    card.classList.remove("is-failed");
+    card.classList.remove("is-failed", "is-hearing");
     retry.hidden = true;
-    say("Listening…");
+    say("Listening…", "listening");
     try {
       const constraints: MediaTrackConstraints = { channelCount: 1 };
       if (select.value) constraints.deviceId = { exact: select.value };
@@ -308,10 +345,16 @@ function enterMic(): void {
         // The pill's mapping: a gate, a full scale, a square-root response.
         const level = Math.min(1, Math.sqrt(Math.max(0, rms - 0.004) / 0.03));
         levels.shift(); levels.push(level);
-        [...bars.children].forEach((bar, i) => { (bar as HTMLElement).style.transform = `scaleY(${Math.max(0.08, levels[i])})`; });
+        draw(true);
         if (level > 0.35) { heard += 1; silentSince = time; } else heard = Math.max(0, heard - 0.25);
-        if (heard > 4) say("Sounds good.", "ok");
-        else if (status.dataset.tone !== "ok" && time - silentSince > 5000) say("Nothing yet. Speak up, move closer, or pick another microphone.", "warn");
+        if (heard > 4) {
+          if (status.dataset.tone !== "ok") say("Sounds good. We can hear you.", "ok");
+          card.classList.add("is-hearing");
+          micHeard = true;
+        } else if (status.dataset.tone !== "ok" && time - silentSince > 5000) {
+          say("Nothing heard. Check the microphone isn't muted, or choose another.", "warn");
+          if (micHeard !== true) micHeard = false;
+        }
       };
       frame = requestAnimationFrame(tick);
       await loadDevices(select);
@@ -319,6 +362,7 @@ function enterMic(): void {
       if (mine === session) failed(micProblem(error));
     }
   };
+  draw(false);
   select.addEventListener("change", () => { void start(); });
   void loadDevices(select).then(start);
   leaveStep = () => {
@@ -333,20 +377,20 @@ async function loadDevices(select: HTMLSelectElement): Promise<void> {
   const current = select.value || settings?.audioDevice || "";
   const devices = await navigator.mediaDevices?.enumerateDevices().catch(() => []) ?? [];
   const inputs = devices.filter((device) => device.kind === "audioinput" && device.deviceId !== "default");
-  select.replaceChildren(new Option("Default microphone", ""), ...inputs.map((device, i) => new Option(device.label || `Microphone ${i + 1}`, device.deviceId)));
+  select.replaceChildren(new Option("System default", ""), ...inputs.map((device, i) => new Option(device.label || `Microphone ${i + 1}`, device.deviceId)));
   select.value = [...select.options].some((option) => option.value === current) ? current : "";
 }
 
-// Model: three good starting points; the rest live in Models. Only those
-// this build can run are offered (starterModels).
+// Model: three good starting points, the recommended one first; the rest
+// live in Models. Only those this build can run are offered (starterModels).
 const STARTER_MODELS = ["parakeet-tdt-0.6b-v3", "parakeet-tdt-0.6b-v2", "base"];
 const starters = () => starterChoices(STARTER_MODELS, speech.map((model) => model.model), chosenModel);
 
-function ratingBar(label: string, value: number, measured: boolean): HTMLElement {
-  return h("span", { class: "ob-rating", "aria-label": `${label} ${value} of 5${measured ? "" : ", estimated"}` }, [
-    h("span", { class: "ob-rating-label", "aria-hidden": "true" }, [label]),
-    h("span", { class: "ob-rating-steps", "aria-hidden": "true" }, Array.from({ length: 5 }, (_, i) => h("i", { class: i < value ? "on" : "" }))),
-    measured ? null : h("span", { class: "ob-rating-est", "aria-hidden": "true" }, ["est."]),
+/** A 1…5 score as five short segments. */
+function scoreBar(label: string, value: number, measured: boolean): HTMLElement {
+  return h("span", { class: "ob-score", "aria-label": `${label} ${value} of 5${measured ? "" : ", estimated"}` }, [
+    h("span", { class: "ob-score-label", "aria-hidden": "true" }, [measured ? label : `${label} (est.)`]),
+    h("span", { class: "ob-score-steps", "aria-hidden": "true" }, Array.from({ length: 5 }, (_, i) => h("i", { class: i < value ? "on" : "" }))),
   ]);
 }
 
@@ -357,56 +401,89 @@ function modelState(id: string): "ready" | "downloading" | "failed" | "missing" 
   return "missing";
 }
 
+function modelCard(id: string): HTMLElement {
+  const info = speechInfo(id);
+  const state = modelState(id);
+  const selected = chosenModel === id;
+  const stateLabel = state === "downloading" ? h("span", { class: "ob-model-state" }, [`Downloading ${Math.round(download.percentage)}%`])
+    : state === "ready" ? h("span", { class: "ob-model-state" }, [svg(ICONS.check), "Downloaded"])
+    : state === "failed" ? h("span", { class: "ob-model-state ob-model-state--warn" }, ["Failed"])
+    : h("span", { class: "ob-model-state" }, [formatBytes(info.bytes)]);
+  const option = h("button", {
+    class: `ob-row ob-model${selected ? " is-selected" : ""}`, type: "button", role: "radio", id: `ob-model-${id}`,
+    "aria-checked": String(selected), tabindex: selected ? "0" : "-1",
+  }, [
+    h("span", { class: "ob-radio", "aria-hidden": "true" }),
+    h("span", { class: "ob-row-text" }, [
+      h("span", { class: "ob-row-title" }, [info.name, info.recommended ? badge("Recommended", "info") : null, info.language === "en" ? badge("EN", "outline", "English only") : null]),
+      h("span", { class: "ob-row-detail" }, [info.language === "en" ? info.summary : `${info.summary}, in ${info.languages}`]),
+    ]),
+    h("span", { class: "ob-model-end" }, [scoreBar("Speed", info.speed, isMeasured(info)), scoreBar("Accuracy", info.accuracy, isMeasured(info)), stateLabel]),
+  ]);
+  option.addEventListener("click", () => { chosenModel = id; renderModel(); document.getElementById(`ob-model-${id}`)?.focus(); });
+  return option;
+}
+
+/** The chosen model's download, or why it failed. */
+function modelProgress(): HTMLElement | null {
+  const info = speechInfo(chosenModel);
+  const state = modelState(chosenModel);
+  if (state === "downloading") {
+    return h("div", { class: "ob-model-progress" }, [
+      h("div", { class: "ob-bar", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(download.percentage)) }, [
+        h("span", { style: `width: ${Math.max(2, download.percentage)}%` }),
+      ]),
+      h("p", {}, [`Downloading ${info.name}: ${Math.round(download.percentage)}% of ${formatBytes(info.bytes)}. You can carry on; it finishes in the background.`]),
+    ]);
+  }
+  if (state === "ready") return h("p", { class: "ob-model-progress ob-model-ready" }, [svg(ICONS.checkCircle), `${info.name} is ready.`]);
+  if (state === "failed") {
+    return h("div", { class: "ob-callout", role: "alert" }, [svg(ICONS.warning), h("div", {}, [
+      h("strong", {}, [`${info.name} didn't download.`]),
+      h("span", { class: "ob-selectable" }, [download.error]),
+      h("span", {}, ["Check your connection and try again, or skip for now and download it later in Models."]),
+    ])]);
+  }
+  return null;
+}
+
 function renderModel(): void {
   const focusedId = stepHost.contains(document.activeElement) ? document.activeElement?.id : "";
-  const list = h("div", { class: "ob-cards ob-models", role: "radiogroup", "aria-label": "Speech model" });
   const ids = starters();
-  for (const id of ids) {
-    const info = speechInfo(id);
-    const state = modelState(id);
-    const selected = chosenModel === id;
-    const end = state === "downloading"
-      ? h("span", { class: "ob-progress-ring", style: `--p:${download.percentage}`, "aria-label": `Downloading, ${Math.round(download.percentage)}%` }, [h("span", { "aria-hidden": "true" }, [`${Math.round(download.percentage)}%`])])
-      : state === "ready" ? h("span", { class: "ob-status ob-status--ok" }, [svg(ICONS.check), "Downloaded"])
-      : state === "failed" ? h("span", { class: "ob-status ob-status--warn" }, ["Failed"])
-      : h("span", { class: "ob-size" }, [formatBytes(info.bytes)]);
-    const option = h("button", {
-      class: `ob-card ob-model${selected ? " is-selected" : ""}`, type: "button", role: "radio", id: `ob-model-${id}`,
-      "aria-checked": String(selected), tabindex: selected ? "0" : "-1",
-    }, [
-      h("span", { class: "ob-radio", "aria-hidden": "true" }),
-      h("span", { class: "ob-card-text" }, [
-        h("strong", {}, [info.name, info.recommended ? h("span", { class: "ob-badge ob-badge--accent" }, ["Recommended"]) : null, info.language === "en" ? h("span", { class: "ob-badge" }, ["EN"]) : null]),
-        h("span", {}, [info.language === "en" ? info.summary : `${info.summary} · ${info.languages}`]),
-        h("span", { class: "ob-ratings" }, [ratingBar("Speed", info.speed, isMeasured(info)), ratingBar("Accuracy", info.accuracy, isMeasured(info))]),
+  const recommended = ids.filter((id) => speechInfo(id).recommended);
+  const others = ids.filter((id) => !speechInfo(id).recommended);
+  const list = h("div", { class: "ob-models", role: "radiogroup", "aria-label": "Speech model" }, [
+    recommended.length ? group(recommended.map(modelCard)) : null,
+    modelProgress(),
+    others.length ? h("div", { class: "ob-section" }, [
+      h("div", { class: "ob-section-head" }, [
+        h("h2", {}, [recommended.length ? "Other models" : "Models"]),
+        h("span", {}, [`All ${SPEECH_MODELS.length} are in Models`]),
       ]),
-      h("span", { class: "ob-card-end" }, [end]),
-    ]);
-    option.addEventListener("click", () => { chosenModel = id; renderModel(); document.getElementById(`ob-model-${id}`)?.focus(); });
-    list.append(option);
-  }
+      group(others.map(modelCard)),
+    ]) : null,
+  ]);
   // Arrow keys move the choice, as in any radio group.
   list.addEventListener("keydown", (event) => {
     const delta = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
     if (!delta) return;
     event.preventDefault();
-    chosenModel = ids[(ids.indexOf(chosenModel) + delta + ids.length) % ids.length];
+    const order = [...recommended, ...others];
+    chosenModel = order[(order.indexOf(chosenModel) + delta + order.length) % order.length];
     renderModel();
     document.getElementById(`ob-model-${chosenModel}`)?.focus();
   });
-  const failed = modelState(chosenModel) === "failed";
   stepHost.replaceChildren(
-    header("stack", "indigo", "Choose a speech model", "It runs on this computer. You can switch any time in Models."),
+    header("Choose a speech model", `It runs ${onThisComputer()}, so nothing you say is uploaded. The recommended model suits most people; you can change it any time in Models.`),
     list,
-    h("p", { class: `ob-note${failed ? " ob-note--warn" : ""}`, role: failed ? "alert" : false }, [failed
-      ? `The download didn't finish: ${download.error}`
-      : "Downloads carry on in the background while you finish setting up. Ratings compare the models on a short English test; est. marks an estimate."]),
+    h("p", { class: "ob-footnote" }, ["Speed and accuracy compare the models on a short English test; est. marks an estimate."]),
   );
   const state = modelState(chosenModel);
+  const failed = state === "failed";
   setFooter({
     next: state === "ready" || state === "downloading" ? "Continue" : failed ? "Try again" : "Download and continue",
     back: true,
-    skip: state === "ready" || state === "downloading" ? undefined : "Not now",
+    skip: state === "ready" || state === "downloading" ? undefined : "Skip for now",
   });
   // A progress update re-renders the list; keep focus where it was.
   if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
@@ -433,26 +510,31 @@ async function chooseModel(): Promise<boolean> {
   }
 }
 
-// Try it: a chat with one message waiting for an answer. The real shortcut
-// (handled by the pill) dictates as usual; its live text shows in the
-// composer, and what was heard lands as your message with how fast you
-// spoke. The button beside the composer records without inserting anywhere.
+// Try it: a message thread waiting for an answer. The real shortcut (handled
+// by the pill) dictates as usual; its live text shows in the message box, and
+// what was heard lands as your message with how fast you spoke. The button
+// beside the message box records without inserting anywhere.
 function enterTry(): void {
-  const shortcut = settings?.recordingShortcut ?? "";
   const holdMode = settings?.recordingShortcutMode === "push-to-talk";
+  const keys = shortcutText();
   const thread = h("div", { class: "ob-thread", role: "log", "aria-live": "polite" }, [
-    bubble("them", "Hi! What will you use Bark for? Answer out loud."),
+    h("div", { class: "ob-bubble ob-bubble--them" }, ["Try a sentence like “Book a follow-up in ten days and send the letter to Dr Byrne.”"]),
   ]);
-  const live = h("div", { class: "ob-compose-text", "data-placeholder": "Your words appear here as you speak" });
-  const mic = h("button", { class: "ob-mic-btn", type: "button", "aria-label": "Hold to talk", title: "Hold to talk" }, [svg(ICONS.mic)]);
-  const compose = h("div", { class: "ob-compose" }, [live, mic]);
-  const hint = h("p", { class: "ob-try-hint" }, holdMode
-    ? ["Hold", keycaps(shortcut), "while you speak, or hold the microphone button."]
-    : ["Press", keycaps(shortcut), "to start and again to finish, or hold the microphone button."]);
-  const chat = h("div", { class: "ob-card ob-chat" }, [thread, compose]);
-  const status = h("p", { class: "ob-note", id: "obTryStatus" });
-  stepHost.replaceChildren(header("bubble", "teal", "Try it", "Say a sentence. Watch it appear as you speak."), hint, chat, status);
-  setFooter({ next: "Continue", back: true, skip: "Skip" });
+  const level = h("span", { class: "ob-compose-level", "aria-hidden": "true" }, Array.from({ length: 12 }, () => h("span")));
+  const live = h("span", { class: "ob-compose-text", "data-placeholder": "Your words appear here as you speak" });
+  const field = h("div", { class: "ob-compose-field" }, [level, live]);
+  const mic = h("button", { class: "ob-mic-btn", type: "button", "aria-label": "Hold to talk", title: "Hold to talk" }, [svg(ICONS.mic), svg(ICONS.stop)]);
+  const compose = h("div", { class: "ob-compose" }, [field, mic]);
+  const chat = h("div", { class: "ob-chat" }, [thread, compose]);
+  const status = h("p", { class: "ob-try-status", id: "obTryStatus" });
+  stepHost.replaceChildren(
+    header("Try it", keys
+      ? [`${holdMode ? "Hold" : "Press"} `, h("span", { class: "ob-keys-inline" }, [keys]), ` and say something, or hold the microphone button.`]
+      : "Hold the microphone button and say something."),
+    chat,
+    status,
+  );
+  setFooter({ next: "Continue", back: true });
 
   // Whether the chosen model can transcribe yet, and what to do if not.
   const showModel = () => {
@@ -460,32 +542,42 @@ function enterTry(): void {
     const name = speechInfo(settings?.model ?? chosenModel).name;
     mic.disabled = state !== "ready";
     compose.classList.toggle("is-waiting", state !== "ready");
-    status.classList.toggle("ob-note--warn", state === "failed" || state === "missing");
-    status.textContent = state === "downloading" ? `${name} is downloading · ${Math.round(download.percentage)}%. You can try it when it's ready.`
-      : state === "failed" ? `${name} didn't download. Go back to try again, or skip this step.`
-      : state === "missing" ? `${name} isn't downloaded yet. Go back to download it, or skip this step.`
-      : "";
+    status.classList.toggle("is-warn", state === "failed" || state === "missing");
+    status.replaceChildren(...(state === "ready" ? [] : [
+      svg(ICONS[state === "downloading" ? "download" : "warning"]),
+      state === "downloading" ? `${name} is still downloading (${Math.round(download.percentage)}%). Dictation starts working when it's done.`
+        : state === "failed" ? `${name} didn't download. Go back to try again, or skip this step.`
+        : `${name} isn't downloaded yet. Go back to download it, or skip this step.`,
+    ]));
   };
   showModel();
 
-  let tries = 0;
+  // A level that moves while the button is held (the window's own stream is
+  // not open here, so it follows the live words arriving).
+  let pulse = 0;
+  const animate = () => {
+    pulse = requestAnimationFrame(animate);
+    const t = performance.now() / 1000;
+    [...level.children].forEach((bar, i) => {
+      (bar as HTMLElement).style.transform = `scaleY(${(0.35 + 0.65 * Math.abs(Math.sin(t * 5 + i * 0.9))).toFixed(3)})`;
+    });
+  };
+  const setLive = (on: boolean) => {
+    compose.classList.toggle("is-live", on);
+    cancelAnimationFrame(pulse);
+    if (on && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) animate();
+  };
+
+  const say = (text: string) => { status.classList.add("is-warn"); status.replaceChildren(svg(ICONS.warning), text); };
   const result = (text: string, seconds: number) => {
     const clean = text.trim();
     live.textContent = "";
-    compose.classList.remove("is-live");
-    if (!clean) { status.textContent = "Nothing was heard. Try again a little louder."; return; }
-    thread.append(bubble("me", clean));
+    setLive(false);
+    if (!clean) { say("Nothing was heard. Try again a little louder, or go back to test the microphone."); return; }
     const words = clean.split(/\s+/).length;
     const wpm = seconds > 0 ? Math.round((words / seconds) * 60) : 0;
-    tries += 1;
-    const detail = wpm > 0 ? `${words} word${words === 1 ? "" : "s"} in ${seconds.toFixed(1)} s · ${wpm} words a minute` : `${words} word${words === 1 ? "" : "s"}`;
-    setTimeout(() => {
-      thread.append(h("div", { class: "ob-bubble ob-bubble--them ob-bubble--done" }, [
-        svg(ICONS.check),
-        h("span", {}, [h("strong", {}, [tries === 1 ? "That's it. It works." : "Got that too."]), h("span", {}, [detail])]),
-      ]));
-      thread.scrollTop = thread.scrollHeight;
-    }, 320);
+    const stats = [`${words} word${words === 1 ? "" : "s"}`, seconds > 0 ? `${seconds.toFixed(1)} s` : "", wpm > 0 ? `${wpm} words a minute` : ""].filter(Boolean).join(" · ");
+    thread.append(h("div", { class: "ob-mine" }, [h("div", { class: "ob-bubble ob-bubble--me" }, [clean]), h("span", { class: "ob-stats" }, [stats])]));
     thread.scrollTop = thread.scrollHeight;
   };
 
@@ -498,7 +590,7 @@ function enterTry(): void {
   const unlisten: Promise<UnlistenFn>[] = [
     listen<{ text: string }>("transcript-preview", (event) => {
       live.textContent = event.payload.text;
-      compose.classList.add("is-live");
+      setLive(true);
     }),
     listen<{ item: HistoryItem }>("transcript-history-updated", (event) => {
       if (!holding) result(event.payload.item.text, event.payload.item.durationSeconds);
@@ -511,13 +603,13 @@ function enterTry(): void {
     if (holding || stopping || mic.disabled) return;
     holding = true;
     mic.classList.add("is-on");
-    compose.classList.add("is-live");
-    status.textContent = "";
+    setLive(true);
+    showModel();
     started = invoke("start_recording").catch((error) => {
-      status.textContent = String(error);
+      say(String(error));
       holding = false;
       mic.classList.remove("is-on");
-      compose.classList.remove("is-live");
+      setLive(false);
       throw error;
     });
   };
@@ -529,7 +621,7 @@ function enterTry(): void {
     void (started ?? Promise.resolve())
       .then(() => invoke<{ transcript: string; recordingSeconds: number }>("stop_voice_test_capture"))
       .then((capture) => result(capture.transcript, capture.recordingSeconds))
-      .catch((error) => { if (holding) status.textContent = String(error); live.textContent = ""; compose.classList.remove("is-live"); })
+      .catch((error) => { if (holding) say(String(error)); live.textContent = ""; setLive(false); })
       .finally(() => { holding = false; stopping = false; });
   };
   mic.addEventListener("pointerdown", press);
@@ -540,69 +632,70 @@ function enterTry(): void {
 
   leaveStep = () => {
     release();
+    cancelAnimationFrame(pulse);
     for (const pending of unlisten) void pending.then((stop) => stop()).catch(() => {});
   };
 }
 
-function bubble(who: "me" | "them", text: string): HTMLElement {
-  return h("div", { class: `ob-bubble ob-bubble--${who}` }, [text]);
-}
-
 function renderImprove(): void {
-  const toggle = h("input", { type: "checkbox", role: "switch", class: "ob-switch", id: "obTraining" }) as HTMLInputElement;
+  const toggle = h("input", { type: "checkbox", role: "switch", class: "ob-switch", id: "obTraining", "aria-label": "Keep my dictations to improve models" }) as HTMLInputElement;
   toggle.checked = Boolean(settings?.trainingCapture);
   toggle.addEventListener("change", () => {
     void saveSettings({ trainingCapture: toggle.checked }).catch(() => { toggle.checked = !toggle.checked; });
   });
   stepHost.replaceChildren(
-    header("heart", "pink", "Help improve the models", "Optional, and off unless you turn it on."),
-    h("div", { class: "ob-card ob-toggle-card" }, [
-      h("label", { class: "ob-card-text", for: "obTraining" }, [
-        h("strong", {}, ["Keep my dictations to improve models"]),
-        h("span", {}, ["Saves each dictation's audio and text on this computer, for training your own models. Nothing is uploaded. Export or delete them any time in Settings."]),
-      ]),
-      toggle,
+    header("Help improve the models", "Optional, and off unless you turn it on."),
+    group([
+      row([h("label", { for: "obTraining" }, ["Keep my dictations to improve models"])],
+        `Saves each dictation's audio and text ${onThisComputer()}, for training your own models. Nothing is uploaded. Export or delete them any time in Settings.`, [toggle]),
     ]),
-    h("p", { class: "ob-note" }, ["Leave this off for patient notes or anything else sensitive."]),
+    h("p", { class: "ob-footnote" }, ["Leave this off for patient notes or anything else sensitive."]),
   );
   setFooter({ next: "Continue", back: true });
 }
 
 // Done: a live checklist of what setup left in place, each with its fix.
-function checkItem(ok: boolean | "busy", title: string, detail: string, fix?: { label: string; step: Step }): HTMLElement {
-  const mark = ok === true ? h("span", { class: "ob-check ob-check--ok", "aria-hidden": "true" }, [svg(ICONS.check)])
-    : ok === "busy" ? h("span", { class: "ob-check ob-check--busy", "aria-hidden": "true" })
-    : h("span", { class: "ob-check ob-check--warn", "aria-hidden": "true" }, ["!"]);
-  const button = fix ? h("button", { class: "ob-btn ob-btn--sm", type: "button" }, [fix.label]) : null;
-  button?.addEventListener("click", () => go(fix!.step));
-  return h("li", { class: "ob-check-row" }, [mark, h("div", { class: "ob-card-text" }, [h("strong", {}, [title]), h("span", {}, [detail])]), button]);
+type CheckState = "done" | "pending" | "problem" | "busy";
+function checkItem(state: CheckState, required: boolean, title: string, detail: string, fix?: { label: string; step: Step }): HTMLElement {
+  const icon = state === "done" ? ICONS.checkCircle : state === "problem" ? ICONS.alertCircle : required ? ICONS.dashedCircle : ICONS.minusCircle;
+  const tone = state === "busy" ? "pending" : state;
+  const mark = h("span", { class: `ob-check-mark ob-check-mark--${tone}${required ? "" : " is-optional"}` }, [svg(icon)]);
+  // Downloading: a spinner where the fix would be.
+  const end = state === "busy" ? h("span", { class: "ob-spinner", "aria-hidden": "true" })
+    : fix ? smallButton(fix.label, () => go(fix.step)) : null;
+  return row([title, required ? null : badge("Optional")], detail, [end], h("span", { class: "ob-check-lead", "aria-hidden": "true" }, [mark]));
 }
 
 function renderDone(): void {
-  const shortcut = settings?.recordingShortcut ?? "";
   const mac = permissions.platform === "macos";
   const micOk = permissions.microphone === "granted";
   const typeOk = permissions.accessibility === "granted";
   const model = settings?.model ?? chosenModel;
   const state = modelState(model);
   const name = speechInfo(model).name;
-  const ready = micOk && (!mac || typeOk) && state === "ready";
-  const list = h("ul", { class: "ob-card ob-checklist" }, [
-    checkItem(micOk, "Microphone", micOk ? "Allowed" : "Not allowed yet", micOk ? undefined : { label: "Fix", step: "permissions" }),
-    mac ? checkItem(typeOk, "Typing into apps", typeOk ? "Accessibility is allowed" : "Until it's allowed, your words are copied for you to paste", typeOk ? undefined : { label: "Fix", step: "permissions" }) : null,
-    checkItem(state === "ready" ? true : state === "downloading" ? "busy" : false, name,
-      state === "ready" ? "Downloaded and ready" : state === "downloading" ? `Downloading · ${Math.round(download.percentage)}%` : state === "failed" ? "The download failed" : "Not downloaded yet",
-      state === "ready" || state === "downloading" ? undefined : { label: state === "failed" ? "Retry" : "Download", step: "model" }),
+  // Only what dictation can't work without; typing into apps is optional.
+  const ready = micOk && state === "ready";
+  const keys = shortcutText();
+  const hold = settings?.recordingShortcutMode === "push-to-talk";
+  const list = group([
+    checkItem(micOk ? "done" : permissions.microphone === "denied" ? "problem" : "pending", true, "Microphone allowed",
+      micOk ? "Heard only while you dictate" : permissions.microphone === "denied" ? "Turned off in your privacy settings" : "Not allowed yet",
+      micOk ? undefined : { label: "Fix", step: "permissions" }),
+    checkItem(state === "ready" ? "done" : state === "downloading" ? "busy" : state === "failed" ? "problem" : "pending", true, "Speech model ready",
+      state === "ready" ? `${name} ${onThisComputer()}` : state === "downloading" ? `Downloading, ${Math.round(download.percentage)}%` : state === "failed" ? download.error || "The download failed" : "Not downloaded",
+      state === "ready" || state === "downloading" ? undefined : { label: "Fix", step: "model" }),
+    mac ? checkItem(typeOk ? "done" : "pending", false, "Types into apps", typeOk ? "Your words go where you type" : "Dictations are copied for you to paste",
+      typeOk ? undefined : { label: "Allow", step: "permissions" }) : null,
+    micHeard === null ? null : checkItem(micHeard ? "done" : "pending", false, "Microphone tested", micHeard ? "We heard you" : "Nothing heard",
+      micHeard ? undefined : { label: "Test", step: "mic" }),
   ]);
   stepHost.replaceChildren(
-    header(ready ? "check" : "wave", "green", ready ? "You're all set" : "Almost there", ready ? "Bark is ready in every app." : "Everything else is ready. You can finish later in Settings."),
-    h("div", { class: "ob-card ob-recap" }, [
-      h("div", { class: "ob-recap-keys" }, [keycaps(shortcut)]),
-      h("p", {}, [settings?.recordingShortcutMode === "push-to-talk" ? "Hold to dictate in any app, let go to insert." : "Press to dictate in any app, press again to insert."]),
-    ]),
+    header(ready ? "You're all set" : "Almost there", ready
+      ? (keys ? [`${hold ? "Hold" : "Press"} `, h("span", { class: "ob-keys-inline" }, [keys]), " in any app to dictate."] : "Bark is ready in every app.")
+      : "Bark can't dictate until the items marked below are done. You can finish later in Settings."),
     list,
   );
-  setFooter({ next: "Open Bark", back: true });
+  setFooter({ next: ready ? "Start dictating" : "Done", back: true });
 }
 
 // ── Navigation ──────────────────────────────────────────────────────────
@@ -613,13 +706,19 @@ function setFooter(options: { next: string; back?: boolean; skip?: string }): vo
   if (options.skip) skipButton.textContent = options.skip;
 }
 
+// "Step 2 of 6 · Microphone" over a segmented line; the welcome shows none.
 function renderProgress(): void {
-  const index = STEPS.indexOf(step);
-  progressList.replaceChildren(...STEPS.map((name, i) => h("li", {
-    class: i < index ? "is-done" : i === index ? "is-current" : "",
-    "aria-current": i === index ? "step" : false,
-    "aria-label": `${STEP_NAMES[name]}${i < index ? ", done" : ""}`,
-  })));
+  const steps: Step[] = STEPS.filter((name) => name !== "welcome");
+  const index = steps.indexOf(step);
+  if (index < 0) {
+    progressHost.replaceChildren();
+    return;
+  }
+  const caption = `Step ${index + 1} of ${steps.length} · ${STEP_NAMES[step]}`;
+  progressHost.replaceChildren(
+    h("div", { class: "ob-segments", "aria-hidden": "true" }, steps.map((_, i) => h("span", { class: i < index ? "is-done" : i === index ? "is-current" : "" }))),
+    h("p", { "aria-label": `Step ${index + 1} of ${steps.length}, ${STEP_NAMES[step]}` }, [caption]),
+  );
 }
 
 function go(next: Step): void {
@@ -709,6 +808,7 @@ async function start(): Promise<void> {
     invoke<SpeechModel[]>("get_dictation_models").then((models) => { speech = models; }).catch(() => {}),
     refreshPermissions(),
   ]);
+  document.documentElement.dataset.platform = permissions.platform;
   if (settings?.model && SPEECH_MODELS.some((model) => model.id === settings!.model)) chosenModel = settings.model;
   if (!starters().includes(chosenModel)) chosenModel = starters()[0] ?? chosenModel;
   const wanted = location.hash.slice(1) as Step;

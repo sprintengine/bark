@@ -10,14 +10,14 @@
   <!-- First-run setup, one step at a time (driven by onboarding.ts). -->
   <div class="ob" id="onboarding">
     <div class="ob-drag" data-tauri-drag-region></div>
-    <ol class="ob-progress" id="obProgress" aria-label="Setup steps"></ol>
+    <div class="ob-progress" id="obProgress"></div>
     <main class="ob-main">
       <section class="ob-step" id="obStep" aria-live="polite"></section>
     </main>
     <footer class="ob-foot">
       <button class="ob-btn ob-btn--ghost" id="obBack" type="button">Back</button>
       <span class="ob-foot-spacer"></span>
-      <button class="ob-btn ob-btn--ghost" id="obSkip" type="button">Not now</button>
+      <button class="ob-btn ob-btn--outline" id="obSkip" type="button">Skip for now</button>
       <button class="ob-btn ob-btn--primary" id="obNext" type="button">Get started</button>
     </footer>
   </div>

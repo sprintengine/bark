@@ -5,6 +5,7 @@
 //
 // `?demo&theme=light` picks the theme; `?demo&empty` starts with no history.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import { onboardingDemo } from "./demoOnboarding";
 import { pillDemo } from "./demoPill";
 
 const params = new URLSearchParams(location.search);
@@ -129,10 +130,11 @@ function respond(cmd: string, args: Record<string, unknown> | undefined): unknow
 
 if (active) {
   mockWindows("home");
-  // `&pill=<state>` drives the recording pill (demoPill.ts); its events are mocked too.
-  const pill = pillDemo(params);
-  const answer = pill ? pill.respond(respond) : respond;
-  mockIPC((cmd, args) => answer(cmd, args as Record<string, unknown> | undefined), { shouldMockEvents: pill !== null });
+  // The pill (`&pill=<state>`, demoPill.ts) and the setup window (demoOnboarding.ts)
+  // drive themselves with events, so those are mocked too.
+  const driver = pillDemo(params) ?? onboardingDemo(params);
+  const answer = driver ? driver.respond(respond) : respond;
+  mockIPC((cmd, args) => answer(cmd, args as Record<string, unknown> | undefined), { shouldMockEvents: driver !== null });
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark") localStorage.setItem("fairspoken.appearance", theme);
 }
