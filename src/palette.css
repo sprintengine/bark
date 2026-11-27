@@ -1,0 +1,219 @@
+/* The Ctrl+K palette (palette.ts), sized like the Mac app's CommandPalette:
+   a 600 px solid card 96 px from the top over a dimmed window, a 48 px
+   field, 32 px rows in groups under small labels, and a 36 px row of key
+   hints along the foot. Colours are the --bark-* tokens. */
+
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  background: rgba(0, 0, 0, 0.12);
+  font-family: var(--sem-font-family-ui);
+  -webkit-font-smoothing: antialiased;
+}
+[data-mode="dark"] .palette-overlay { background: rgba(0, 0, 0, 0.4); }
+.palette-overlay[hidden] { display: none; }
+
+.palette-card {
+  box-sizing: border-box;
+  position: absolute;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(600px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--bark-card);
+  border: 1px solid var(--bark-hairline);
+  border-radius: var(--bark-radius-card);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  color: var(--bark-ink);
+  text-align: left;
+}
+[data-mode="dark"] .palette-card { box-shadow: 0 14px 44px rgba(0, 0, 0, 0.6); }
+
+.palette-rule {
+  flex: none;
+  height: 1px;
+  background: var(--bark-hairline);
+}
+
+/* Field */
+.palette-field {
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 16px;
+}
+.palette-search-icon {
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  color: var(--bark-ink-2);
+}
+.palette-search-icon svg { width: 100%; height: 100%; }
+.palette-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--bark-ink);
+  font: inherit;
+  font-size: 15px;
+  caret-color: var(--bark-primary);
+}
+.palette-input::placeholder { color: var(--bark-ink-3); opacity: 1; }
+.palette-input::selection { background: color-mix(in srgb, var(--bark-info) 30%, transparent); }
+
+/* Results */
+.palette-list {
+  box-sizing: border-box;
+  flex: 0 1 auto;
+  max-height: min(460px, calc(100vh - 96px - 86px - 24px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  scroll-padding: 6px 0;
+}
+.palette-heading {
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--bark-ink-3);
+}
+.palette-empty {
+  margin: 0;
+  padding: 28px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--bark-ink-2);
+}
+
+.palette-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: default;
+  user-select: none;
+}
+.palette-row--two-line { align-items: flex-start; }
+.palette-row.is-selected { background: var(--bark-selected); }
+
+.palette-leading {
+  flex: none;
+  display: inline-flex;
+  justify-content: center;
+  width: 16px;
+}
+.palette-row--two-line .palette-leading { padding-top: 2px; }
+.palette-icon {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  color: var(--bark-ink-2);
+}
+.palette-icon svg { width: 100%; height: 100%; }
+.palette-monogram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--palette-mono) 14%, transparent);
+  color: var(--palette-mono);
+  font-family: var(--sem-font-family-mono);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: -0.15px;
+  line-height: 1;
+}
+
+.palette-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.palette-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--bark-ink);
+}
+.palette-title u { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.palette-subtitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 15px;
+  color: var(--bark-ink-2);
+}
+.palette-aside {
+  flex: none;
+  font-size: 12px;
+  color: var(--bark-ink-3);
+}
+.palette-trailing {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+.palette-row:not(.is-selected) .palette-enter-key { display: none; }
+
+/* Keycaps (`Keycap`): 11 px on a faint fill. */
+.palette-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--bark-key-fill);
+  color: var(--bark-ink-2);
+  font-family: var(--sem-font-family-ui);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Footer */
+.palette-footer {
+  box-sizing: border-box;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--bark-ink-3);
+}
+.palette-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (prefers-contrast: more) {
+  .palette-row.is-selected { outline: 1px solid var(--bark-input); }
+}
