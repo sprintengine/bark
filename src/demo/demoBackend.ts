@@ -6,9 +6,17 @@
 // `?demo&theme=light` picks the theme; `?demo&empty` starts with no history;
 // `?demo&platform=mac` draws the Mac build (Windows is the default).
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import { onboardingDemo } from "./demoOnboarding";
+import { pillDemo } from "./demoPill";
 
 const params = new URLSearchParams(location.search);
 const active = params.has("demo") && !("__TAURI_INTERNALS__" in window);
+
+// Windows keys (Ctrl, Shift) and copy, unless `&platform=mac`.
+if (active && params.get("platform") !== "mac") {
+  Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+  Object.defineProperty(navigator, "userAgent", { get: () => "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" });
+}
 
 const MIN = 60_000;
 const now = Date.now();
@@ -122,7 +130,6 @@ function respond(cmd: string, args: Record<string, unknown> | undefined): unknow
 }
 
 if (active) {
-  if (params.get("platform") !== "mac") Object.defineProperty(navigator, "platform", { get: () => "Win32" });
   mockWindows("home");
   // A headless browser has no microphones; give the pickers two to show.
   Object.defineProperty(navigator, "mediaDevices", { value: {
@@ -133,7 +140,11 @@ if (active) {
     getUserMedia: async () => { throw new Error("No microphone in the demo"); },
     addEventListener: () => {},
   } });
-  mockIPC((cmd, args) => respond(cmd, args as Record<string, unknown> | undefined));
+  // The pill (`&pill=<state>`, demoPill.ts) and the setup window (demoOnboarding.ts)
+  // drive themselves with events, so those are mocked too.
+  const driver = pillDemo(params) ?? onboardingDemo(params);
+  const answer = driver ? driver.respond(respond) : respond;
+  mockIPC((cmd, args) => answer(cmd, args as Record<string, unknown> | undefined), { shouldMockEvents: driver !== null });
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark") localStorage.setItem("fairspoken.appearance", theme);
 }

@@ -101,8 +101,9 @@ the [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) release `b10930`
 
 - **Fraunces** typeface ([undercasetype/Fraunces](https://github.com/undercasetype/Fraunces),
   from the [Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/fraunces),
-  native macOS client only) — SIL Open Font License 1.1, © 2018 The Fraunces
-  Project Authors. The Bark wordmark and Home's greeting are set in it.
+  the native macOS client and the desktop app's setup guide) — SIL Open Font
+  License 1.1, © 2018 The Fraunces Project Authors. The Bark wordmark and
+  Home's greeting are set in it.
   `apps/macos/Fairspoken/Resources/Fonts/Fraunces-SemiBold.ttf` is a modified
   version: a static instance of the variable font (weight 600, optical size 24,
   SOFT 0, WONK 0), subset to Latin, made with fontTools. The licence ships beside
