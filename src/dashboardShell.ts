@@ -1,12 +1,9 @@
-// Window material, local appearance preference and the shared tooltip (the
+// Local appearance preference and the shared tooltip (the
 // sidebar update row names its full state there).
 // Navigation stays in home.ts so every route follows the same lifecycle.
 import "./dashboardShell.css";
 
 import "./appearance";
-if ("__TAURI_INTERNALS__" in window && /Mac/.test(navigator.platform)) {
-  document.documentElement.dataset.windowMaterial = "glass";
-}
 
 const tooltip = document.createElement("div");
 tooltip.className = "ds-tooltip";

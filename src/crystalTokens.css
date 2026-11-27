@@ -1,12 +1,14 @@
-/* Crystal: the Bark app theme (design/crystal/README.md). This file
-   only declares tokens. It re-points the vendored design-system's semantic
-   colours at the Crystal palette, so every existing component follows.
+/* Bark's tokens, the same values as the Mac app's (apps/macos/Packages/
+   FairspokenUI/Sources/FairspokenUI/Theme.swift, `Crystal`). This file only
+   declares tokens. It re-points the vendored design-system's semantic colours
+   at this palette, so every component follows.
 
-   The rules in one breath: the window chrome (the sidebar) is the OS frost,
-   tinted once on body; the content stands on opaque cards with hairline
-   edges, a 1px top highlight and a tight two-layer shadow. One green accent,
-   used sparingly; colour otherwise only in the sidebar's icon tiles and in
-   status.
+   The look in one breath: dark is a true-black ground with surfaces a few
+   steps of white above it, 8% white hairlines, neutral text in three steps and
+   one blue for the primary action. Light keeps the same structure on a
+   near-white ground. Every surface is opaque: nothing shows through the
+   window, and cards have an edge but no shadow. Diffs are blue (added) and
+   orange (removed); red is kept for the microphone being on.
 
    It wins over tokens.css and light-scope.css by order, not specificity:
    theme.css imports all three, once per page, in that order. A nested
@@ -14,252 +16,251 @@
 
 :root,
 [data-mode="light"] {
-  /* Grounds. `page` is the window's own colour: painted once on body (at
-     52% over the OS frost on a Mac, opaque elsewhere). `canvas` is the
-     opaque content card; `card` the groups that sit on it. */
-  --crystal-page: #e6e9ed;
-  --crystal-page-sheen: #f3f5f7;
-  --crystal-canvas: #f6f7f9;
-  --crystal-card: #ffffff;
-  --crystal-card-edge: rgba(16, 24, 32, 0.09);
-  --crystal-card-highlight: rgba(255, 255, 255, 0.9);
-  --crystal-shadow-card: 0 1px 2px rgba(16, 24, 32, 0.05), 0 2px 8px -2px rgba(16, 24, 32, 0.07);
-  --crystal-shadow-canvas: 0 0 0 0.5px rgba(16, 24, 32, 0.1), 0 1px 3px rgba(16, 24, 32, 0.06), 0 8px 24px -8px rgba(16, 24, 32, 0.12);
-  /* Legacy names the feature sheets read; they now name the opaque card. */
-  --crystal-surface: var(--crystal-card);
-  --crystal-surface-strong: #ffffff;
-  --crystal-edge: var(--crystal-card-highlight);
-  --crystal-hairline: rgba(16, 24, 32, 0.09);
-  --crystal-ink: #16191d;
-  --crystal-ink-2: #59636d;
-  --crystal-ink-3: #6a747e;
-  /* Client accent: green, used sparingly. Dark enough for white button text
-     and for accent-coloured text to clear 4.5:1 on a card. */
-  --crystal-accent: #237a50;
-  --crystal-accent-hover: #1d6a45;
-  --crystal-tint: rgba(35, 122, 80, 0.08);
-  --crystal-tint-strong: rgba(35, 122, 80, 0.16);
-  --crystal-wash: rgba(46, 139, 94, 0.07);
-  /* Status: functional, never decorative. */
-  --crystal-ok: #237a50;
-  --crystal-warn: #94660f;
-  --crystal-error: #b4283c;
-  --crystal-live: #d93b2f;
-  /* Neutral fills for hover, pressed and selected, on an opaque card. */
-  --crystal-fill-hover: rgba(16, 24, 32, 0.045);
-  --crystal-fill-active: rgba(16, 24, 32, 0.08);
-  --crystal-chip: #ffffff;
-  --crystal-track: rgba(16, 24, 32, 0.1);
-  /* The inks of the sidebar row ramp. Opaque here; under the window
-     material each is mixed toward transparent (crystal.css), so a row tints
-     the frost instead of covering it. hover < active < selected. */
-  --crystal-row-hover: #f2f4f6;
-  --crystal-row-active: #dfe3e8;
-  --crystal-row-selected: #cdd3da;
-  /* Popovers, tooltips and toasts: the only surfaces allowed a CSS blur, and
-     dense enough that what they cover never reads through. */
-  --crystal-surface-overlay: rgba(255, 255, 255, 0.86);
-  --crystal-shadow: var(--crystal-shadow-card);
-  --crystal-shadow-float: 0 1px 2px rgba(16, 24, 32, 0.08), 0 10px 28px -8px rgba(16, 24, 32, 0.22);
-  --crystal-shadow-control: 0 1px 2px rgba(16, 24, 32, 0.08);
-  --crystal-shadow-chip: 0 1px 2px rgba(16, 24, 32, 0.12), 0 0 0 0.5px rgba(16, 24, 32, 0.06);
-  --crystal-shadow-track: inset 0 0 0 1px rgba(16, 24, 32, 0.04);
-  /* Flat fills for what sits inside a card: a field, a keycap, a bezel. */
-  --crystal-well: rgba(16, 24, 32, 0.04);
-  --crystal-well-strong: rgba(16, 24, 32, 0.065);
-  /* Legacy sidebar names: the sidebar is the frost, so they are see-through. */
-  --crystal-sidebar: transparent;
-  --crystal-sidebar-edge: transparent;
-  --crystal-selection: var(--crystal-row-selected);
-  --crystal-band: transparent;
-  --crystal-glass: var(--crystal-card);
-  --crystal-glass-strong: var(--crystal-card);
-  --crystal-glass-edge: var(--crystal-card-edge);
-  /* The brand mark: the app icon's black tile behind its photo, with a hairline edge
-     so it holds on any surface. */
-  --crystal-mark-top: #2a2a2d;
-  --crystal-mark-bottom: #0a0a0b;
-  --crystal-mark-sheen: rgba(255, 255, 255, 0.08);
-  --crystal-mark-edge: rgba(0, 0, 0, 0.2);
-  --crystal-mark-shadow: rgba(16, 24, 32, 0.22);
-  /* Sidebar icon tiles: one hue per place, as a system settings list. */
-  --crystal-tile-home: #2f9e63;
-  --crystal-tile-notes: #e0a10b;
-  --crystal-tile-dictionary: #e3622f;
-  --crystal-tile-models: #5865d8;
-  --crystal-tile-activity: #db3f72;
-  --crystal-tile-settings: #7d848d;
-  --crystal-tile-blue: #2f80ed;
-
-  --sem-color-text-default: #2b3238;
-  --sem-color-text-on-accent: #ffffff;
-  --sem-color-border-default: rgba(16, 24, 32, 0.13);
-  --sem-color-border-strong: rgba(16, 24, 32, 0.2);
-  --sem-color-status-neutral-soft: rgba(16, 24, 32, 0.07);
-  --sem-color-status-good-soft: rgba(35, 122, 80, 0.14);
-  --sem-color-status-warn-soft: rgba(148, 102, 15, 0.14);
-  --sem-color-status-danger-soft: rgba(180, 40, 60, 0.12);
-  --sem-color-status-good-faint: rgba(35, 122, 80, 0.07);
-  --sem-color-diff-changed: rgba(16, 24, 32, 0.06);
-  --sem-color-diff-changed-strong: rgba(16, 24, 32, 0.14);
-  --sem-color-overlay-scrim: rgba(16, 24, 32, 0.28);
-  --sem-color-activity-glow-start: rgba(46, 139, 94, 0.55);
-  --sem-color-activity-glow-end: #9aa6b0;
-  --sem-shadow-modal: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 2px 6px rgba(16, 24, 32, 0.08), 0 16px 48px -12px rgba(16, 24, 32, 0.2);
-  --sem-shadow-control-raised: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 1px 2px rgba(16, 24, 32, 0.16);
-  --sem-shadow-control-edge: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 1px 2px rgba(16, 24, 32, 0.06);
-  --sem-shadow-control-pressed: inset 0 1px 2px rgba(16, 24, 32, 0.1);
+  /* Surfaces (`Crystal.canvas`, `card`, `message`, `selected`). */
+  --bark-canvas: #fafafa;
+  --bark-card: #ffffff;
+  --bark-message: #ebebed;
+  --bark-selected: #ececee;
+  /* Text. */
+  --bark-ink: #18181b;
+  --bark-ink-2: #52525b;
+  --bark-ink-3: #63636b;
+  /* Lines and fills. */
+  --bark-hairline: rgba(0, 0, 0, 0.1);
+  --bark-hairline-soft: rgba(0, 0, 0, 0.07);
+  --bark-input: rgba(0, 0, 0, 0.16);
+  --bark-well: rgba(0, 0, 0, 0.035);
+  --bark-key-fill: rgba(0, 0, 0, 0.06);
+  --bark-row-hover: rgba(0, 0, 0, 0.04);
+  /* Accents and status. */
+  --bark-primary: #1b4ed8;
+  --bark-primary-hover: #1743bb;
+  --bark-on-accent: #ffffff;
+  --bark-info: #1d4ed8;
+  --bark-removed: #c2410c;
+  --bark-recording: #dc2626;
+  --bark-warn: #92400e;
+  --bark-error: #b91c1c;
+  /* Small icon tiles: the palette's hues only. */
+  --bark-tile-orange: #ea6a0a;
+  --bark-tile-blue: #1d4ed8;
+  --bark-tile-gray: #71717a;
+  --bark-tile-red: #dc2626;
+  --bark-tile-teal: #0284c7;
+  /* App monograms, by app (`AppMonogram.palette`). */
+  --bark-mono-0: #1d4ed8;
+  --bark-mono-1: #c2410c;
+  --bark-mono-2: #0369a1;
+  --bark-mono-3: #4b5563;
+  --bark-mono-4: #92400e;
+  /* The composer's lift. */
+  --bark-composer-shadow: 0 6px 12px rgba(0, 0, 0, 0.07);
+  --bark-float-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --bark-scrim: rgba(0, 0, 0, 0.22);
 }
 
 [data-mode="dark"] {
-  --crystal-page: #202328;
-  --crystal-page-sheen: #272b31;
-  --crystal-canvas: #151719;
-  --crystal-card: #1d2023;
-  --crystal-card-edge: rgba(255, 255, 255, 0.08);
-  --crystal-card-highlight: rgba(255, 255, 255, 0.045);
-  --crystal-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px -2px rgba(0, 0, 0, 0.35);
-  --crystal-shadow-canvas: 0 0 0 0.5px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.3), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
-  --crystal-surface-strong: #24282c;
-  --crystal-hairline: rgba(255, 255, 255, 0.08);
-  --crystal-ink: #e9ecef;
-  --crystal-ink-2: #a3acb5;
-  --crystal-ink-3: #8b949d;
-  --crystal-accent: #5ccb94;
-  --crystal-accent-hover: #74d6a6;
-  --crystal-tint: rgba(92, 203, 148, 0.1);
-  --crystal-tint-strong: rgba(92, 203, 148, 0.18);
-  --crystal-wash: rgba(92, 203, 148, 0.1);
-  --crystal-ok: #5ccb94;
-  --crystal-warn: #e7b95a;
-  --crystal-error: #ff7d8e;
-  --crystal-live: #ff6a5e;
-  --crystal-fill-hover: rgba(255, 255, 255, 0.05);
-  --crystal-fill-active: rgba(255, 255, 255, 0.09);
-  --crystal-chip: rgba(255, 255, 255, 0.16);
-  --crystal-track: rgba(255, 255, 255, 0.13);
-  --crystal-row-hover: #33373d;
-  --crystal-row-active: #3b4047;
-  --crystal-row-selected: #434950;
-  --crystal-surface-overlay: rgba(36, 39, 44, 0.9);
-  --crystal-shadow-float: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
-  --crystal-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --crystal-shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
-  --crystal-shadow-track: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --crystal-well: rgba(255, 255, 255, 0.05);
-  --crystal-well-strong: rgba(255, 255, 255, 0.08);
+  --bark-canvas: #000000;
+  --bark-card: #111111;
+  --bark-message: #1e1e1e;
+  --bark-selected: #191a1d;
+  --bark-ink: #f5f5f5;
+  --bark-ink-2: #a3a3a3;
+  --bark-ink-3: #8f8f8f;
+  --bark-hairline: rgba(255, 255, 255, 0.08);
+  --bark-hairline-soft: rgba(255, 255, 255, 0.05);
+  --bark-input: rgba(255, 255, 255, 0.11);
+  --bark-well: rgba(255, 255, 255, 0.035);
+  --bark-key-fill: rgba(245, 245, 245, 0.07);
+  --bark-row-hover: rgba(255, 255, 255, 0.045);
+  --bark-primary: #346bf1;
+  --bark-primary-hover: #4a7cf3;
+  --bark-on-accent: #ffffff;
+  --bark-info: #51a2ff;
+  --bark-removed: #ff8904;
+  --bark-recording: #fb414a;
+  --bark-warn: #ffb900;
+  --bark-error: #ff6467;
+  --bark-tile-orange: #ff8904;
+  --bark-tile-blue: #51a2ff;
+  --bark-tile-gray: #99a1af;
+  --bark-tile-red: #fb414a;
+  --bark-tile-teal: #00bcff;
+  --bark-mono-0: #51a2ff;
+  --bark-mono-1: #ff8904;
+  --bark-mono-2: #00bcff;
+  --bark-mono-3: #99a1af;
+  --bark-mono-4: #ffb900;
+  --bark-composer-shadow: 0 12px 16px rgba(0, 0, 0, 0.45);
+  --bark-float-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --bark-scrim: rgba(0, 0, 0, 0.55);
+}
+
+/* Increase contrast (Windows high contrast, or the system's more-contrast
+   setting): the stronger text and lines the Mac uses with Increase Contrast. */
+@media (prefers-contrast: more) {
+  :root, [data-mode="light"] {
+    --bark-ink: #000000; --bark-ink-2: #2e2e33; --bark-ink-3: #46464b;
+    --bark-hairline: rgba(0, 0, 0, 0.32); --bark-hairline-soft: rgba(0, 0, 0, 0.28); --bark-input: rgba(0, 0, 0, 0.45);
+    --bark-primary: #123a9e; --bark-info: #1e3a8a; --bark-removed: #9a3412;
+  }
+  [data-mode="dark"] {
+    --bark-card: #161616; --bark-message: #262626; --bark-selected: #26272b;
+    --bark-ink: #ffffff; --bark-ink-2: #d6d6d6; --bark-ink-3: #b8b8b8;
+    --bark-hairline: rgba(255, 255, 255, 0.3); --bark-hairline-soft: rgba(255, 255, 255, 0.26); --bark-input: rgba(255, 255, 255, 0.4);
+    --bark-primary: #2456d6; --bark-info: #8cc2ff; --bark-removed: #ffb066;
+  }
+}
+
+/* The older Crystal names, which the feature sheets still read, pointed at
+   the palette above. Declared on every mode scope so a nested preview pane
+   resolves them against its own palette. */
+:root,
+[data-mode] {
+  --crystal-page: var(--bark-canvas);
+  --crystal-page-sheen: var(--bark-canvas);
+  --crystal-canvas: var(--bark-canvas);
+  --crystal-card: var(--bark-card);
+  --crystal-card-edge: var(--bark-hairline);
+  --crystal-card-highlight: transparent;
+  --crystal-shadow-card: none;
+  --crystal-shadow-canvas: none;
+  --crystal-surface: var(--bark-card);
+  --crystal-surface-strong: var(--bark-message);
+  --crystal-edge: transparent;
+  --crystal-hairline: var(--bark-hairline);
+  --crystal-ink: var(--bark-ink);
+  --crystal-ink-2: var(--bark-ink-2);
+  --crystal-ink-3: var(--bark-ink-3);
+  --crystal-accent: var(--bark-primary);
+  --crystal-accent-hover: var(--bark-primary-hover);
+  --crystal-tint: color-mix(in srgb, var(--bark-info) 12%, transparent);
+  --crystal-tint-strong: color-mix(in srgb, var(--bark-info) 20%, transparent);
+  --crystal-wash: transparent;
+  /* "Ready" and other good news stay neutral: the brand has no green. */
+  --crystal-ok: var(--bark-ink-2);
+  --crystal-warn: var(--bark-warn);
+  --crystal-error: var(--bark-error);
+  --crystal-live: var(--bark-recording);
+  --crystal-fill-hover: var(--bark-row-hover);
+  --crystal-fill-active: var(--bark-selected);
+  --crystal-chip: var(--bark-message);
+  --crystal-track: var(--bark-hairline);
+  --crystal-row-hover: var(--bark-row-hover);
+  --crystal-row-active: var(--bark-selected);
+  --crystal-row-selected: var(--bark-selected);
+  --crystal-surface-overlay: var(--bark-card);
+  --crystal-shadow: none;
+  --crystal-shadow-float: var(--bark-float-shadow);
+  --crystal-shadow-control: none;
+  --crystal-shadow-chip: none;
+  --crystal-shadow-track: none;
+  --crystal-well: var(--bark-well);
+  --crystal-well-strong: var(--bark-key-fill);
+  --crystal-sidebar: var(--bark-canvas);
+  --crystal-sidebar-edge: var(--bark-hairline);
+  --crystal-selection: var(--bark-selected);
+  --crystal-band: transparent;
+  --crystal-glass: var(--bark-card);
+  --crystal-glass-strong: var(--bark-card);
+  --crystal-glass-edge: var(--bark-hairline);
   --crystal-mark-top: #2a2a2d;
   --crystal-mark-bottom: #0a0a0b;
   --crystal-mark-sheen: rgba(255, 255, 255, 0.08);
-  --crystal-mark-edge: rgba(255, 255, 255, 0.2);
-  --crystal-mark-shadow: rgba(0, 0, 0, 0.4);
-  --crystal-tile-home: #34a86a;
-  --crystal-tile-notes: #d99c0c;
-  --crystal-tile-dictionary: #de5e2c;
-  --crystal-tile-models: #6170e0;
-  --crystal-tile-activity: #d8427a;
-  --crystal-tile-settings: #7a828c;
-  --crystal-tile-blue: #3a86ee;
+  --crystal-mark-edge: var(--bark-hairline);
+  --crystal-mark-shadow: transparent;
+  --crystal-tile-home: var(--bark-tile-gray);
+  --crystal-tile-notes: var(--bark-tile-orange);
+  --crystal-tile-dictionary: var(--bark-tile-orange);
+  --crystal-tile-models: var(--bark-tile-blue);
+  --crystal-tile-activity: var(--bark-tile-red);
+  --crystal-tile-settings: var(--bark-tile-gray);
+  --crystal-tile-blue: var(--bark-tile-blue);
 
-  --sem-color-text-default: #cfd5da;
-  --sem-color-text-on-accent: #0b1a12;
-  --sem-color-border-default: rgba(255, 255, 255, 0.11);
-  --sem-color-border-strong: rgba(255, 255, 255, 0.17);
-  --sem-color-status-neutral-soft: rgba(255, 255, 255, 0.08);
-  --sem-color-status-good-soft: rgba(92, 203, 148, 0.18);
-  --sem-color-status-warn-soft: rgba(231, 185, 90, 0.16);
-  --sem-color-status-danger-soft: rgba(255, 125, 142, 0.16);
-  --sem-color-status-good-faint: rgba(92, 203, 148, 0.1);
-  --sem-color-diff-changed: rgba(255, 255, 255, 0.07);
-  --sem-color-diff-changed-strong: rgba(255, 255, 255, 0.16);
-  --sem-color-overlay-scrim: rgba(0, 0, 0, 0.55);
-  --sem-color-activity-glow-start: rgba(92, 203, 148, 0.6);
-  --sem-color-activity-glow-end: #c3ccd4;
-  --sem-shadow-modal: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.3), 0 16px 48px -12px rgba(0, 0, 0, 0.6);
-  --sem-shadow-control-raised: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.4);
-  --sem-shadow-control-edge: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.25);
-  --sem-shadow-control-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.4);
-}
+  --sem-color-text-default: var(--bark-ink);
+  --sem-color-text-on-accent: var(--bark-on-accent);
+  --sem-color-border-default: var(--bark-input);
+  --sem-color-border-strong: var(--bark-input);
+  --sem-color-status-neutral-soft: var(--bark-key-fill);
+  --sem-color-status-good-soft: var(--bark-key-fill);
+  --sem-color-status-warn-soft: color-mix(in srgb, var(--bark-warn) 14%, transparent);
+  --sem-color-status-danger-soft: color-mix(in srgb, var(--bark-error) 14%, transparent);
+  --sem-color-status-good-faint: var(--bark-well);
+  --sem-color-diff-changed: var(--bark-well);
+  --sem-color-diff-changed-strong: var(--bark-key-fill);
+  --sem-color-overlay-scrim: var(--bark-scrim);
+  --sem-color-activity-glow-start: color-mix(in srgb, var(--bark-primary) 55%, transparent);
+  --sem-color-activity-glow-end: var(--bark-ink-3);
+  --sem-shadow-modal: var(--bark-float-shadow);
+  --sem-shadow-control-raised: none;
+  --sem-shadow-control-edge: none;
+  --sem-shadow-control-pressed: none;
 
-/* Reduced transparency: the same layout on solid fills. */
-@media (prefers-reduced-transparency: reduce) {
-  :root,
-  [data-mode="light"] { --crystal-surface-overlay: #ffffff; }
-  [data-mode="dark"] { --crystal-surface-overlay: #24272c; }
-}
-
-/* Mappings shared by both modes. They are declared on every mode scope so a
-   nested preview pane resolves them against its own palette. */
-:root,
-[data-mode] {
-  /* Small floating surfaces only (popovers, toasts): never over live content. */
-  --crystal-glass-filter: blur(14px) saturate(1.1);
-  --crystal-backdrop: linear-gradient(180deg, var(--crystal-page-sheen) 0%, var(--crystal-page) 100%);
-  /* Radii: 12 for every card (and the content canvas), 8 for fields, rows
-     and wells, 6 for push buttons and popups. */
+  --crystal-glass-filter: none;
+  --crystal-backdrop: var(--bark-canvas);
+  /* Radii (`Radius`): 8 for controls, rows, selects and menus; 12 for cards
+     and grouped lists; 16 for the composer and a dictation's bubble. */
+  --bark-radius-control: 8px;
+  --bark-radius-card: 12px;
+  --bark-radius-composer: 16px;
   --crystal-radius-card: 12px;
   --crystal-radius-field: 8px;
-  --crystal-radius-control: 6px;
-  /* The frost between and around the cards. */
-  --crystal-gap: 4px;
-  /* A switch thumb stays white on both the track and the accent, in both modes. */
+  --crystal-radius-control: 8px;
+  --crystal-gap: 0px;
   --crystal-thumb: #ffffff;
-  /* Motion: three durations, one curve. */
+  /* Motion (`Motion`): 120 / 180 / 260 ms on one ease-out curve. */
   --crystal-motion-fast: 120ms;
   --crystal-motion: 180ms;
   --crystal-motion-slow: 260ms;
   --crystal-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  --sem-color-bg-app: var(--crystal-page);
-  --sem-color-bg-surface: var(--crystal-card);
-  --sem-color-bg-surface-raised: var(--crystal-surface-strong);
-  --sem-color-bg-hover: var(--crystal-fill-hover);
-  --sem-color-bg-active: var(--crystal-fill-active);
-  --sem-color-bg-selected: var(--crystal-fill-active);
-  --sem-color-bg-selected-resting: var(--crystal-fill-hover);
-  --sem-color-text-primary: var(--crystal-ink);
-  --sem-color-text-muted: var(--crystal-ink-2);
-  --sem-color-text-subtle: var(--crystal-ink-3);
-  --sem-color-text-disabled: var(--crystal-ink-3);
-  --sem-color-border-subtle: var(--crystal-hairline);
-  --sem-color-border-focus: var(--crystal-accent);
-  --sem-color-accent-primary: var(--crystal-accent);
-  --sem-color-accent-hover: var(--crystal-accent-hover);
+  --sem-color-bg-app: var(--bark-canvas);
+  --sem-color-bg-surface: var(--bark-card);
+  --sem-color-bg-surface-raised: var(--bark-message);
+  --sem-color-bg-hover: var(--bark-row-hover);
+  --sem-color-bg-active: var(--bark-selected);
+  --sem-color-bg-selected: var(--bark-selected);
+  --sem-color-bg-selected-resting: var(--bark-row-hover);
+  --sem-color-text-primary: var(--bark-ink);
+  --sem-color-text-muted: var(--bark-ink-2);
+  --sem-color-text-subtle: var(--bark-ink-3);
+  --sem-color-text-disabled: var(--bark-ink-3);
+  --sem-color-border-subtle: var(--bark-hairline);
+  --sem-color-border-focus: var(--bark-primary);
+  --sem-color-accent-primary: var(--bark-primary);
+  --sem-color-accent-hover: var(--bark-primary-hover);
   --sem-color-accent-soft: var(--crystal-tint);
   --sem-color-accent-soft-strong: var(--crystal-tint-strong);
-  --sem-color-status-neutral: var(--crystal-ink-2);
-  --sem-color-status-good: var(--crystal-ok);
-  --sem-color-status-warn: var(--crystal-warn);
-  --sem-color-status-danger: var(--crystal-error);
-  --sem-color-diff-added: var(--crystal-ok);
-  --sem-color-diff-removed: var(--crystal-error);
-  --sem-shadow-drawer: var(--crystal-shadow-float);
-  --sem-shadow-popover: var(--crystal-shadow-float);
-  --sem-font-family-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --sem-font-family-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Code", Consolas, monospace;
-  /* Type: 11 / 12 / 13 / 14 / 16 / 28. */
+  --sem-color-status-neutral: var(--bark-ink-2);
+  --sem-color-status-good: var(--bark-ink-2);
+  --sem-color-status-warn: var(--bark-warn);
+  --sem-color-status-danger: var(--bark-error);
+  --sem-color-diff-added: var(--bark-info);
+  --sem-color-diff-removed: var(--bark-removed);
+  --sem-shadow-drawer: var(--bark-float-shadow);
+  --sem-shadow-popover: var(--bark-float-shadow);
+  /* The system face on each platform: SF Pro on a Mac, Segoe UI on Windows. */
+  --sem-font-family-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, "Helvetica Neue", sans-serif;
+  --sem-font-family-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", "Cascadia Code", Consolas, Menlo, monospace;
+  /* Type (`TypeScale`): 11 micro, 12 meta, 13 body, 14 rows, 15 headings and
+     dictated text, 22 page titles, 28 display. */
   --sem-font-size-micro: 11px;
   --sem-font-size-meta: 12px;
   --sem-font-size-body: 13px;
-  --sem-font-size-heading: 14px;
-  --sem-font-size-title: 16px;
+  --sem-font-size-heading: 15px;
+  --sem-font-size-title: 22px;
   --sem-font-size-display: 28px;
-  --sem-font-tracking-tight: -0.01em;
+  --sem-font-tracking-tight: 0;
   --sem-motion-duration-fast: var(--crystal-motion-fast);
   --sem-motion-duration-normal: var(--crystal-motion);
   --sem-motion-duration-deliberate: var(--crystal-motion-slow);
   --sem-motion-ease-standard: var(--crystal-ease);
   --sem-radius-chip: 999px;
-  --sem-radius-control: 6px;
+  --sem-radius-control: 8px;
   --sem-radius-overlay: 10px;
   --sem-radius-shell: 12px;
   --sem-radius-shell-lg: 12px;
-  --sem-glass-blur: 14px;
-  --sem-glass-opacity: 0.86;
-  --sem-glass-saturation: 1.1;
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  :root,
-  [data-mode] { --crystal-glass-filter: none; }
+  --sem-glass-blur: 0px;
+  --sem-glass-opacity: 1;
+  --sem-glass-saturation: 1;
 }
