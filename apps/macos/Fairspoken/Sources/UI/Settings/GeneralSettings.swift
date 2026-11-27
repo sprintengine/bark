@@ -95,7 +95,6 @@ enum GeneralSettings {
             ]),
             Section("Post-training recordings", rows: [
                 Row("Save recordings to improve models",
-                    detail: "Keeps each dictation's audio and text on this Mac, for training a model on your voice. Nothing is uploaded.",
                     keywords: "training capture audio keep voice") {
                     SettingSwitch(label: "Save recordings to improve models", isOn: model.setting(\.trainingCapture))
                 },

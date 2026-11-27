@@ -18,7 +18,7 @@ struct ModelsView: View {
                                favourites: Set(model.settings.settings.favoriteModels))
         ScrollView {
             VStack(alignment: .leading, spacing: Layout.gap) {
-                PageTitle("Models", subtitle: "Speech recognition on this Mac's Neural Engine")
+                PageTitle("Models")
                     .padding(.bottom, 4)
                 ModelFilterBar(query: $query)
                 let columns = ModelColumns(width: tableWidth)
@@ -38,10 +38,6 @@ struct ModelsView: View {
                     }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
-                Text("Speed and accuracy: measured on an M4 Mac with the app's own engines, on 20 LibriSpeech test-clean clips (147 s). Rows marked “published” use the authors' figures.")
-                    .font(.caption).foregroundStyle(Crystal.ink3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 4)
             }
             .frame(maxWidth: Layout.readable, alignment: .leading)
             .padding(.horizontal, Layout.pageH)
@@ -380,10 +376,6 @@ struct ModelDetailSheet: View {
             SettingsGroup {
                 figureRow("Speed", score: info.speed, value: info.rtfx.map { String(format: "%.0f× real time", $0) } ?? "Not measured")
                 figureRow("Accuracy", score: info.accuracy, value: info.wer.map { String(format: "%.1f%% word error rate", $0) } ?? "Not measured")
-                Text(sourceNote).font(.system(size: 12)).foregroundStyle(Crystal.ink3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 14).padding(.vertical, 9)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 detailRow("Languages", info.languages)
                 detailRow("Download", Format.bytes(info.approxBytes))
                 detailRow("Memory", "About \(Format.bytes(info.memoryBytes)) while in use")
@@ -455,14 +447,6 @@ struct ModelDetailSheet: View {
         .frame(width: 520)
         .background(Crystal.card)
         .presentationBackground(Crystal.card)
-    }
-
-    private var sourceNote: String {
-        switch info.scoreSource {
-        case .measured: "Measured on an M4 Mac: 20 LibriSpeech test-clean clips, median of warm runs."
-        case .published: "Published figures (LibriSpeech test-clean), not measured on this Mac."
-        case .none: "No figures yet; bars are an estimate."
-        }
     }
 
     private func label(_ text: String) -> some View {

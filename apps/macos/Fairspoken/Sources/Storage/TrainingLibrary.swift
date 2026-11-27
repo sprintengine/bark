@@ -218,7 +218,7 @@ final class TrainingLibrary {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Use This Folder"
-        panel.message = "Choose where to save recordings for post-training. A drive with plenty of space is best: about 2 MB per minute of speech."
+        panel.message = "Choose where to save recordings."
         panel.directoryURL = usesDefaultFolder ? nil : folder.deletingLastPathComponent()
         guard panel.runModal() == .OK, let picked = panel.url else { return }
         let isDataFolder = picked.lastPathComponent == Self.folderName

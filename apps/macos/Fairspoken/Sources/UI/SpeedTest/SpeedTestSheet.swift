@@ -287,7 +287,7 @@ private struct SpeakingStep: View {
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Now read it aloud").font(TypeScale.title).foregroundStyle(Crystal.ink)
-                    Text("At your natural pace. It's recorded and transcribed with your speech model, then thrown away: nothing is inserted or kept.")
+                    Text("At your natural pace.")
                         .font(TypeScale.body).foregroundStyle(Crystal.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -354,8 +354,6 @@ private struct SpeakingStep: View {
                         Text(shortcutMode == .pushToTalk ? "while you read." : "to start.")
                     }
                     .font(TypeScale.body).foregroundStyle(Crystal.ink)
-                    Text("Stop when you reach the end; the time runs from start to stop.")
-                        .font(TypeScale.meta).foregroundStyle(Crystal.ink3)
                 }
             }
             Spacer(minLength: 0)
@@ -365,8 +363,8 @@ private struct SpeakingStep: View {
     }
 
     private var stopHint: String {
-        dictation.trigger == .button || shortcutMode == .toggle ? "Click or press the shortcut to stop · esc to cancel"
-            : "Let go to stop · esc to cancel"
+        dictation.trigger == .button || shortcutMode == .toggle ? "Click or press the shortcut to stop"
+            : "Let go to stop"
     }
 }
 
