@@ -6,6 +6,7 @@ import { formatBytes, speechInfo } from "./modelCatalog";
 import { speechModelShortName } from "./speechModels";
 import { errorMessage } from "./errors";
 import { icon } from "./icons";
+import { notice } from "./confirmDialog";
 
 // Home, as on the Mac: the new-dictation screen. How to dictate, a box to try
 // it in (type, or dictate into it, and keep it as a note), the keyboard hints,
@@ -172,7 +173,7 @@ async function saveNote(): Promise<void> {
     grow();
     await history.refresh();
   } catch (error) {
-    window.alert(`Couldn't save the note: ${errorMessage(error)}`);
+    await notice("Couldn't save the note", errorMessage(error));
   }
   renderComposer();
 }

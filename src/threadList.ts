@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import * as history from "./historyStore";
 import { icon, monogramEl } from "./icons";
 import { errorMessage } from "./errors";
+import { confirmDialog, notice } from "./confirmDialog";
 
 // The sidebar's thread list, as on the Mac: search, a filter, and the
 // dictations grouped by day. A row shows the app and when, the first line,
@@ -30,12 +31,12 @@ export async function copyDictation(item: history.Dictation): Promise<void> {
 }
 
 export async function deleteDictation(item: history.Dictation): Promise<boolean> {
-  if (!window.confirm(`Delete this dictation?\n\n“${history.title(item)}” is removed from history. This can't be undone.`)) return false;
+  if (!await confirmDialog("Delete this dictation?", `“${history.title(item)}” is removed from history. This can't be undone.`, "Delete")) return false;
   try {
     await invoke("delete_note", { id: item.id });
     if (item.details) await invoke("delete_transcript_history_item", { id: item.details.id }).catch(() => {});
   } catch (error) {
-    window.alert(`Couldn't delete it: ${errorMessage(error)}`);
+    await notice("Couldn't delete it", errorMessage(error));
     return false;
   }
   await history.refresh();
@@ -201,7 +202,7 @@ function toggleFilterMenu(open = filterMenu.hidden): void {
 async function deleteAll(): Promise<void> {
   const all = history.dictations();
   if (all.length === 0) return;
-  if (!window.confirm(`Delete all ${all.length} dictations and notes?\n\nTheir text is removed from this computer. Your usage stats and any kept recordings stay. This can't be undone.`)) return;
+  if (!await confirmDialog(`Delete all ${all.length} dictations and notes?`, "Their text is removed from this computer. Your usage stats and any kept recordings stay. This can't be undone.", "Delete All")) return;
   for (const item of all) {
     await invoke("delete_note", { id: item.id }).catch(() => {});
     if (item.details) await invoke("delete_transcript_history_item", { id: item.details.id }).catch(() => {});
