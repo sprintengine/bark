@@ -302,7 +302,7 @@
     <h2>Shortcut</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><div class="row-label">Dictation shortcut</div><div class="row-help">Press it in any app to start dictating. Esc cancels a recording.</div></div>
+        <div class="row-text"><div class="row-label">Dictation shortcut</div></div>
         <div class="row-control">
           <button class="shortcut" id="recordingShortcutChip" type="button" data-label="Recording" aria-label="Dictation shortcut">
             <span class="keys" aria-hidden="true"></span>
@@ -311,7 +311,7 @@
         </div>
       </div>
       <div class="row">
-        <div class="row-text"><div class="row-label">Show copied messages</div><div class="row-help">Opens the list of your recent dictations over the app in front.</div></div>
+        <div class="row-text"><div class="row-label">Show copied messages</div><div class="row-help">This shortcut opens a list of your recent dictations on top of the app you're using.</div></div>
         <div class="row-control">
           <button class="shortcut" id="transcriptStackShortcutChip" type="button" data-label="Copied messages" aria-label="Copied messages shortcut">
             <span class="keys" aria-hidden="true"></span>
@@ -320,7 +320,7 @@
         </div>
       </div>
       <div class="row">
-        <div class="row-text"><div class="row-label" id="recordingModeLabel">Shortcut mode</div><div class="row-help">Press to start and press again to stop, or hold it while you speak.</div></div>
+        <div class="row-text"><div class="row-label" id="recordingModeLabel">Shortcut mode</div></div>
         <div class="row-control">
           <div class="seg" id="recordingModeSeg" role="group" aria-labelledby="recordingModeLabel">
             <button type="button" data-value="toggle" aria-pressed="true">Press to start and stop</button>
@@ -331,7 +331,7 @@
       <div class="row" id="fnPushToTalkRow">
         <div class="row-text">
           <label class="row-label" for="fnPushToTalk">Hold fn to dictate</label>
-          <div class="row-help">Hold the fn (globe) key and speak; let go and Bark types it. Needs the Input Monitoring permission.</div>
+          <div class="row-help">Bark needs the Input Monitoring permission for this.</div>
         </div>
         <div class="row-control"><input id="fnPushToTalk" class="switch" type="checkbox" role="switch" /></div>
       </div>
@@ -343,7 +343,7 @@
     <h2>Microphone</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><label class="row-label" for="audioDeviceSelect">Microphone</label><div class="row-help">Bark listens on this one only while you dictate.</div></div>
+        <div class="row-text"><label class="row-label" for="audioDeviceSelect">Microphone</label></div>
         <div class="row-control mic-control">
           <button class="icon-btn" id="refreshDevices" type="button" aria-label="Refresh microphones" title="Refresh microphones">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3M4.5 12a7.5 7.5 0 0 1 12.8-5.3"/><path d="M17.5 3.5v3.3h-3.3M6.5 20.5v-3.3h3.3"/></svg>
@@ -354,15 +354,15 @@
         </div>
       </div>
       <div class="row">
-        <div class="row-text"><div class="row-label">Level</div><div class="row-help">Speak as you would to dictate. The bars should reach past halfway.</div></div>
+        <div class="row-text"><div class="row-label">Level</div><div class="row-help">Speak as you would when dictating. The bars should go past halfway.</div></div>
         <div class="row-control"><div class="level" aria-hidden="true"><span id="inputMeter"></span></div></div>
       </div>
       <div class="row">
-        <div class="row-text"><div class="row-label">Accuracy test</div><div class="row-help">Read a passage aloud and see how much of it the model got right.</div></div>
+        <div class="row-text"><div class="row-label">Accuracy test</div></div>
         <div class="row-control"><button class="btn" data-open="voicetest" type="button">Test</button></div>
       </div>
       <div class="row">
-        <div class="row-text"><label class="row-label" for="maxRecordingSeconds">Longest recording</label><div class="row-help">A recording stops on its own after this long.</div></div>
+        <div class="row-text"><label class="row-label" for="maxRecordingSeconds">Longest recording</label></div>
         <div class="row-control">
           <select id="maxRecordingSeconds" class="setting-select w-sm">
             <option value="30">30 seconds</option>
@@ -383,23 +383,22 @@
       <div class="row" id="insertAtCursorRow">
         <div class="row-text">
           <label class="row-label" for="insertAtCursor">Paste into the current app</label>
-          <div class="row-help">Types where your cursor is. With no text field, it goes on the clipboard.</div>
         </div>
         <div class="row-control"><input id="insertAtCursor" class="switch" type="checkbox" role="switch" /></div>
       </div>
       <div class="row" id="accessibilityInsertRow">
         <div class="row-text">
           <label class="row-label" for="accessibilityInsert">Insert without pasting</label>
-          <div class="row-help">Native Mac apps only; Electron apps, terminals and web pages ignore it.</div>
+          <div class="row-help">This only works in apps made for Mac. In other apps, terminals and web pages, Bark pastes as usual.</div>
         </div>
         <div class="row-control"><input id="accessibilityInsert" class="switch" type="checkbox" role="switch" /></div>
       </div>
       <div class="row">
-        <div class="row-text"><label class="row-label" for="interactionSounds">Start and stop sounds</label><div class="row-help">A soft click as recording starts and ends.</div></div>
+        <div class="row-text"><label class="row-label" for="interactionSounds">Start and stop sounds</label></div>
         <div class="row-control"><input id="interactionSounds" class="switch" type="checkbox" role="switch" /></div>
       </div>
       <div class="row">
-        <div class="row-text"><label class="row-label" for="alwaysOnTop">Keep the pill on top</label><div class="row-help">The recording pill stays above other windows.</div></div>
+        <div class="row-text"><label class="row-label" for="alwaysOnTop">Keep the pill on top</label></div>
         <div class="row-control"><input id="alwaysOnTop" class="switch" type="checkbox" role="switch" /></div>
       </div>
     </div>
@@ -409,7 +408,7 @@
     <h2>Appearance</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><div class="row-label" id="appearanceLabel">Theme</div><div class="row-help" id="appearanceStatus" role="status">Follows your system appearance.</div></div>
+        <div class="row-text"><div class="row-label" id="appearanceLabel">Theme</div><div class="row-help" id="appearanceStatus" role="status"></div></div>
         <div class="row-control">
           <div class="seg" id="appearanceChoices" role="group" aria-labelledby="appearanceLabel">
             <button type="button" data-appearance="system" aria-pressed="true">System</button>
@@ -425,7 +424,7 @@
     <h2>Setup</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><div class="row-label">Setup guide</div><div class="row-help">Walk through permissions, the model and a first dictation again.</div></div>
+        <div class="row-text"><div class="row-label">Setup guide</div></div>
         <div class="row-control"><button class="btn" type="button" data-open="onboarding">Open</button></div>
       </div>
     </div>
@@ -466,7 +465,6 @@
       <div class="row">
         <div class="row-text">
           <label class="row-label" for="noteRetentionMinutes">Delete dictations and notes</label>
-          <div class="row-help">Older ones are removed after this long. Pinned ones are kept, and so are your usage stats.</div>
         </div>
         <div class="row-control">
           <select id="noteRetentionMinutes" class="setting-select w-sm">
@@ -481,7 +479,7 @@
         </div>
       </div>
       <div class="row">
-        <div class="row-text"><div class="row-label">On this computer</div><div class="row-help" id="historyCount">Your dictations and notes stay on this computer.</div></div>
+        <div class="row-text"><div class="row-label">On this computer</div><div class="row-help" id="historyCount"></div></div>
       </div>
     </div>
   </section>
@@ -489,7 +487,7 @@
     <h2>Delete</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><div class="row-label">Delete all dictations and notes</div><div class="row-help">Their text is removed from this computer. Usage stats and any kept recordings stay.</div></div>
+        <div class="row-text"><div class="row-label">Delete all dictations and notes</div></div>
         <div class="row-control"><button class="btn btn-danger" type="button" data-action="delete-all">Delete All…</button></div>
       </div>
     </div>
@@ -502,7 +500,7 @@
     <h2>Where Bark listens</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><div class="row-label" id="locationLabel">Transcribe on</div><div class="row-help">Audio never leaves this computer unless you choose your Bark Server or Bark Cloud.</div></div>
+        <div class="row-text"><div class="row-label" id="locationLabel">Transcribe on</div></div>
         <div class="row-control">
           <div class="seg" id="locationSeg" role="group" aria-labelledby="locationLabel">
             <button type="button" data-value="local" aria-pressed="true">This PC</button>
@@ -515,7 +513,7 @@
         <div class="row">
           <div class="row-text">
             <label class="row-label" for="cloudAuthToken">Token</label>
-            <div class="row-help">Audio is sent to Bark Cloud.</div>
+            <div class="row-help">Bark sends your audio to Bark Cloud to transcribe it.</div>
           </div>
           <div class="row-control">
             <input id="cloudAuthToken" class="setting-input mono w-lg" type="password" autocomplete="off" />
@@ -551,7 +549,7 @@
         <button class="btn" id="modelPrepare" type="button">Download</button>
       </div>
       <div class="row">
-        <div class="row-text"><label class="row-label" for="langSelect">Language</label><div class="row-help">The language you speak, or let the model tell.</div></div>
+        <div class="row-text"><label class="row-label" for="langSelect">Language</label></div>
         <div class="row-control">
           <select id="langSelect" class="setting-select w-md">
             <option value="auto">Auto-detect</option>
@@ -573,7 +571,7 @@
     <h2>Cleanup</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><label class="row-label" for="postProcess">Apply your dictionary</label><div class="row-help">Your words, corrections and snippets, in every dictation.</div></div>
+        <div class="row-text"><label class="row-label" for="postProcess">Apply your dictionary</label></div>
         <div class="row-control"><input id="postProcess" class="switch" type="checkbox" role="switch" /></div>
       </div>
       <div class="row">
@@ -600,7 +598,7 @@
         <div class="row">
           <div class="row-text">
             <label class="row-label" for="polishCloudAuthToken">Cloud token</label>
-            <div class="row-help">Same token as cloud dictation.</div>
+            <div class="row-help">This is the same token you use for Bark Cloud dictation.</div>
           </div>
           <div class="row-control"><input id="polishCloudAuthToken" class="setting-input mono w-lg" type="password" autocomplete="off" /></div>
         </div>
@@ -621,7 +619,7 @@
       <div class="row" id="superModeRow">
         <div class="row-text">
           <label class="row-label" for="superModeSelect">Super mode</label>
-          <div class="row-help" id="superModeHelp">Adds Whisper for your dictionary terms. More memory and battery; Auto runs on mains power only.</div>
+          <div class="row-help" id="superModeHelp">Runs a second speech model to catch the words in your dictionary. It uses more memory and battery. Auto turns it on only when your computer is plugged in.</div>
         </div>
         <div class="row-control">
           <select id="superModeSelect" class="setting-select w-sm">
@@ -741,7 +739,6 @@
       <div class="row">
         <div class="row-text">
           <div class="row-label" id="polishToneOtherLabel">Everything else</div>
-          <div class="row-help">Any app or site not covered above, or listed below.</div>
         </div>
         <div class="row-control">
           <div class="seg" id="polishToneOther" role="group" aria-labelledby="polishToneOtherLabel">
@@ -767,7 +764,7 @@
       </div>
       <!-- Not a <form>: it sits inside #settingsForm, and nested forms are dropped by the parser. -->
       <div class="row" id="formatMappingAdd" role="group" aria-label="Add an app or site">
-        <div class="row-text"><label class="row-label" for="formatMappingKey">Add an app or site</label><div class="row-help">Its address (mail.example.com) or app:its id.</div></div>
+        <div class="row-text"><label class="row-label" for="formatMappingKey">Add an app or site</label></div>
         <div class="row-control">
           <input id="formatMappingKey" class="setting-input w-md" type="text" placeholder="example.com or app:bundle.id" autocomplete="off" />
           <select id="formatMappingFormat" class="setting-select w-sm" aria-label="Format"></select>
@@ -795,7 +792,7 @@
           </div>
         </div>
         <div class="row">
-          <div class="row-text"><div class="row-label">Use Bark Server for dictation</div><div class="row-help">Off, Bark transcribes on this computer. You can switch in Transcription too.</div></div>
+          <div class="row-text"><div class="row-label">Use Bark Server for dictation</div></div>
           <div class="row-control"><button class="btn" type="button" data-settings-target="transcription">Transcription…</button></div>
         </div>
       </div>
@@ -806,7 +803,7 @@
         <div class="row host-finder">
           <div class="row-text">
             <div class="row-label">Servers on your tailnet</div>
-            <div class="row-help" id="tailnetStatus" role="status">Find looks for Bark Server on your other machines.</div>
+            <div class="row-help" id="tailnetStatus" role="status"></div>
           </div>
         </div>
         <div class="tailnet-hosts" id="tailnetHosts" role="list" aria-label="Servers found" hidden></div>
@@ -827,26 +824,26 @@
       <summary><h2>Enter it yourself</h2></summary>
       <div class="settings-card">
         <div class="row">
-          <div class="row-text"><label class="row-label" for="tailnetAddress">Machine name</label><div class="row-help">Its name on your network; Bark finds the address.</div></div>
+          <div class="row-text"><label class="row-label" for="tailnetAddress">Machine name</label></div>
           <div class="row-control">
             <input id="tailnetAddress" class="setting-input mono w-md" type="text" placeholder="build-box or name:port" autocomplete="off" autocapitalize="off" spellcheck="false" />
             <button class="btn" id="tailnetProbe" type="button">Check</button>
           </div>
         </div>
         <div class="row">
-          <div class="row-text"><label class="row-label" for="remoteUrl">Address</label><div class="row-help">The server's address, with its port.</div></div>
+          <div class="row-text"><label class="row-label" for="remoteUrl">Address</label></div>
           <div class="row-control">
             <input id="remoteUrl" class="setting-input mono w-lg" type="url" placeholder="https://host.example.com" />
           </div>
         </div>
         <div class="row">
-          <div class="row-text"><label class="row-label" for="remoteAuthToken">Token</label><div class="row-help">From Bark Server › Connect, on the server.</div></div>
+          <div class="row-text"><label class="row-label" for="remoteAuthToken">Token</label><div class="row-help">You'll find the token in Bark Server on the server, under Connect.</div></div>
           <div class="row-control">
             <input id="remoteAuthToken" class="setting-input mono w-lg" type="password" autocomplete="off" />
           </div>
         </div>
         <div class="row">
-          <div class="row-text"><label class="row-label" for="remoteTimeoutSeconds">Timeout</label><div class="row-help">How long to wait for the server.</div></div>
+          <div class="row-text"><label class="row-label" for="remoteTimeoutSeconds">Timeout</label></div>
           <div class="row-control">
             <input id="remoteTimeoutSeconds" class="setting-input num w-xs" type="number" min="5" max="300" step="5" />
             <span class="meta">seconds</span>
@@ -890,7 +887,7 @@
       </div>
     </div>
     <p class="section-footer" id="updateStableNote" hidden></p>
-    <p class="section-footer">Bark checks for new versions and asks before installing one.</p>
+    
   </section>
 </section>
 
@@ -904,7 +901,7 @@
     <h2>Details</h2>
     <div class="settings-card">
       <div class="row">
-        <div class="row-text"><div class="row-label">Speech engines</div><div class="row-help">Parakeet and Whisper, running on this computer.</div></div>
+        <div class="row-text"><div class="row-label">Speech engines</div><div class="row-help">parakeet-rs and whisper.cpp</div></div>
       </div>
     </div>
   </section>
@@ -921,7 +918,7 @@
   <section class="settings-section" aria-labelledby="suggestionsTitle" id="suggestionsSection" hidden>
     <h2 id="suggestionsTitle">Suggestions</h2>
     <div class="settings-card" id="suggestionRows"></div>
-    <p class="section-footer">Fixes you made that are never applied on their own. Accept one to correct it from now on.</p>
+    
   </section>
   <section class="settings-section" aria-labelledby="vocabTitle">
     <h2 id="vocabTitle">Your words</h2>
@@ -933,17 +930,17 @@
       </form>
       <div class="chips" id="vocabChips"></div>
     </div>
-    <p class="section-footer">Spelt your way in every dictation, and sent to Bark Server as hints.</p>
+    
   </section>
   <section class="settings-section" aria-labelledby="correctionsTitle">
     <div class="section-head"><h2 id="correctionsTitle">Corrections</h2><button class="btn" id="addCorrection" type="button">Add</button></div>
     <div class="settings-card" id="correctionRows"></div>
-    <p class="section-footer">Whole words and phrases, replaced in every dictation.</p>
+    
   </section>
   <section class="settings-section" aria-labelledby="snippetsTitle">
     <div class="section-head"><h2 id="snippetsTitle">Snippets</h2><button class="btn" id="addSnippet" type="button">Add</button></div>
     <div class="settings-card" id="snippetRows"></div>
-    <p class="section-footer">Say the trigger and Bark types the whole text.</p>
+    <p class="section-footer">When you say a snippet's trigger, Bark types its full text.</p>
   </section>
   <section class="settings-section" aria-labelledby="learningTitle">
     <h2 id="learningTitle">Learning</h2>
@@ -951,7 +948,6 @@
       <div class="row">
         <div class="row-text">
           <label class="row-label" for="learnFromEdits">Learn from your corrections</label>
-          <div class="row-help">Names you fix join your words; medicine names are only suggested. Only the word pair is kept, never what you wrote.</div>
         </div>
         <div class="row-control"><input id="learnFromEdits" class="switch" type="checkbox" role="switch" /></div>
       </div>

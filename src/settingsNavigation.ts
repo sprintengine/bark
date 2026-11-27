@@ -5,16 +5,16 @@
 export const categories = ["general", "history", "activity", "transcription", "styles", "dictionary", "server", "updates", "about"] as const;
 export type Category = (typeof categories)[number];
 
-export const PAGES: Record<Category, { title: string; subtitle: string }> = {
-  general: { title: "General", subtitle: "Your shortcut and microphone, and what happens when you stop speaking." },
-  history: { title: "History", subtitle: "Every dictation and note stays on this computer, newest first." },
-  activity: { title: "Activity", subtitle: "Warnings and errors worth a look." },
-  transcription: { title: "Transcription", subtitle: "Where Bark listens, the model that hears you, and what cleanup does." },
-  styles: { title: "App styles", subtitle: "Bark shapes what you say for the app you are in. Anything not listed uses the defaults." },
-  dictionary: { title: "Dictionary", subtitle: "Names and terms spelt your way, and words Bark keeps mishearing." },
-  server: { title: "Bark Server", subtitle: "Transcribe on another computer running Bark Server, over your own network." },
-  updates: { title: "Updates", subtitle: "Bark checks for new versions and asks before installing one." },
-  about: { title: "About", subtitle: "" },
+export const PAGES: Record<Category, { title: string }> = {
+  general: { title: "General" },
+  history: { title: "History" },
+  activity: { title: "Activity" },
+  transcription: { title: "Transcription" },
+  styles: { title: "App styles" },
+  dictionary: { title: "Dictionary" },
+  server: { title: "Bark Server" },
+  updates: { title: "Updates" },
+  about: { title: "About" },
 };
 
 /** Older names for pages, from deep links and the palette. */
@@ -48,11 +48,10 @@ function announce(): void {
 }
 
 function showPage(): void {
-  const { title, subtitle } = PAGES[category];
   titleEl.parentElement!.hidden = category === "about";
-  titleEl.textContent = title;
-  subtitleEl.textContent = subtitle;
-  subtitleEl.hidden = !subtitle;
+  titleEl.textContent = PAGES[category].title;
+  subtitleEl.textContent = "";
+  subtitleEl.hidden = true;
   noResults.hidden = true;
   for (const page of pages) {
     page.hidden = page.dataset.settingsPage !== category;
@@ -121,10 +120,8 @@ function search(text: string): void {
   for (const button of buttons) button.removeAttribute("aria-current");
   titleEl.parentElement!.hidden = false;
   titleEl.textContent = "Results";
-  subtitleEl.hidden = false;
-  subtitleEl.textContent = total === 0
-    ? `Nothing matches “${query}”. Try another word, or press esc to clear the search.`
-    : `Every setting that mentions “${query}”.`;
+  subtitleEl.hidden = total !== 0;
+  subtitleEl.textContent = total === 0 ? `Nothing matches “${query}”.` : "";
   content.scrollTop = 0;
   announce();
 }

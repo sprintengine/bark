@@ -215,10 +215,10 @@ function updatePolishUi(settings: Settings): void {
   const hasToken = local || (cloudAvailable && settings.cloudAuthToken.trim() !== "");
   polishEnabled.disabled = !hasToken;
   polishHelp.textContent = local
-    ? "Removes fillers and self-corrections, on this computer."
-    : !cloudAvailable ? "Bark Cloud is not in this build. Choose This PC."
-    : hasToken ? "Sends transcript text, never audio, to Bark Cloud."
-    : "Add a Bark Cloud token below to turn this on.";
+    ? ""
+    : !cloudAvailable ? "Bark Cloud isn't available in this version. Choose This PC instead."
+    : hasToken ? "Bark sends the text, but never the audio, to Bark Cloud."
+    : "To turn this on, add a Bark Cloud token below.";
   polishCloudAuthToken.closest<HTMLElement>("[data-polish-cloud]")?.toggleAttribute("hidden", local || !cloudAvailable);
   document.getElementById("polishLocalModelRow")?.toggleAttribute("hidden", !local);
   document.getElementById("polishDeveloperPanel")?.toggleAttribute("hidden", !local);
@@ -226,11 +226,11 @@ function updatePolishUi(settings: Settings): void {
   // The format decision reads the focused app through macOS Accessibility.
   polishFormatPanel.hidden = polishTonesPanel.hidden || !isMacOS();
   formatAiDetectionHelp.textContent = local
-    ? "Asks the polish model once per site or app, on this computer."
-    : "Asks Bark Cloud once per site or app, sending its name and title.";
+    ? ""
+    : "Bark sends each new app's or site's name and title to Bark Cloud, once.";
   contextAwarenessHelp.textContent = local
-    ? "Reads text near your cursor to spell names right. Stays on this computer."
-    : "Reads text near your cursor to spell names right. Sent to Bark Cloud with polish.";
+    ? "Bark reads the text near your cursor so it can spell names correctly."
+    : "Bark reads the text near your cursor so it can spell names correctly, and sends it to Bark Cloud with your dictation.";
 }
 
 function readFromForm(): Settings {
@@ -325,7 +325,7 @@ function updateSuperModeUi(): void {
   superModeRow.hidden = location === "cloud" || (local && !parakeet);
   superModeModelRow.hidden = !local || !parakeet || superModeSelect.value === "off";
   superModeHelp.textContent = location === "remote-host"
-    ? "Asks your host to add Whisper when it serves both engines and has room."
+    ? "Your Bark Server runs the second model if it has one and has room for it."
     : superModeHelpLocal;
 }
 

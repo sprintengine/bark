@@ -655,7 +655,7 @@ fn validate_remote_base_url(raw_url: &str) -> Result<Url, String> {
         .ok_or_else(|| "Remote host URL must include a host".to_string())?;
     if scheme != "https" && !(scheme == "http" && host_allows_plain_http(host)) {
         return Err(
-            "Remote host URL must use HTTPS unless it is localhost or a private network address"
+            "This address must start with https:// because the server isn't on this computer, your home network or your Tailscale network."
                 .to_string(),
         );
     }
