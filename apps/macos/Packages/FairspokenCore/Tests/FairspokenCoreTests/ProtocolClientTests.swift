@@ -105,7 +105,7 @@ struct RemoteURLPolicyTests {
 
     @Test func messagesMatchTheRustClient() {
         #expect(RemoteURLPolicy.ValidationError.requiresHTTPS.errorDescription
-                == "Remote host URL must use HTTPS unless it is localhost or a private network address")
+                == "This address must start with https:// because the server isn't on this Mac, your home network or your Tailscale network.")
         #expect(RemoteURLPolicy.ValidationError.notConfigured.errorDescription == "Remote transcription host URL is not configured")
     }
 

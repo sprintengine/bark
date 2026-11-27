@@ -396,7 +396,7 @@ private struct ModelSection: View {
                 row(title: info.name,
                     badge: Badge(state.isReady ? "Ready" : state.label,
                                  style: state.isReady ? .neutral : { if case .failed = state { return .error } else { return .neutral } }()),
-                    detail: "Runs on this Mac. \(info.summary)") {
+                    detail: nil) {
                     Text(Format.bytes(model.models.shownBytes(info))).font(.mono(12)).foregroundStyle(Crystal.ink3)
                 }
                 if case .downloading(let f) = state {
@@ -405,7 +405,7 @@ private struct ModelSection: View {
                 if !s.remoteUrl.isEmpty {
                     SoftDivider()
                     row(title: "Bark Server", badge: Badge(serverBadge, style: serverStyle),
-                        detail: "\(model.hostStatus.hostName). \(remote ? "Dictation runs there now." : "Used when you choose it.")") {
+                        detail: model.hostStatus.hostName) {
                         Button(remote ? "Use This Mac" : "Use Bark Server") {
                             model.settings.update { $0.transcriptionLocation = remote ? .local : .remoteHost }
                             if !remote { model.hostStatus.refresh() }
@@ -434,16 +434,18 @@ private struct ModelSection: View {
         }
     }
 
-    private func row<Control: View>(title: String, badge: Badge, detail: String, @ViewBuilder control: () -> Control) -> some View {
+    private func row<Control: View>(title: String, badge: Badge, detail: String?, @ViewBuilder control: () -> Control) -> some View {
         HStack(alignment: .center, spacing: 32) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(title).font(.system(size: 14, weight: .medium)).foregroundStyle(Crystal.ink)
                     badge
                 }
-                Text(detail).font(.system(size: 12)).foregroundStyle(Crystal.ink2).lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 520, alignment: .leading)
+                if let detail {
+                    Text(detail).font(.system(size: 12)).foregroundStyle(Crystal.ink2).lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 520, alignment: .leading)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             control()

@@ -23,8 +23,8 @@ public enum UpdateChannel: String, CaseIterable, Identifiable, Sendable {
     /// One line each, shown under the picker.
     public var explanation: String {
         switch self {
-        case .stable: "Releases that have already run as nightlies. Changes less often."
-        case .nightly: "The newest changes, built every day before they reach Stable."
+        case .stable: "Updates that have been tested for a while. They come less often."
+        case .nightly: "A new version every day, with the newest changes. These are tested less."
         }
     }
 
