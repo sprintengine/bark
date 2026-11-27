@@ -597,7 +597,7 @@ private struct StyleMenuRow: View {
         let current = item.styleID
         if model.isStyleForced(item) {
             InfoRow(symbolView: AnyView(TypeGlyph(size: 15, color: Crystal.ink2)), title: "Verbatim", detail: "always",
-                    help: "Bark never reshapes what goes into a terminal or a password field.")
+                    help: "Bark types exactly what you said in terminals and password fields.")
         } else {
             menu(current: current)
         }

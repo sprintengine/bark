@@ -27,19 +27,6 @@ struct SettingsView: View {
             }
         }
 
-        var subtitle: String? {
-            switch self {
-            case .general: "Your shortcut and microphone, and what happens when you stop speaking."
-            case .history: "Every dictation and note stays on this Mac, newest first."
-            case .transcription: "Where Bark listens, the model that hears you, and what cleanup takes out."
-            case .appStyles: "Bark shapes what you say for the app you are in. Anything not listed uses the defaults."
-            case .vocabulary: "Names and terms spelt your way, and words Bark keeps mishearing."
-            case .host: "Transcribe on another Mac running Bark Server, over your own network."
-            case .updates: "Bark checks for new versions and asks before installing one."
-            case .about: nil
-            }
-        }
-
         var symbol: String {
             switch self {
             case .general: "slider.horizontal.3"
@@ -91,7 +78,7 @@ private struct SettingsPageView: View {
 
     var body: some View {
         let sections = SettingsCatalog.sections(tab, model: model)
-        SettingsPage(title: tab == .about ? nil : tab.title, subtitle: tab.subtitle) {
+        SettingsPage(title: tab == .about ? nil : tab.title) {
             ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
                 SectionView(section: section, first: index == 0)
             }
@@ -106,8 +93,7 @@ private struct SettingsSearchResults: View {
 
     var body: some View {
         let results = SettingsCatalog.search(query, model: model)
-        SettingsPage(title: "Results", subtitle: results.isEmpty ? "Nothing matches “\(query)”. Try another word, or press esc to clear the search."
-                                                                  : "Every setting that mentions “\(query)”.") {
+        SettingsPage(title: "Results", subtitle: results.isEmpty ? "Nothing matches “\(query)”." : nil) {
             ForEach(results, id: \.tab) { result in
                 VStack(alignment: .leading, spacing: 0) {
                     Button {

@@ -155,8 +155,8 @@ export interface SettingsView {
 }
 
 export const CHANNEL_HELP: Record<Channel, string> = {
-  stable: "Tested releases, a few times a month.",
-  nightly: "The newest changes, built every day. Expect rough edges.",
+  stable: "Updates that have been tested for a while. They come less often.",
+  nightly: "A new version every day, with the newest changes. These are tested less.",
 };
 
 export function settingsView(status: UpdateStatus, manual: boolean): SettingsView {

@@ -222,7 +222,7 @@ function badge(text: string, tone: string): HTMLElement {
   return Object.assign(document.createElement("span"), { className: `badge badge--${tone}`, textContent: text });
 }
 
-function grow_row(title: string, b: HTMLElement, detail: string, control: HTMLElement): HTMLElement {
+function grow_row(title: string, b: HTMLElement, detail: string | null, control: HTMLElement): HTMLElement {
   const row = document.createElement("div");
   row.className = "grow";
   const text = document.createElement("div");
@@ -230,7 +230,8 @@ function grow_row(title: string, b: HTMLElement, detail: string, control: HTMLEl
   const head = document.createElement("div");
   head.className = "grow-title";
   head.append(document.createTextNode(title), b);
-  text.append(head, Object.assign(document.createElement("div"), { className: "grow-detail", textContent: detail }));
+  text.append(head);
+  if (detail) text.append(Object.assign(document.createElement("div"), { className: "grow-detail", textContent: detail }));
   row.append(text, control);
   return row;
 }
@@ -248,7 +249,7 @@ function renderModel(): void {
   const state = modelState();
   const size = Object.assign(document.createElement("span"), { className: "mono-meta", textContent: formatBytes(info.bytes) });
   const rows: HTMLElement[] = [grow_row(info.name, badge(state.label, state.tone === "error" ? "error" : "neutral"),
-    `Runs on this PC. ${info.summary}, in ${info.languages}.`, size)];
+    null, size)];
   if (settings.remoteUrl.trim()) {
     const s = serverState();
     const use = document.createElement("button");
@@ -260,7 +261,7 @@ function renderModel(): void {
     });
     let host = settings.remoteUrl;
     try { host = new URL(settings.remoteUrl).host; } catch { /* as typed */ }
-    rows.push(grow_row("Bark Server", badge(s.label, s.tone), `${host}. ${remote ? "Dictation runs there now." : "Used when you choose it."}`, use));
+    rows.push(grow_row("Bark Server", badge(s.label, s.tone), host, use));
   }
   modelCard.replaceChildren(...rows);
 }

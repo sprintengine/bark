@@ -20,7 +20,7 @@ enum AppStylesSettings {
                 view: CategoryRow(category: category))
         }
         defaults.append(Row(id: "category-other", searchText: "Everything else default style other apps",
-                            view: SettingsRow("Everything else", detail: "Any app or site not covered above, or listed below.") {
+                            view: SettingsRow("Everything else") {
             StylePicker(selection: rules.defaultStyle, label: "Style for everything else") { style in
                 if let style { model.settings.update { $0.styleRules.defaultStyle = style } }
             }
@@ -31,7 +31,7 @@ enum AppStylesSettings {
         }
         if apps.isEmpty {
             apps.append(Row(id: "dest-empty", searchText: "apps sites",
-                            view: SettingsRow("No apps yet", detail: "Apps you dictate into appear here, with the style each one gets.")))
+                            view: SettingsRow("No apps yet", detail: "When you dictate in an app, it will be added to this list.")))
         }
         return [
             Section("Defaults", rows: defaults),
@@ -466,8 +466,7 @@ struct AddStyleRuleSheet: View {
                 .padding(.top, 16)
             SettingsGroup {
                 if kind == 0 {
-                    SettingsRow("App", detail: forced ? "Bark never reshapes what goes into \(appName): it is always Verbatim."
-                                                      : bundleID ?? "An app that's open now, or one from Applications.") {
+                    SettingsRow("App", detail: forced ? "Bark types exactly what you said in \(appName), without changing anything." : nil) {
                         SelectMenu(appName.isEmpty ? "Choose…" : appName, label: "App", minWidth: 180) {
                             ForEach(apps, id: \.id) { app in
                                 Button(app.name) { bundleID = app.id; appName = app.name; style = suggested }
@@ -477,7 +476,7 @@ struct AddStyleRuleSheet: View {
                         }
                     }
                 } else {
-                    SettingsRow("Website", detail: hostError ?? "Its address: mail.example.com or example.com.") {
+                    SettingsRow("Website", detail: hostError) {
                         SettingsTextField("Website", text: $host, prompt: "example.com").frame(width: 200)
                     }
                 }

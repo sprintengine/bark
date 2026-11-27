@@ -15,8 +15,7 @@ enum TranscriptionSettings {
         let s = model.settings.settings
         let remote = s.transcriptionLocation == .remoteHost
         var listens: [Row] = [
-            Row("Transcribe on", detail: remote ? "Audio goes to your Bark Server and nowhere else."
-                                                : "Audio never leaves this Mac unless you choose your Bark Server.",
+            Row("Transcribe on",
                 keywords: "location local remote host network device this mac server") {
                 SegmentedChoice("Transcribe on", selection: Binding(get: { remote ? TranscriptionLocation.remoteHost : .local }, set: { v in
                     model.settings.update { $0.transcriptionLocation = v }
@@ -54,21 +53,21 @@ enum TranscriptionSettings {
     /// cleans up, whatever these say.
     @MainActor
     static func cleanupSections(_ model: AppModel) -> [Section] {
-        [Section("Cleanup", footer: "Cleanup never guesses: when it isn't sure, it leaves your words as they were. The Verbatim style skips it.",
+        [Section("Cleanup",
                  trailing: AnyView(CleanupResetButton()), rows: [
             Row(id: "cleanup-fillers", searchText: "Remove filler words um uh er you know like repeats stutters cleanup",
                 view: CleanupRow(title: "Remove filler words",
-                                 detail: "Drops “um”, “uh” and “er”, and “you know” or “like” when they are filler, not meaning. Stutters and repeated words go too.",
+                                 detail: "Removes words like um, uh and you know.",
                                  key: \.cleanupFillers,
                                  example: [.removed("Um,"), .plain("can we"), .removed("the the"), .plain("meet at ten?")])),
             Row(id: "cleanup-corrections", searchText: "Fix self-corrections no wait sorry I mean scratch that actually restart cleanup",
                 view: CleanupRow(title: "Fix self-corrections",
-                                 detail: "Keeps what you meant when you change your mind mid-sentence: “no wait”, “sorry”, “I mean”, “scratch that”.",
+                                 detail: "When you say no wait or scratch that, Bark keeps only what you meant.",
                                  key: \.cleanupSelfCorrections,
                                  example: [.plain("by"), .removed("Thursday, no wait,"), .added("Friday")])),
             Row(id: "cleanup-commands", searchText: "Spoken commands smart punctuation new line new paragraph comma full stop question mark cleanup",
                 view: CleanupRow(title: "Spoken commands and smart punctuation",
-                                 detail: "Say “comma”, “full stop”, “new line” or “new paragraph” and get the mark; stray full stops and capitals are tidied.",
+                                 detail: "Say comma or new line and Bark types the punctuation.",
                                  key: \.cleanupSpokenCommands,
                                  example: [.plain("thanks"), .removed("comma new line"), .added(",⏎"), .plain("Sam")])),
         ])]
@@ -227,7 +226,7 @@ enum HostSettings {
         let finder = model.hostFinder
         let hosts = finder.hosts.filter(\.isThisMac) + finder.hosts.filter { !$0.isThisMac }
         var current: [Row] = [
-            Row("Use Bark Server for dictation", detail: "Off, Bark transcribes on this Mac. You can switch in Transcription too.",
+            Row("Use Bark Server for dictation",
                 keywords: "network device remote host location") {
                 SettingSwitch(label: "Use Bark Server for dictation", isOn: Binding(get: { s.transcriptionLocation == .remoteHost }, set: { on in
                     model.settings.update { $0.transcriptionLocation = on ? .remoteHost : .local }
@@ -251,12 +250,11 @@ enum HostSettings {
             Section("Your server", rows: current),
             Section("On your network", trailing: AnyView(FindHostsButton()), rows: found),
             Section("Enter it yourself",
-                    footer: "HTTPS is required beyond this Mac, your local network and your Tailscale network. The token is kept in your Keychain.",
                     rows: [
                         Row(id: "machine", searchText: "Machine name look up host manual address", view: MachineLookupRow()),
                         Row(id: "address", searchText: "Address URL host manual", view: AddressRow()),
                         Row(id: "token", searchText: "Token password secret key manual", view: TokenRow()),
-                        Row("Timeout", detail: "How long to wait for the server before keeping the recording to try again.",
+                        Row("Timeout",
                             keywords: "seconds wait network") {
                             ValueStepper(value: Binding(get: { s.remoteTimeoutSeconds }, set: { v in model.settings.update { $0.remoteTimeoutSeconds = v } }),
                                          range: 5...300, step: 5, label: "Timeout") { "\($0) s" }
@@ -396,7 +394,7 @@ private struct MachineLookupRow: View {
 
     var body: some View {
         let finder = model.hostFinder
-        SettingsRow("Machine name", detail: finder.lookupError ?? "Its name on your network; Bark finds the address.") {
+        SettingsRow("Machine name", detail: finder.lookupError) {
             RowField(label: "Machine name", text: $machine, prompt: "studio-mac or studio-mac:48173", width: 220, onSubmit: lookUp)
             Button(finder.lookingUp ? "Looking…" : "Look Up", action: lookUp)
                 .cardButton()
@@ -414,7 +412,7 @@ private struct MachineLookupRow: View {
 private struct AddressRow: View {
     @Environment(AppModel.self) private var model
     var body: some View {
-        SettingsRow("Address", detail: "The server's address, with its port.") {
+        SettingsRow("Address") {
             RowField(label: "Address", text: Binding(get: { model.settings.settings.remoteUrl },
                                                      set: { v in model.settings.update { $0.remoteUrl = v } }),
                      prompt: "http://practice-mini.local:48173") { model.hostStatus.refresh(force: true) }
@@ -430,7 +428,7 @@ private struct TokenRow: View {
     var body: some View {
         let finder = model.hostFinder
         let waiting = finder.needsToken.map { $0.url.absoluteString == model.settings.settings.remoteUrl && token.isEmpty } ?? false
-        SettingsRow("Token", detail: waiting ? "\(finder.needsToken?.name ?? "This server") needs its token." : "From Bark Server › Connect, on the server.") {
+        SettingsRow("Token", detail: waiting ? "\(finder.needsToken?.name ?? "This server") needs its token." : "You'll find the token in Bark Server on the server, under Connect.") {
             RowField(label: "Token", text: $token, prompt: "Paste the token", secure: true, focusRequest: focusRequest) {
                 model.settings.remoteToken = token
                 model.hostStatus.refresh(force: true)

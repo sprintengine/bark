@@ -16,23 +16,21 @@ enum GeneralSettings {
     static func sections(_ model: AppModel) -> [Section] {
         let s = model.settings.settings
         var shortcut: [Row] = [
-            Row("Dictation shortcut", detail: "Press it in any app to start dictating. Esc cancels a recording.",
+            Row("Dictation shortcut",
                 keywords: "hotkey keyboard key record") {
                 KeyboardShortcuts.Recorder(for: .dictation) { _ in model.mirrorShortcut() }
             },
-            Row("Paste last dictation", detail: "Pastes your last dictation again into the app in front. Clear it to turn it off.",
+            Row("Paste last dictation",
                 keywords: "hotkey keyboard key paste again repeat") {
                 KeyboardShortcuts.Recorder(for: .pasteLast)
             },
-            Row("Shortcut mode", detail: s.recordingShortcutMode == .toggle
-                ? "Press once to start and again to stop."
-                : "Hold the shortcut while you speak; let go to finish.",
+            Row("Shortcut mode",
                 keywords: "toggle push to talk hold press") {
                 SegmentedChoice("Shortcut mode", selection: Binding(get: { s.recordingShortcutMode },
                                                                     set: { v in model.settings.update { $0.recordingShortcutMode = v } }),
                                 options: [.init(.toggle, "Press to start and stop"), .init(.pushToTalk, "Hold to talk")])
             },
-            Row("Hold fn to dictate", detail: "Hold the fn (globe) key and speak; let go and Bark types it.",
+            Row("Hold fn to dictate",
                 keywords: "globe function key push to talk") {
                 SettingSwitch(label: "Hold fn to dictate", isOn: Binding(get: { s.fnPushToTalk }, set: { v in
                     model.settings.update { $0.fnPushToTalk = v }
@@ -53,7 +51,7 @@ enum GeneralSettings {
                     view: MicrophoneRow()),
                 Row(id: "level", searchText: "Level test microphone input meter audio",
                     view: MicLevelRow()),
-                Row("Longest recording", detail: "A recording stops on its own after this long.",
+                Row("Longest recording",
                     keywords: "maximum length duration limit audio") {
                     ValueStepper(value: Binding(get: { s.maxRecordingSeconds }, set: { v in model.settings.update { $0.maxRecordingSeconds = v } }),
                                  range: 10...600, step: 10, label: "Longest recording") { Format.duration(Double($0)) }
@@ -61,21 +59,20 @@ enum GeneralSettings {
             ]),
             Section("When you stop speaking", rows: [
                 Row("Paste into the current app",
-                    detail: "Types where your cursor is. Never into a password field; with no text field, it goes on the clipboard.",
                     keywords: "insert cursor command v accessibility") {
                     SettingSwitch(label: "Paste into the current app", isOn: model.setting(\.insertAtCursor))
                 },
-                Row("Restore the clipboard afterwards", detail: "Puts back what you had copied before the dictation.",
+                Row("Restore the clipboard afterwards",
                     keywords: "pasteboard copy") {
                     SettingSwitch(label: "Restore the clipboard afterwards", isOn: model.setting(\.restoreClipboard))
                         .disabled(!s.insertAtCursor)
                 },
                 Row("Show text while speaking",
-                    detail: "The recording pill shows your words as you say them. Not available with Bark Server.",
+                    detail: s.transcriptionLocation == .remoteHost ? "This doesn't work when Bark Server is doing the transcribing." : nil,
                     keywords: "live transcript pill preview words") {
                     SettingSwitch(label: "Show text while speaking", isOn: model.setting(\.showTextWhileSpeaking))
                 },
-                Row("Start and stop sounds", detail: "A soft click as recording starts and ends.",
+                Row("Start and stop sounds",
                     keywords: "audio feedback chime sound") {
                     SettingSwitch(label: "Start and stop sounds", isOn: model.setting(\.interactionSounds))
                 },
@@ -88,7 +85,7 @@ enum GeneralSettings {
                 Row(id: "perm-ax", searchText: "Permissions Accessibility allow type paste privacy", view: PermissionRow(kind: .accessibility)),
                 Row(id: "perm-input", searchText: "Permissions Input Monitoring fn globe allow privacy",
                     view: PermissionRow(kind: .inputMonitoring, optional: !s.fnPushToTalk)),
-                Row("Setup guide", detail: "Walk through permissions, the model and a first dictation again.",
+                Row("Setup guide",
                     keywords: "onboarding welcome tutorial") {
                     Button("Open Setup Guide…") { model.openOnboarding?() }.cardButton()
                 },
@@ -116,7 +113,7 @@ private struct MicrophoneRow: View {
 
     var body: some View {
         let current = model.settings.settings.audioDevice
-        SettingsRow("Microphone", detail: "Bark listens on this one only while you dictate.") {
+        SettingsRow("Microphone") {
             SelectMenu(Microphones.displayName(for: current), label: "Microphone", minWidth: 200) {
                 Picker("Microphone", selection: Binding(get: { current }, set: { v in model.settings.update { $0.audioDevice = v } })) {
                     Text("System default\(Microphones.defaultName().map { " (\($0))" } ?? "")").tag("")
@@ -139,8 +136,7 @@ private struct MicLevelRow: View {
 
     var body: some View {
         let live = testing || model.dictation.phase.isListening
-        SettingsRow("Level", detail: testing ? "Speak as you would to dictate. The bars should reach past halfway."
-                                             : "Test the microphone without dictating.") {
+        SettingsRow("Level", detail: testing ? "Speak as you would when dictating. The bars should go past halfway." : nil) {
             LevelBars(meter: model.dictation.meter, active: live, bars: 24, color: Crystal.primary)
                 .frame(width: 140, height: 18)
                 .accessibilityHidden(true)
@@ -185,8 +181,7 @@ private struct LaunchAtLoginRow: View {
 
     var body: some View {
         SettingsRow("Launch at login",
-                    detail: error ?? (needsApproval ? "Waiting for approval in System Settings › General › Login Items."
-                                                    : "Bark opens in the menu bar when you log in, ready to dictate.")) {
+                    detail: error ?? (needsApproval ? "To finish turning this on, allow Bark in System Settings › General › Login Items." : nil)) {
             if needsApproval {
                 Button("Open Login Items") { LoginItem.openSystemSettings() }.cardButton()
             }
@@ -208,7 +203,7 @@ private struct LaunchAtLoginRow: View {
 private struct GlobeKeyWarning: View {
     var body: some View {
         SettingsRow("fn is set to “\(Permissions.globeKeyActionName)”",
-                    detail: "Set “Press fn key to” to Do Nothing, or holding fn will do both.") {
+                    detail: "Holding fn will do that as well as dictate. To stop it, set “Press fn key to” to “Do Nothing” in Keyboard Settings.") {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Crystal.warn).accessibilityHidden(true)
         } control: {
             Button("Keyboard Settings…") {
@@ -235,7 +230,7 @@ enum HistorySettings {
             Section("Keep", rows: [
                 Row(id: "keep", searchText: "Keep the last retention limit cap history count older removed", view: RetentionRow()),
                 Row("On this Mac",
-                    detail: "\(Format.number(dictations)) dictation\(dictations == 1 ? "" : "s") and \(Format.number(notes)) note\(notes == 1 ? "" : "s"), in transcript-history.json.",
+                    detail: "\(Format.number(dictations)) dictation\(dictations == 1 ? "" : "s") and \(Format.number(notes)) note\(notes == 1 ? "" : "s").",
                     keywords: "file storage disk folder") {
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([history.historyURL]) }.cardButton()
                 },
@@ -254,7 +249,7 @@ private struct RetentionRow: View {
 
     var body: some View {
         let history = model.history
-        SettingsRow("Keep the last", detail: "Older dictations and notes are removed as new ones arrive. Your usage stats are kept either way.") {
+        SettingsRow("Keep the last") {
             SelectMenu("\(Format.number(history.retentionLimit)) dictations", label: "Keep the last", minWidth: 150) {
                 Picker("Keep the last", selection: Binding(get: { history.retentionLimit }, set: { limit in
                     if history.items.count > limit { pending = limit } else { history.setRetentionLimit(limit) }
@@ -280,7 +275,7 @@ private struct DeleteAllRow: View {
 
     var body: some View {
         let count = model.history.items.count
-        SettingsRow("Delete all dictations and notes", detail: "Their text is removed from this Mac. Usage stats and any kept recordings stay.") {
+        SettingsRow("Delete all dictations and notes") {
             Button("Delete All…", role: .destructive) { confirm = true }
                 .cardButton()
                 .foregroundStyle(Crystal.error)
@@ -308,7 +303,7 @@ enum UpdatesSettings {
     static func sections(_ model: AppModel) -> [Section] {
         let updates = model.updates
         return [
-            Section("This version", footer: "Bark checks every 6 hours and asks before installing. Only updates signed by Bark install.", rows: [
+            Section("This version", rows: [
                 Row(id: "status", searchText: "Updates status check install new version", view: UpdateStatusRow()),
                 Row("Current version", detail: nil, keywords: "build number") {
                     Text("\(updates.currentVersion) (\(updates.build))")
@@ -375,7 +370,7 @@ enum AboutSettings {
                 Row("Bundle identifier", keywords: "about id") {
                     Text(AppInfo.bundleID).font(.mono(12)).foregroundStyle(Crystal.ink2).textSelection(.enabled)
                 },
-                Row("Speech engines", detail: "Parakeet through FluidAudio and Whisper through WhisperKit, on the Neural Engine.",
+                Row("Speech engines", detail: "FluidAudio and WhisperKit",
                     keywords: "about coreml fluidaudio whisperkit") {
                     EmptyView()
                 },
@@ -386,7 +381,7 @@ enum AboutSettings {
             ]),
             Section("Privacy", rows: [
                 Row(id: "privacy", searchText: "Privacy audio data uploaded network",
-                    view: Text("Audio stays in memory and is never saved, unless you turn on Save recordings to improve models. Your last \(limit) dictations stay on this Mac. With Bark Server, audio goes to that server only. To learn from your corrections, the text around a dictation is read again after you edit it, and only the corrected words are kept.")
+                    view: Text("Bark doesn't save your audio unless you turn on Save recordings to improve models. Your last \(limit) dictations are kept on this Mac. If you use Bark Server, your audio goes to that server and nowhere else. When you correct a dictation, Bark keeps only the words you changed.")
                         .font(.system(size: 13))
                         .lineSpacing(3)
                         .foregroundStyle(Crystal.ink2)

@@ -19,7 +19,7 @@ function apply(): void {
     button.setAttribute("aria-pressed", String(button.dataset.appearance === appearance));
   }
   const status = document.getElementById("appearanceStatus");
-  if (status) status.textContent = appearance === "system" ? "Follows your system appearance." : `${appearance === "dark" ? "Dark" : "Light"} appearance is selected.`;
+  if (status) status.textContent = "";
 }
 function choose(next: Appearance, broadcast = false): void {
   appearance = next;

@@ -19,7 +19,7 @@ public enum RemoteURLPolicy {
             case .invalid(let detail): "Invalid remote host URL: \(detail)"
             case .hasCredentials: "Remote host URL must not contain username or password"
             case .missingHost: "Remote host URL must include a host"
-            case .requiresHTTPS: "Remote host URL must use HTTPS unless it is localhost or a private network address"
+            case .requiresHTTPS: "This address must start with https:// because the server isn't on this Mac, your home network or your Tailscale network."
             }
         }
     }

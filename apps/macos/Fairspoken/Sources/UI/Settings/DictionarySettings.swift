@@ -13,7 +13,7 @@ enum DictionarySettings {
         let suggestions = model.learned.suggestions
         var out: [Section] = []
         if !suggestions.isEmpty {
-            out.append(Section("Suggestions", footer: "Fixes you made that are never applied on their own. Accept one to correct it from now on.",
+            out.append(Section("Suggestions",
                                rows: suggestions.map { item in
                                    Row(id: "suggestion-\(item.id)", searchText: "Suggestion learned \(item.heard) \(item.intended)",
                                        view: SuggestionRow(item: item))
@@ -30,14 +30,14 @@ enum DictionarySettings {
                 view: CorrectionRow(correction: c, index: index))
         }
         out += [
-            Section("Your words", footer: "Spelt your way in every dictation, and sent to Bark Server as hints.",
+            Section("Your words",
                     trailing: AnyView(Count(used: s.vocabularyHints.count, of: AppSettings.maxVocabularyHints)), rows: terms),
-            Section("Corrections", footer: "Whole words and phrases, in any case, replaced in every dictation.",
+            Section("Corrections",
                     trailing: AnyView(Count(used: s.transcriptCorrections.count, of: AppSettings.maxCorrections)), rows: corrections),
             Section("Learning", rows: [
                 Row(id: "learn", searchText: "Learn from your corrections edits automatic learned", view: LearningRow()),
             ]),
-            Section("Packs", footer: "A pack's key terms are sent to your server after yours, up to 50 in all. They don't count toward your 50.",
+            Section("Packs",
                     rows: VocabularyPacks.all.map { pack in
                         Row(pack.name, detail: pack.description, keywords: "pack vocabulary terms", id: "pack-\(pack.id)") {
                             SettingSwitch(label: pack.name, isOn: Binding(get: { model.settings.settings.enabledPacks.contains(pack.id) }, set: { on in
@@ -200,7 +200,6 @@ private struct LearningRow: View {
         let s = model.settings.settings
         let last = s.learnFromEdits ? model.learned.lastChange : nil
         SettingsRow("Learn from your corrections",
-                    detail: "Fix a misheard word right after dictating: names join your words, and words misheard twice become corrections. Only the word pair is kept, never what you wrote.",
                     accessory: { EmptyView() },
                     below: {
                         if let last {
