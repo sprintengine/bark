@@ -737,7 +737,7 @@ private struct CorrectionComposer: View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topLeading) {
                 if !editing {
-                    Text("Correct the text: click here, change it, press ⏎ to save")
+                    Text("Correct the text")
                         .font(.system(size: 15))
                         .foregroundStyle(Crystal.ink2)
                         .padding(.leading, 5)

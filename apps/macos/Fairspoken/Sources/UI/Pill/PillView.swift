@@ -127,7 +127,6 @@ struct PillView: View {
     private func listeningRow(since: Date) -> some View {
         HStack(spacing: 6) {
             PillIconButton(symbol: "xmark", label: "Cancel", help: "Cancel (\(Self.cancelKey ?? "esc"))") { dictation.cancel() }
-            cancelHint.padding(.leading, -4)
             Circle().fill(Crystal.recording).frame(width: 8, height: 8).padding(.leading, 2).accessibilityHidden(true)
             TimelineView(.periodic(from: since, by: 1)) { ctx in
                 Text(Self.clock(ctx.date.timeIntervalSince(since)))
@@ -161,7 +160,6 @@ struct PillView: View {
         let label = dictation.transcribingNote ?? "Transcribing"
         return HStack(spacing: 6) {
             PillIconButton(symbol: "xmark", label: "Cancel", help: "Cancel (\(Self.cancelKey ?? "esc"))") { dictation.cancel() }
-            cancelHint.padding(.leading, -4)
             PillSpinner(reduceMotion: reduceMotion).padding(.leading, 2)
             // "Retrying the host (1 of 2)", "Transcribing on this Mac" once the first try failed.
             Text(label + "…")
@@ -243,19 +241,6 @@ struct PillView: View {
         .frame(height: Self.height)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Ready, \(shortcut) to dictate")
-    }
-
-    /// A quiet reminder that the cancel key (Escape unless changed) ends the dictation, while
-    /// listening and while transcribing.
-    @ViewBuilder private var cancelHint: some View {
-        if let key = Self.cancelKey {
-            Text("\(key) to cancel")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Crystal.ink3)
-                .lineLimit(1)
-                .fixedSize()
-                .accessibilityHidden(true)
-        }
     }
 
     static var cancelKey: String? {

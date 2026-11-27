@@ -17,7 +17,6 @@ struct HomeView: View {
                 }
                 HomeHeading()
                 HomeComposer().padding(.top, 22)
-                KeyHints().padding(.top, 14).padding(.horizontal, 4)
                 if !SetupGuide.isReady(model.setupChecklist()) {
                     SetupCard().padding(.top, 32)
                 } else if model.history.usage.totalDictations > 0 {
@@ -44,19 +43,11 @@ private struct HomeHeading: View {
         let s = model.settings.settings
         let push = s.recordingShortcutMode == .pushToTalk
         let key = s.fnPushToTalk ? "fn" : HotkeyController.currentShortcutSymbols
-        VStack(alignment: .leading, spacing: 6) {
-            Text(s.fnPushToTalk || push ? "Hold \(key) and speak." : "Press \(key) and speak.")
-                .font(TypeScale.title)
-                .tracking(-0.33)
-                .foregroundStyle(Crystal.ink)
-                .accessibilityAddTraits(.isHeader)
-            Text(s.fnPushToTalk || push
-                 ? "Let go and \(AppInfo.displayName) types it wherever your cursor is. If nothing can take it, it goes on the clipboard."
-                 : "Press it again and \(AppInfo.displayName) types it wherever your cursor is. If nothing can take it, it goes on the clipboard.")
-                .font(.system(size: 14))
-                .foregroundStyle(Crystal.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Text(s.fnPushToTalk || push ? "Hold \(key) and speak." : "Press \(key) and speak.")
+            .font(TypeScale.title)
+            .tracking(-0.33)
+            .foregroundStyle(Crystal.ink)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -284,37 +275,6 @@ private struct EngineChip: View {
         .onHover { hovered = $0 }
         .help("Where dictation runs")
         .accessibilityLabel(remote ? "Transcribing on Bark Server" : "Transcribing with \(model.models.activeModel.shortName) on this Mac")
-    }
-}
-
-/// Keyboard hints under the composer: only shortcuts that exist.
-private struct KeyHints: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let s = model.settings.settings
-        let shortcut = HotkeyController.currentShortcutSymbols
-        let push = s.recordingShortcutMode == .pushToTalk
-        FlowLayout(spacing: 18, lineSpacing: 6) {
-            if s.fnPushToTalk && push {
-                hint(["fn", shortcut], "hold to dictate")
-            } else {
-                if s.fnPushToTalk { hint(["fn"], "hold to dictate") }
-                hint([shortcut], push ? "hold to dictate" : "start or stop")
-            }
-            if let cancel = HotkeyController.cancelShortcutSymbols { hint([cancel == "⎋" ? "esc" : cancel], "cancel") }
-            hint(["⌘⏎"], "save a note")
-            hint(["⌘K"], "search")
-        }
-    }
-
-    private func hint(_ keys: [String], _ text: String) -> some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 3) { ForEach(keys, id: \.self) { Keycap(label: $0) } }
-            Text(text).font(.system(size: 12)).foregroundStyle(Crystal.ink3)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(keys.joined(separator: " or ")): \(text)")
     }
 }
 
