@@ -1,24 +1,31 @@
 /* ── Voice-reactive level meter ─────────────────────────────────
-   The pill's wave bars are driven by real capture levels streamed from the
-   backend as `audio-level` events; they sit flat through silence instead of
-   pulsing on a loop. */
+   The pill's waveform, as on the Mac: the last 0.8 s of the voice as thin
+   bars, newest on the right, each bar's height and strength following the
+   level it was heard at (a fifth of full height at rest). With reduced motion
+   the bars hold still at a fixed height and light up from the left with the
+   level instead. Levels come from the backend's `audio-level` events; the
+   bars sit flat through silence instead of pulsing on a loop. */
 
 const waveBars = Array.from(document.querySelectorAll<HTMLElement>(".wave span"));
 // Gate matches the backend's per-window speech RMS threshold, so the bars
 // consider "voice" exactly what the transcriber's gap detection does.
 const METER_GATE_RMS = 0.004;
-// Conversational speech sits well below the old 0.055 ceiling, so the bars
-// spent their time near the floor and barely moved. This is a normal speaking
-// voice at full scale; louder speech simply clamps.
+// A normal speaking voice at full scale; louder speech simply clamps.
 const METER_FULL_RMS = 0.026;
-const METER_FLOOR_SCALE = 0.12;
-// One weight per bar in index.html: tall in the middle, quieter at the ends.
-const METER_BAR_WEIGHTS = [0.42, 0.66, 0.88, 1, 0.8, 0.95, 0.72, 0.58, 0.4];
+// A bar at rest, as a fraction of the waveform's height.
+const REST_HEIGHT = 0.2;
+// Reduced motion: every bar at this height, lit or not.
+const STILL_HEIGHT = 0.4;
+// The history advances at 30 Hz, so 24 bars are the last 0.8 s.
+const SAMPLE_MS = 1000 / 30;
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 let meterTarget = 0;
 let meterDisplay = 0;
 let meterRafId: number | null = null;
+let lastSample = 0;
+// Oldest first; one value per bar.
+const history: number[] = waveBars.map(() => 0);
 // The meter keeps animating while this holds (the pill is recording).
 let keepRunning: () => boolean = () => false;
 
@@ -32,6 +39,8 @@ export function startMeter(isRecording: () => boolean): void {
   keepRunning = isRecording;
   meterTarget = 0;
   meterDisplay = 0;
+  history.fill(0);
+  lastSample = 0;
   if (meterRafId === null) meterFrame();
 }
 
@@ -44,20 +53,28 @@ export function stopMeter(): void {
   resetMeterBars();
 }
 
+function drawBar(bar: HTMLElement, height: number, level: number): void {
+  bar.style.transform = `scaleY(${height.toFixed(3)})`;
+  bar.style.opacity = (0.3 + 0.55 * level).toFixed(3);
+}
+
 function meterFrame(): void {
   meterRafId = requestAnimationFrame((time) => {
     const attack = 0.45;
     const decay = reducedMotionQuery.matches ? 0.08 : 0.18;
     meterDisplay += (meterTarget - meterDisplay) * (meterTarget > meterDisplay ? attack : decay);
-    // A slight per-bar shimmer while there is signal keeps the meter reading
-    // as a waveform; with reduced motion the bars track level only.
-    const shimmer = !reducedMotionQuery.matches && meterDisplay > 0.03;
-    waveBars.forEach((bar, index) => {
-      const wobble = shimmer ? 0.89 + 0.11 * Math.sin(time / 90 + index * 1.7) : 1;
-      const scale = METER_FLOOR_SCALE + meterDisplay * (METER_BAR_WEIGHTS[index] ?? 0.8) * wobble * (1 - METER_FLOOR_SCALE);
-      bar.style.transform = `scaleY(${Math.min(1, Math.max(METER_FLOOR_SCALE, scale)).toFixed(3)})`;
-    });
-    if (keepRunning() || meterDisplay > 0.02) {
+    if (time - lastSample >= SAMPLE_MS) {
+      lastSample = time;
+      history.shift();
+      history.push(meterDisplay);
+    }
+    if (reducedMotionQuery.matches) {
+      const lit = meterDisplay * waveBars.length;
+      waveBars.forEach((bar, i) => drawBar(bar, STILL_HEIGHT, lit > i + 0.5 ? 1 : 0));
+    } else {
+      waveBars.forEach((bar, i) => drawBar(bar, Math.max(REST_HEIGHT, history[i]), history[i]));
+    }
+    if (keepRunning() || history.some((value) => value > 0.02)) {
       meterFrame();
     } else {
       meterRafId = null;
@@ -66,10 +83,10 @@ function meterFrame(): void {
   });
 }
 
+/** Every bar at rest: a dotted line. */
 export function resetMeterBars(): void {
-  for (const bar of waveBars) {
-    bar.style.transform = `scaleY(${METER_FLOOR_SCALE})`;
-  }
+  history.fill(0);
+  for (const bar of waveBars) drawBar(bar, REST_HEIGHT, 0);
 }
 
 /** Feed one `audio-level` reading; true when it carries voice. */

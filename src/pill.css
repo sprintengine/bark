@@ -1,56 +1,27 @@
-/* Mini pill window — bottom-center capsule in the Crystal look: a white
-   capsule in light mode, graphite in dark (it follows the app's appearance
-   through appearance.ts). While recording it carries a live dot, a level
-   meter, the timer and the shortcut that stops it.
-   Self-contained: this window loads only this sheet. The fill stays opaque on
-   purpose (2026-06-09): the pill window is transparent but nothing behind it
-   is blurred, so translucency reads as smudge at this size. The sheen is a
-   still neutral gradient, so the capsule reads as a raised glass object. */
+/* Mini pill window: the floating voice capsule, drawn as the Mac pill is
+   (apps/macos/Fairspoken/Sources/UI/Pill/PillView.swift). An opaque capsule
+   in the card colour with a 1 px ring and a soft shadow; nothing behind it
+   shows through. Listening: the red dot, the timer, a waveform that follows
+   the voice and the blue finish button. Then transcribing, and what happened.
+   It follows the app's light or dark choice through appearance.ts.
+
+   The native window is resized per state (pill_window_bounds in lib.rs): the
+   capsule plus a margin for its shadow. Each state's content is sized to fit
+   the width that state gets. */
+
+@import "./theme.css";
 
 :root {
-  --pill-fill-top:    #ffffff;
-  --pill-fill-bottom: #eef0f2;
-  --pill-idle-top:    #f1f3f5;
-  --pill-idle-bottom: #dfe3e7;
-  --text-primary:     #15191d;
-  --text-secondary:   #5b6670;
-  --text-muted:       #8a949c;
-  --ready:            #2e8b5e;   /* client accent */
-  --live:             #d9483b;   /* microphone on */
-  --warn:             #9a6b12;
-  --error:            #b4283c;
-  --sweep:            rgba(46, 139, 94, 0.75);
-  --sweep-soft:       rgba(120, 132, 142, 0.55);
-  --pill-edge:        rgba(16, 24, 32, 0.12);
-  --pill-highlight:   rgba(255, 255, 255, 0.95);
-  --hairline:         rgba(16, 24, 32, 0.1);
-  --shadow:           0 1px 2px rgba(16, 24, 32, 0.14), 0 4px 12px -2px rgba(16, 24, 32, 0.2);
-  --key-fill:         rgba(16, 24, 32, 0.06);
-
-  --capsule-h:        32px;
-  --margin-x:         6px;
-  --margin-bottom:    7px;
+  --capsule-h: 34px;
+  --margin-x: 6px;
+  --margin-bottom: 6px;
+  --ring: rgba(0, 0, 0, 0.1);
+  --capsule-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 3px 6px -2px rgba(0, 0, 0, 0.16);
 }
 
 [data-mode="dark"] {
-  --pill-fill-top:    #2a2e33;
-  --pill-fill-bottom: #1c1f23;
-  --pill-idle-top:    #34383e;
-  --pill-idle-bottom: #24272b;
-  --text-primary:     #e8ecef;
-  --text-secondary:   #9aa4ad;
-  --text-muted:       #6b747c;
-  --ready:            #5ccb94;
-  --live:             #ff6e62;
-  --warn:             #e7b95a;
-  --error:            #ff7d8e;
-  --sweep:            rgba(92, 203, 148, 0.8);
-  --sweep-soft:       rgba(195, 204, 212, 0.55);
-  --pill-edge:        rgba(255, 255, 255, 0.12);
-  --pill-highlight:   rgba(255, 255, 255, 0.14);
-  --hairline:         rgba(255, 255, 255, 0.08);
-  --shadow:           0 1px 2px rgba(0, 0, 0, 0.42), 0 4px 12px -2px rgba(0, 0, 0, 0.5);
-  --key-fill:         rgba(255, 255, 255, 0.1);
+  --ring: rgba(255, 255, 255, 0.1);
+  --capsule-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 3px 6px -2px rgba(0, 0, 0, 0.6);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -62,11 +33,10 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: transparent;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  font-size: 12px;
-  letter-spacing: -0.01em;
+  font-family: var(--sem-font-family-ui);
+  font-size: 13px;
   line-height: 1.3;
-  color: var(--text-primary);
+  color: var(--bark-ink);
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
@@ -81,292 +51,309 @@ html, body {
 }
 
 /* ── Capsule ─────────────────────────────────────────────────── */
+/* As wide as what it says, up to the window; the states with a button
+   beside the capsule's content (the gear, Undo) take the full width. */
 .pill {
   position: relative;
-  width: 100%;
+  max-width: 100%;
   height: var(--capsule-h);
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 6px;
   border: none;
   border-radius: calc(var(--capsule-h) / 2);
-  padding: 0 12px;
+  padding: 0 14px 0 6px;
   font: inherit;
-  font-weight: 500;
-  color: var(--text-primary);
-  background: linear-gradient(180deg, var(--pill-fill-top) 0%, var(--pill-fill-bottom) 100%);
-  box-shadow:
-    inset 0 1px 0 var(--pill-highlight),
-    inset 0 0 0 1px var(--pill-edge),
-    var(--shadow);
+  color: var(--bark-ink);
+  background: var(--bark-card);
+  box-shadow: inset 0 0 0 1px var(--ring), var(--capsule-shadow);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
 }
 
+body[data-pill="hover"] .pill,
+body[data-pill="polished"] .pill,
+body[data-pill="error"] .pill { width: 100%; }
+
 .pill:focus-visible {
-  outline: 2px solid var(--ready);
+  outline: 2px solid var(--bark-primary);
   outline-offset: 2px;
 }
 
-/* Idle stays subtle through a quieter solid fill, not opacity — the capsule
-   must never read as see-through. */
+/* Idle: a short handle, the capsule's colour and ring, nothing in it.
+   Hovering it opens the ready capsule. */
 body[data-pill="idle"] .pill {
+  width: 100%;
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(180deg, var(--pill-idle-top) 0%, var(--pill-idle-bottom) 100%);
-  box-shadow:
-    inset 0 1px 0 var(--pill-highlight),
-    inset 0 0 0 1px var(--hairline),
-    0 1px 4px rgba(0, 0, 0, 0.18),
-    0 3px 8px rgba(0, 0, 0, 0.12);
+  padding: 0;
 }
 
 body[data-pill="idle"] .pill > * { display: none; }
 
-/* Recording keeps a faint live-red edge; nothing else glows. */
-body[data-pill="recording"] .pill {
-  box-shadow:
-    inset 0 1px 0 var(--pill-highlight),
-    inset 0 0 0 1px color-mix(in srgb, var(--live) 38%, transparent),
-    var(--shadow);
+/* An error: a red wash and a red ring. */
+body[data-pill="error"] .pill {
+  background: linear-gradient(color-mix(in srgb, var(--bark-recording) 5%, transparent), color-mix(in srgb, var(--bark-recording) 5%, transparent)), var(--bark-card);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bark-recording) 28%, transparent), var(--capsule-shadow);
+  padding: 0 40px 0 12px;
+}
+[data-mode="dark"] body[data-pill="error"] .pill {
+  background: linear-gradient(color-mix(in srgb, var(--bark-recording) 7%, transparent), color-mix(in srgb, var(--bark-recording) 7%, transparent)), var(--bark-card);
 }
 
-/* Transcribing: a quiet silver-to-green sheen travels around the edge.
-   Drawn inside the capsule so `overflow: hidden` cannot clip it. */
-@property --pill-rim-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-.pill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--pill-rim-angle),
-    transparent 0deg,
-    var(--sweep-soft) 50deg,
-    var(--sweep) 110deg,
-    transparent 165deg,
-    transparent 360deg
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-body[data-pill="transcribing"] .pill::after {
-  opacity: 1;
-  animation: pill-rim-sweep 2.4s linear infinite;
-}
-@keyframes pill-rim-sweep {
-  to { --pill-rim-angle: 360deg; }
+/* ── Parts ───────────────────────────────────────────────────── */
+/* Everything is hidden until a state asks for it (the matrix below). */
+.brand-mark, .glyph, .glyph svg, .spinner, .status-dot, .timer, .pill-label,
+.wave, .pill-hint, .finish { display: none; flex: none; }
+
+/* The sheepdog, as on the ready capsule. */
+.brand-mark {
+  width: 20px;
+  height: 20px;
+  margin: 0 4px;
+  border-radius: 4.5px;
+  background: #000000;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.24), 0 0.5px 1px rgba(0, 0, 0, 0.25);
 }
 
-/* ── Capsule content ─────────────────────────────────────────── */
-.status-dot {
-  width: 6px;
-  height: 6px;
+/* The state's glyph in a 24 px square at the capsule's start. */
+.glyph {
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: var(--bark-ink);
+}
+.glyph svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Cancel (the capsule's click while transcribing) reads like the Mac's
+   muted round button. */
+body[data-pill="transcribing"] .glyph { width: 26px; height: 26px; border-radius: 50%; color: var(--bark-ink-2); }
+body[data-pill="transcribing"] .pill:hover .glyph { background: var(--bark-row-hover); color: var(--bark-ink); }
+body[data-pill="transcribing"] .glyph svg { width: 13px; height: 13px; stroke-width: 2.2; }
+body[data-pill="error"] .glyph { width: 18px; color: var(--bark-error); }
+body[data-pill="error"] .glyph svg { width: 16px; height: 16px; stroke-width: 1.8; }
+
+/* A 14 px ring with one lit quarter, turning; still with reduced motion. */
+.spinner {
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
   border-radius: 50%;
-  flex: none;
-  background: var(--ready);
+  border: 2px solid color-mix(in srgb, var(--bark-ink) 14%, transparent);
+  border-top-color: var(--bark-ink-2);
+  animation: pill-spin 0.8s linear infinite;
 }
+@keyframes pill-spin { to { transform: rotate(360deg); } }
 
-/* Recording: the live dot wears a soft halo, as in the native pill. */
-body[data-pill="recording"] .status-dot {
+.status-dot {
   width: 8px;
   height: 8px;
-  margin: 0 2px;
-  background: var(--live);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 28%, transparent);
-}
-body[data-pill="error"] .status-dot { background: var(--error); }
-body[data-pill="starting"] .status-dot { background: var(--text-muted); }
-body[data-pill="transcribing"] .status-dot { background: var(--text-secondary); }
-
-.brand {
-  font-weight: 600;
-  letter-spacing: -0.005em;
-}
-
-body[data-long-hint][data-pill="hover"] .brand { display: none; }
-
-.pill-label {
-  color: var(--text-primary);
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-left: 10px;
+  border-radius: 50%;
+  background: var(--bark-recording);
 }
 
 .timer {
-  color: var(--text-secondary);
-  font-family: ui-rounded, -apple-system, system-ui, sans-serif;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
+  color: var(--bark-ink-2);
 }
 
-.pill-hint {
-  font: 600 11px/18px ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
-  color: var(--text-secondary);
-  background: var(--key-fill);
-  border-radius: 5px;
-  padding: 0 6px;
+/* The words: a title in ink, then a quieter detail ("saved in History"). */
+.pill-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--bark-ink);
+}
+.label-title { font-weight: 500; }
+.label-detail { color: var(--bark-ink-2); }
+.pill-label kbd { margin: 0 1px; }
+body[data-pill="starting"] .pill-label,
+body[data-pill="transcribing"] .pill-label { margin-left: 2px; color: var(--bark-ink-2); }
+body[data-pill="starting"] .label-title,
+body[data-pill="transcribing"] .label-title { font-weight: 400; }
+body[data-pill="starting"] .label-title::after,
+body[data-pill="transcribing"] .label-title::after { content: "…"; }
+body[data-pill="error"] .pill-label { color: var(--bark-error); }
+body[data-pill="error"] .label-title { font-weight: 400; }
+body[data-pill="error"] .label-detail { color: color-mix(in srgb, var(--bark-error) 75%, transparent); }
+
+/* A key, as the Mac's small keycap: 11 px medium on a faint fill. */
+.pill-label kbd { display: inline-grid; }
+.pill-hint, .pill-label kbd {
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--bark-key-fill);
+  color: var(--bark-ink-2);
+  font: 500 11px/1 var(--sem-font-family-ui);
+  vertical-align: middle;
 }
 
-/* Recording: the live dot, the level and the timer, nothing else. The keys
-   that stop or cancel are explained in Settings and the setup guide. */
-body[data-pill="recording"] .pill { gap: 9px; }
-
-/* Visibility matrix: every state shows the dot plus its own content. */
-body[data-pill="hover"] .pill-label,
-body[data-pill="hover"] .timer,
-body[data-pill="hover"] .wave,
-body[data-pill="starting"] .wave,
-body[data-pill="starting"] .timer,
-body[data-pill="starting"] .pill-hint,
-body[data-pill="recording"] .brand,
-body[data-pill="recording"] .pill-label,
-body[data-pill="recording"] .pill-hint,
-body[data-pill="transcribing"] .brand,
-body[data-pill="transcribing"] .wave,
-body[data-pill="transcribing"] .timer,
-body[data-pill="transcribing"] .pill-hint,
-body[data-pill="copied"] .brand,
-body[data-pill="copied"] .wave,
-body[data-pill="copied"] .timer,
-body[data-pill="copied"] .pill-hint,
-body[data-pill="notice"] .brand,
-body[data-pill="notice"] .wave,
-body[data-pill="notice"] .timer,
-body[data-pill="notice"] .pill-hint,
-body[data-pill="error"] .brand,
-body[data-pill="error"] .wave,
-body[data-pill="error"] .timer,
-body[data-pill="error"] .pill-hint {
-  display: none;
-}
-
-/* ── Waveform — a real level meter while recording ─────────────
-   Bar heights are driven by main.ts from backend `audio-level` events; the
-   bars sit at their floor scale through silence and rise with the voice.
-   No keyframe loop: motion means signal. */
+/* ── Waveform ────────────────────────────────────────────────── */
+/* 24 bars 2 px wide with 2 px gaps, 16 px high, newest on the right; a narrow
+   pill shows the newest ones. Heights and strengths come from pillMeter.ts. */
 .wave {
-  display: flex;
+  height: 16px;
+  min-width: 0;
+  max-width: 94px;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
-  height: 18px;
+  overflow: hidden;
 }
-
 .wave span {
-  width: 3px;
-  border-radius: 1.5px;
-  background: var(--text-secondary);
-  transform: scaleY(0.12);
-  transform-origin: center;
-  will-change: transform;
+  flex: none;
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--bark-ink);
+  opacity: 0.3;
+  transform: scaleY(0.2);
+  will-change: transform, opacity;
 }
 
-/* While recording the level reads in ink, quieter at the edges; the dot
-   beside it carries the live red. */
-body[data-pill="recording"] .wave span { background: var(--text-primary); opacity: 0.85; }
-body[data-pill="recording"] .wave span:first-child,
-body[data-pill="recording"] .wave span:last-child { opacity: 0.45; }
-body[data-pill="recording"] .wave span:nth-child(2),
-body[data-pill="recording"] .wave span:nth-child(8) { opacity: 0.65; }
-
-.wave span { height: 18px; }
-
-/* ── AI polish undo — trailing action in the polished state ──── */
-body[data-pill="polished"] .brand,
-body[data-pill="polished"] .wave,
-body[data-pill="polished"] .timer,
-body[data-pill="polished"] .pill-hint {
-  display: none;
+/* Finish: the one blue thing on the pill. The capsule's click finishes. */
+.finish {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  place-items: center;
+  color: var(--bark-on-accent);
+  background: var(--bark-primary);
 }
+.pill:hover .finish { background: color-mix(in srgb, var(--bark-primary) 88%, transparent); }
+.finish svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── What each state shows ───────────────────────────────────── */
+/* Ready (hover): the mark, the waveform at rest, the shortcut; the gear sits
+   at the end. A long shortcut takes the waveform's room. */
+body[data-pill="hover"] .pill { padding: 0 40px 0 4px; }
+body[data-pill="hover"] .brand-mark { display: block; }
+body[data-pill="hover"] .wave { display: flex; flex: 0 1 54px; }
+body[data-pill="hover"] .pill-hint { display: inline-grid; margin-left: 4px; }
+body[data-long-hint][data-pill="hover"] .wave { display: none; }
+
+/* Starting: the spinner and "Starting…". */
+body[data-pill="starting"] .spinner,
+body[data-pill="starting"] .pill-label { display: block; }
+body[data-pill="starting"] .pill { padding-left: 12px; }
+
+/* Listening: the dot, the timer, the waveform, finish. */
+body[data-pill="recording"] .pill { padding: 0 4px; width: 100%; }
+body[data-pill="recording"] .status-dot,
+body[data-pill="recording"] .timer { display: block; }
+body[data-pill="recording"] .wave { display: flex; flex: 1 1 94px; margin: 0 2px; }
+body[data-pill="recording"] .finish { display: grid; }
+
+/* Transcribing: cancel, the spinner, "Transcribing…". */
+body[data-pill="transcribing"] .pill { padding-left: 4px; }
+body[data-pill="transcribing"] .glyph,
+body[data-pill="transcribing"] .g-cancel { display: grid; }
+body[data-pill="transcribing"] .spinner,
+body[data-pill="transcribing"] .pill-label { display: block; }
+
+/* What happened: a glyph and the words. */
+body[data-pill="copied"] .glyph,
+body[data-pill="notice"] .glyph,
+body[data-pill="polished"] .glyph,
+body[data-pill="error"] .glyph { display: grid; }
+body[data-pill="copied"] .pill-label,
+body[data-pill="notice"] .pill-label,
+body[data-pill="polished"] .pill-label,
+body[data-pill="error"] .pill-label { display: block; }
+body[data-pill="copied"] .g-clipboard,
+body[data-pill="notice"] .g-clipboard,
+body[data-pill="copied"][data-outcome="inserted"] .g-check,
+body[data-pill="notice"][data-outcome="notCopied"] .g-history,
+body[data-pill="polished"] .g-check,
+body[data-pill="error"] .g-warning { display: block; }
+body[data-pill="copied"][data-outcome="inserted"] .g-clipboard,
+body[data-pill="notice"][data-outcome="notCopied"] .g-clipboard { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
+
+/* ── AI polish undo: a ghost text button at the end ──────────── */
+body[data-pill="polished"] .pill { padding-right: 70px; }
 
 .undo-polish-btn {
   position: absolute;
-  right: calc(var(--margin-x) + 6px);
-  bottom: calc(var(--margin-bottom) + (var(--capsule-h) - 22px) / 2);
-  height: 22px;
+  right: calc(var(--margin-x) + 3px);
+  bottom: calc(var(--margin-bottom) + (var(--capsule-h) - 28px) / 2);
+  height: 28px;
   padding: 0 10px;
   display: none;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--pill-edge);
-  border-radius: 11px;
+  border: none;
+  border-radius: 14px;
   background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  font-weight: 600;
+  color: var(--bark-ink);
+  font: 500 13px/1 var(--sem-font-family-ui);
   cursor: pointer;
 }
 
 body[data-pill="polished"] .undo-polish-btn { display: flex; }
-/* Keep the Undo button clear of the label. */
-body[data-pill="polished"] .pill { padding-right: 64px; justify-content: flex-start; }
 
-.undo-polish-btn:hover { border-color: var(--text-secondary); }
+.undo-polish-btn:hover { background: var(--bark-row-hover); }
 
 .undo-polish-btn:focus-visible {
-  outline: 2px solid var(--ready);
+  outline: 2px solid var(--bark-primary);
   outline-offset: 1px;
 }
 
-/* ── Settings gear — hover-revealed trailing action ───────────── */
+/* ── Settings gear: a round icon button at the end ───────────── */
+/* On the ready capsule, and on an error, where the capsule itself retries:
+   Settings must stay one click away. */
 .settings-btn {
   position: absolute;
-  right: calc(var(--margin-x) + 6px);
-  bottom: calc(var(--margin-bottom) + (var(--capsule-h) - 22px) / 2);
-  width: 22px;
-  height: 22px;
+  right: calc(var(--margin-x) + 3px);
+  bottom: calc(var(--margin-bottom) + (var(--capsule-h) - 28px) / 2);
+  width: 28px;
+  height: 28px;
   display: none;
   align-items: center;
   justify-content: center;
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--bark-ink-2);
   cursor: pointer;
 }
 
 body[data-pill="hover"] .settings-btn,
 body[data-pill="error"] .settings-btn { display: flex; }
 
-/* In the error state the capsule is the retry action, so the gear must stay
-   reachable — otherwise the user is stuck with no path to settings. Reserve
-   its width so long error labels never run underneath it. */
-body[data-pill="error"] .pill { padding-right: 36px; }
-
-.settings-btn:hover { color: var(--text-primary); }
+.settings-btn:hover { color: var(--bark-ink); background: var(--bark-row-hover); }
 
 .settings-btn:focus-visible {
-  outline: 2px solid var(--ready);
+  outline: 2px solid var(--bark-primary);
   outline-offset: 1px;
 }
 
 .settings-event-badge {
   position: absolute;
-  top: 1px;
-  right: 1px;
+  top: 3px;
+  right: 3px;
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--warn);
+  background: var(--bark-warn);
 }
 
-.settings-event-badge[data-severity="error"] { background: var(--error); }
+.settings-event-badge[data-severity="error"] { background: var(--bark-error); }
 .settings-event-badge[data-severity="none"] { display: none; }
-
-@media (prefers-reduced-motion: reduce) {
-  body[data-pill="transcribing"] .pill::after { animation: none; }
-}
-
-/* Hover: the gear sits at the trailing end, so the content keeps clear of it. */
-body[data-pill="hover"] .pill { gap: 7px; padding: 0 40px 0 12px; justify-content: flex-start; }

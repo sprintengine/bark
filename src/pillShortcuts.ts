@@ -105,9 +105,9 @@ export async function registerGlobalShortcuts(settings = shortcutSettings): Prom
   });
 }
 
-// The hover pill has room for the name and a short chord ("⌘⇧1",
-// "Ctrl+Shift+1"); a longer one takes the name's place so it never runs
-// under the settings gear.
+// The ready capsule has room for the mark, the resting waveform and a short
+// chord ("⌘⇧1", "Ctrl+Shift+1"); a longer one takes the waveform's place so
+// it never runs under the settings gear.
 function showHint(shortcut: string): void {
   const text = shortcutHint(shortcut);
   pillHint.textContent = text;

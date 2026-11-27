@@ -9,6 +9,9 @@
 </head>
 <body data-pill="idle">
   <div class="window" id="app">
+    <!-- The whole capsule is one button (start, finish, cancel, retry), so the
+         parts inside it are drawn, not separate controls; pill.css shows the
+         ones each state needs. -->
     <button
       class="pill"
       id="recordBtn"
@@ -16,14 +19,27 @@
       aria-pressed="false"
       title="Click to record"
     >
-      <span class="status-dot" id="statusDot" aria-hidden="true"></span>
-      <span class="wave" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      <img class="brand-mark" src="/src/assets/brand/dog-tile.jpg" alt="" aria-hidden="true" />
+      <span class="glyph" aria-hidden="true">
+        <svg class="g-cancel" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+        <svg class="g-check" viewBox="0 0 24 24"><path d="M5 12.8l4.6 4.6L19 7.6"/></svg>
+        <svg class="g-clipboard" viewBox="0 0 24 24"><path d="M9 4.5H7.5A1.5 1.5 0 0 0 6 6v13.5A1.5 1.5 0 0 0 7.5 21h9a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15"/><rect x="9" y="3" width="6" height="3.2" rx="1"/><path d="M9.5 11h5M9.5 14.5h5"/></svg>
+        <svg class="g-history" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.2 3.8v3.6h3.6"/><path d="M12 8v4.3l2.8 1.8"/></svg>
+        <svg class="g-warning" viewBox="0 0 24 24"><path d="M10.3 4.4 2.9 17.5A2 2 0 0 0 4.6 20.5h14.8a2 2 0 0 0 1.7-3L13.7 4.4a2 2 0 0 0-3.4 0Z"/><path d="M12 9.5v4.2"/><path d="M12 17.1v.1"/></svg>
       </span>
-      <span class="brand" aria-hidden="true">Bark</span>
-      <span class="pill-label" id="statusLabel" role="status" aria-live="polite">Ready</span>
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="status-dot" id="statusDot" aria-hidden="true"></span>
       <span class="timer" id="timer" aria-label="Recording duration" aria-live="polite"></span>
+      <span class="pill-label" id="statusLabel" role="status" aria-live="polite">Ready</span>
+      <span class="wave" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </span>
       <kbd class="pill-hint" id="pillHint" aria-hidden="true"></kbd>
+      <span class="finish" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M5.5 12.6l4.3 4.3L18.5 8"/></svg>
+      </span>
     </button>
 
     <button class="undo-polish-btn" id="undoPolishBtn" aria-label="Undo AI edit: copy the original transcript" title="Copy the original transcript">Undo</button>

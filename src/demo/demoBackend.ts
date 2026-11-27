@@ -5,9 +5,16 @@
 //
 // `?demo&theme=light` picks the theme; `?demo&empty` starts with no history.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import { pillDemo } from "./demoPill";
 
 const params = new URLSearchParams(location.search);
 const active = params.has("demo") && !("__TAURI_INTERNALS__" in window);
+
+// `&platform=windows` draws Windows keys (Ctrl, Shift) on a Mac.
+if (active && params.get("platform") === "windows") {
+  Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+  Object.defineProperty(navigator, "userAgent", { get: () => "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" });
+}
 
 const MIN = 60_000;
 const now = Date.now();
@@ -122,7 +129,10 @@ function respond(cmd: string, args: Record<string, unknown> | undefined): unknow
 
 if (active) {
   mockWindows("home");
-  mockIPC((cmd, args) => respond(cmd, args as Record<string, unknown> | undefined));
+  // `&pill=<state>` drives the recording pill (demoPill.ts); its events are mocked too.
+  const pill = pillDemo(params);
+  const answer = pill ? pill.respond(respond) : respond;
+  mockIPC((cmd, args) => answer(cmd, args as Record<string, unknown> | undefined), { shouldMockEvents: pill !== null });
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark") localStorage.setItem("fairspoken.appearance", theme);
 }
