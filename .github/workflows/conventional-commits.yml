@@ -1,6 +1,6 @@
 name: Conventional Commits
 
-# Pull requests are squash-merged with the PR title as the commit subject, and
+# Pull requests are merged with a merge commit whose subject is the PR title, and
 # that subject decides the next version (scripts/release/main-release.mjs), so
 # the title is checked here before it can land.
 on:
