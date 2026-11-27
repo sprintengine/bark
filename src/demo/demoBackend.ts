@@ -145,6 +145,15 @@ if (active) {
   const driver = pillDemo(params) ?? onboardingDemo(params);
   const answer = driver ? driver.respond(respond) : respond;
   mockIPC((cmd, args) => answer(cmd, args as Record<string, unknown> | undefined), { shouldMockEvents: driver !== null });
+  // `&palette` (or `&palette=<query>`) opens Ctrl+K once the window is up.
+  if (params.has("palette")) {
+    setTimeout(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, metaKey: params.get("platform") === "mac", bubbles: true }));
+      const query = params.get("palette");
+      const field = document.querySelector<HTMLInputElement>("[role=dialog] input");
+      if (query && field) { field.value = query; field.dispatchEvent(new Event("input", { bubbles: true })); }
+    }, 600);
+  }
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark") localStorage.setItem("fairspoken.appearance", theme);
 }

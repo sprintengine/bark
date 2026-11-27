@@ -814,3 +814,8 @@ h1, h2, h3, p { margin: 0; }
 .model-table-head { color: var(--bark-ink-2); font-size: 12px; }
 .model-sort-btn { color: inherit; }
 .model-row + .model-row, .model-detail + .model-row { box-shadow: 0 -1px 0 var(--bark-hairline-soft); }
+
+/* Fields that are the whole surface (the palette's, the boxes) show focus
+   by their caret, not a ring. */
+.palette-input:focus-visible, .composer textarea:focus-visible, .sb-search input:focus-visible,
+.mic-picker select:focus-visible, .ds-input--seamless:focus-visible { outline: none; }
